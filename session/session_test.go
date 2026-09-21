@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (C) 2026 Fabrintek Engenharia Digital Ltda
 
-package chirp_test
+package session_test
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 )
 
 func TestChirp_CodeGenerationAndFormatting(t *testing.T) {
-	code, err := chirp.GenerateCode()
+	code, err := session.GenerateCode()
 	if err != nil {
 		t.Fatalf("GenerateCode failed: %v", err)
 	}
@@ -22,12 +22,12 @@ func TestChirp_CodeGenerationAndFormatting(t *testing.T) {
 		t.Fatalf("Expected 6 digits, got %d (%s)", len(code), code)
 	}
 
-	formatted := chirp.FormatCode(code)
+	formatted := session.FormatCode(code)
 	if len(formatted) != 7 || formatted[3] != '-' {
 		t.Fatalf("Expected formatted code XXX-XXX, got %s", formatted)
 	}
 
-	normalized, err := chirp.NormalizeCode(formatted)
+	normalized, err := session.NormalizeCode(formatted)
 	if err != nil {
 		t.Fatalf("NormalizeCode failed: %v", err)
 	}
@@ -51,7 +51,7 @@ func TestChirp_CodeGenerationAndFormatting(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		got, err := chirp.NormalizeCode(tc.input)
+		got, err := session.NormalizeCode(tc.input)
 		if (err != nil) != tc.wantErr {
 			t.Errorf("NormalizeCode(%q) error = %v, wantErr %v", tc.input, err, tc.wantErr)
 		}
@@ -62,7 +62,7 @@ func TestChirp_CodeGenerationAndFormatting(t *testing.T) {
 }
 
 func TestChirp_SessionLifecycleFlow(t *testing.T) {
-	sm := chirp.NewSessionManager(10 * time.Minute)
+	sm := session.NewSessionManager(10 * time.Minute)
 	defer sm.Close()
 
 	// 1. Create Session
@@ -71,7 +71,7 @@ func TestChirp_SessionLifecycleFlow(t *testing.T) {
 		t.Fatalf("CreateSession failed: %v", err)
 	}
 
-	if sess.State != chirp.StatePending {
+	if sess.State != session.StatePending {
 		t.Fatalf("Expected StatePending, got %s", sess.State)
 	}
 	if sess.TechnicianName != "Alice Technician" {
@@ -97,7 +97,7 @@ func TestChirp_SessionLifecycleFlow(t *testing.T) {
 	}
 
 	// 2. Connect Client
-	clientInfo := &chirp.ClientInfo{
+	clientInfo := &session.ClientInfo{
 		Hostname: "workstation-alpha",
 		OS:       "Linux Ubuntu 24.04",
 		Arch:     "x86_64",
@@ -107,7 +107,7 @@ func TestChirp_SessionLifecycleFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ConnectClient failed: %v", err)
 	}
-	if connected.State != chirp.StateConnected {
+	if connected.State != session.StateConnected {
 		t.Fatalf("Expected StateConnected, got %s", connected.State)
 	}
 	if connected.ClientInfo.Hostname != "workstation-alpha" {
@@ -119,7 +119,7 @@ func TestChirp_SessionLifecycleFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RequestConsent failed: %v", err)
 	}
-	if consentReq.State != chirp.StateConsentRequested {
+	if consentReq.State != session.StateConsentRequested {
 		t.Fatalf("Expected StateConsentRequested, got %s", consentReq.State)
 	}
 
@@ -128,7 +128,7 @@ func TestChirp_SessionLifecycleFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SubmitConsent failed: %v", err)
 	}
-	if consentRes.State != chirp.StateConsentGranted {
+	if consentRes.State != session.StateConsentGranted {
 		t.Fatalf("Expected StateConsentGranted, got %s", consentRes.State)
 	}
 	if !consentRes.Consent.Granted {
@@ -140,7 +140,7 @@ func TestChirp_SessionLifecycleFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ActivateSession failed: %v", err)
 	}
-	if activeSess.State != chirp.StateActive {
+	if activeSess.State != session.StateActive {
 		t.Fatalf("Expected StateActive, got %s", activeSess.State)
 	}
 
@@ -155,7 +155,7 @@ func TestChirp_SessionLifecycleFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("EndSession failed: %v", err)
 	}
-	if endedSess.State != chirp.StateTerminated {
+	if endedSess.State != session.StateTerminated {
 		t.Fatalf("Expected StateTerminated, got %s", endedSess.State)
 	}
 
@@ -166,7 +166,7 @@ func TestChirp_SessionLifecycleFlow(t *testing.T) {
 }
 
 func TestChirp_ConsentDeniedFlow(t *testing.T) {
-	sm := chirp.NewSessionManager(10 * time.Minute)
+	sm := session.NewSessionManager(10 * time.Minute)
 	defer sm.Close()
 
 	sess, _ := sm.CreateSession("tech-2", "Bob Tech", 5*time.Minute)
@@ -177,7 +177,7 @@ func TestChirp_ConsentDeniedFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SubmitConsent failed: %v", err)
 	}
-	if denied.State != chirp.StateConsentDenied {
+	if denied.State != session.StateConsentDenied {
 		t.Fatalf("Expected StateConsentDenied, got %s", denied.State)
 	}
 	if denied.Consent.Granted != false {
@@ -192,7 +192,7 @@ func TestChirp_ConsentDeniedFlow(t *testing.T) {
 }
 
 func TestChirp_WaitForConsent(t *testing.T) {
-	sm := chirp.NewSessionManager(10 * time.Minute)
+	sm := session.NewSessionManager(10 * time.Minute)
 	defer sm.Close()
 
 	sess, _ := sm.CreateSession("tech-3", "Charlie", 5*time.Minute)
@@ -217,7 +217,7 @@ func TestChirp_WaitForConsent(t *testing.T) {
 }
 
 func TestChirp_ExpirationTTL(t *testing.T) {
-	sm := chirp.NewSessionManager(50 * time.Millisecond)
+	sm := session.NewSessionManager(50 * time.Millisecond)
 	defer sm.Close()
 
 	sess, err := sm.CreateSession("tech-4", "Dave", 50*time.Millisecond)
@@ -229,13 +229,13 @@ func TestChirp_ExpirationTTL(t *testing.T) {
 
 	// Connect on expired session should return ErrSessionExpired
 	_, err = sm.ConnectClient(sess.Code, nil)
-	if err != chirp.ErrSessionExpired {
+	if err != session.ErrSessionExpired {
 		t.Fatalf("Expected ErrSessionExpired, got %v", err)
 	}
 }
 
 func TestChirp_SubscriptionEvents(t *testing.T) {
-	sm := chirp.NewSessionManager(10 * time.Minute)
+	sm := session.NewSessionManager(10 * time.Minute)
 	defer sm.Close()
 
 	sess, _ := sm.CreateSession("tech-5", "Eve", 5*time.Minute)
@@ -246,7 +246,7 @@ func TestChirp_SubscriptionEvents(t *testing.T) {
 	// Initial receive
 	select {
 	case s := <-ch:
-		if s.State != chirp.StatePending {
+		if s.State != session.StatePending {
 			t.Fatalf("Expected initial state StatePending, got %s", s.State)
 		}
 	case <-time.After(500 * time.Millisecond):
@@ -255,12 +255,12 @@ func TestChirp_SubscriptionEvents(t *testing.T) {
 
 	// Trigger connection update
 	go func() {
-		_, _ = sm.ConnectClient(sess.Code, &chirp.ClientInfo{Hostname: "host-1"})
+		_, _ = sm.ConnectClient(sess.Code, &session.ClientInfo{Hostname: "host-1"})
 	}()
 
 	select {
 	case s := <-ch:
-		if s.State != chirp.StateConnected {
+		if s.State != session.StateConnected {
 			t.Fatalf("Expected update state StateConnected, got %s", s.State)
 		}
 	case <-time.After(500 * time.Millisecond):
@@ -269,7 +269,7 @@ func TestChirp_SubscriptionEvents(t *testing.T) {
 }
 
 func TestChirp_ConcurrentAccess(t *testing.T) {
-	sm := chirp.NewSessionManager(10 * time.Minute)
+	sm := session.NewSessionManager(10 * time.Minute)
 	defer sm.Close()
 
 	var wg sync.WaitGroup
