@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*.*.*' ]
+  pull_request:
+    branches: [ main ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Build, Test & SAST
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with:
+          go-version: '1.26'
+
+      - name: Build & Vet
+        run: |
+          go build ./...
+          go vet ./...
+
+      - name: Cross-compile Check (Windows / macOS)
+        env:
+          CGO_ENABLED: 0
+        run: |
+          GOOS=windows GOARCH=amd64 go build ./...
+          GOOS=darwin GOARCH=amd64 go build ./...
+
+      - name: Lint
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: v2.13.2
+          install-mode: goinstall
+          skip-cache: true
+
+      - name: Test
+        run: go test -race -coverprofile=coverage.out ./...
+
+      - name: SAST (gosec)
+        run: go run github.com/securego/gosec/v2/cmd/gosec@v2.22.1 ./...
+
+      - name: Vulnerability Check (govulncheck)
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.7.0 ./...
