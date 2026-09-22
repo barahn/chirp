@@ -44,9 +44,30 @@ These are constraints on what Chirp may become, not features to be traded away:
   and relay infrastructure. Any hosted service is a convenience, never a
   requirement.
 
+## Contributions are closed for now
+
+Chirp is not accepting external contributions yet. Issues and bug reports are
+welcome; pull requests from outside Fabrintek will not be merged.
+
+This is deliberate and temporary. Chirp is dual-licensed (see
+[LICENSING.md](LICENSING.md)), which works only while Fabrintek holds the
+copyright in all of it. Merging a contribution before Contributor License
+Agreement acceptance is enforced here would leave code in the tree that
+Fabrintek cannot relicense — quietly, and in a way no build or test would
+catch.
+
+Rather than accept contributions under terms that are written down in another
+repository and shown to nobody, the door stays shut until the CLA is presented
+and recorded where pull requests actually arrive. See
+[CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## Licence
 
 GNU Affero General Public License v3.0 — see [LICENSE](LICENSE).
 
 The AGPL is deliberate: Chirp is network-delivered software, and the AGPL is
 what keeps a hosted fork from taking the code without returning changes.
+
+Fabrintek, as sole copyright holder, also licenses Chirp under separate
+commercial terms. This does not affect your rights under the AGPL — see
+[LICENSING.md](LICENSING.md).
