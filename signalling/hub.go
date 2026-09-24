@@ -78,6 +78,21 @@ func (p *pair) set(r Role, c Conn) {
 
 func (p *pair) empty() bool { return p.technician == nil && p.agent == nil }
 
+// Admissible reports whether a session is in a state that may still signal.
+//
+// It lives here, and is exported, so that the HTTP layer can refuse before
+// upgrading a WebSocket rather than after: a peer rejected post-upgrade has to
+// read the reason off a socket, where the same refusal before it is a status
+// code every client already understands. Two copies of this rule would
+// eventually disagree, and the one that mattered would be whichever ran last.
+func Admissible(s *session.Session) error {
+	switch s.State {
+	case session.StateExpired, session.StateTerminated, session.StateConsentDenied:
+		return ErrNotPermitted
+	}
+	return nil
+}
+
 // Hub routes messages between the peers of each session.
 type Hub struct {
 	sessions *session.SessionManager
@@ -114,10 +129,8 @@ func (h *Hub) Join(sessionID string, role Role, conn Conn) error {
 	if err != nil {
 		return err
 	}
-	switch sess.State {
-	case session.StateExpired, session.StateTerminated,
-		session.StateConsentDenied:
-		return ErrNotPermitted
+	if err := Admissible(sess); err != nil {
+		return err
 	}
 
 	h.mu.Lock()
