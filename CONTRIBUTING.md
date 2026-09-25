@@ -79,6 +79,20 @@ the text a contributor certifies says nothing about relicensing. When CLA
 enforcement lands here it will be a distinct, recorded act, not an inference
 drawn from a sign-off.
 
+## Branching model
+
+`develop` is the default branch and where work is integrated. `main` holds what
+has been integrated, and releases are tagged from it.
+
+```
+feature/*  ──▶  develop  ──▶  main  ──▶  tag v*.*.*
+```
+
+Branch from `develop` and open pull requests against `develop`. Nothing targets
+`main` directly — it is reached by merging `develop` forward, so `main` never
+holds a commit `develop` lacks. The full model, and the branch protection it
+assumes, is in [docs/devsecops.md](docs/devsecops.md).
+
 ## What is enforced today
 
 CI checks that every non-merge commit in a pull request carries a
@@ -90,7 +104,22 @@ here under terms Fabrintek cannot pass on. The licence gate treats an
 unrecognised or copyleft dependency as a build failure rather than a warning,
 for that reason.
 
+Alongside those, every pull request runs `go vet`, golangci-lint,
+`go test -race`, a cross-compile check for Windows and macOS, gosec, CodeQL,
+govulncheck, GitHub's dependency review and gitleaks. What each gate is for —
+and why gosec and CodeQL, or govulncheck and dependency review, are not
+duplicates of each other — is in [docs/devsecops.md](docs/devsecops.md).
+
+Do not disable a gate to get a green build. Fix the finding, suppress it
+narrowly in code with a comment saying why it is not exploitable, or change the
+gate in its own pull request.
+
 ## Reporting security vulnerabilities
 
 Do **not** open a public issue for a security-sensitive bug. Email
-[security@mendsec.com](mailto:security@mendsec.com).
+[security@mendsec.com](mailto:security@mendsec.com). Scope, response targets and
+disclosure terms are in [SECURITY.md](SECURITY.md).
+
+Chirp hands a remote technician control of someone else's desktop. A defect in
+PIN generation, PIN redemption, the session lifecycle or the consent flow is
+security-sensitive even when it looks cosmetic.

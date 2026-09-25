@@ -5,6 +5,8 @@ being helped enters it, grants explicit consent, and the session begins. No
 installation, no standing agent, no account.
 
 [![License](https://img.shields.io/badge/License-AGPL--3.0-blue.svg?style=flat-square)](LICENSE)
+[![CI](https://github.com/barahn/chirp/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/barahn/chirp/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/barahn/chirp/actions/workflows/codeql.yml/badge.svg?branch=develop)](https://github.com/barahn/chirp/actions/workflows/codeql.yml)
 
 ## Status: not yet a runnable product
 
@@ -60,6 +62,21 @@ Rather than accept contributions under terms that are written down in another
 repository and shown to nobody, the door stays shut until the CLA is presented
 and recorded where pull requests actually arrive. See
 [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Security
+
+Report vulnerabilities privately to
+[security@mendsec.com](mailto:security@mendsec.com) — not in a public issue. See
+[SECURITY.md](SECURITY.md).
+
+Chirp grants remote control of an end user's machine, so its pipeline treats
+that as the threat model rather than an afterthought: every pull request runs
+gosec, CodeQL, govulncheck, dependency review, gitleaks and a third-party
+licence gate, with every action pinned to a commit SHA. What each gate is for,
+and the repository settings that back it, are in
+[docs/devsecops.md](docs/devsecops.md).
+
+`develop` is the default branch; branch and open pull requests from there.
 
 ## Licence
 
