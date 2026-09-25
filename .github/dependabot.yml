@@ -1,0 +1,29 @@
+version: 2
+updates:
+  # Módulos Go. As atualizações abrem PR contra develop, como qualquer outra
+  # mudança: main só recebe merge de develop.
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+    target-branch: develop
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps"
+    labels: [ dependencies, security ]
+
+  # As próprias GitHub Actions. O CI fixa cada action por SHA; sem isto, um
+  # SHA fixado envelhece em silêncio e perde correções de segurança.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+    target-branch: develop
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci"
+    labels: [ dependencies, ci ]

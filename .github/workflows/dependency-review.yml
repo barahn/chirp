@@ -1,0 +1,29 @@
+name: Dependency Review
+
+# Barra no PR a dependência com vulnerabilidade conhecida ou licença
+# incompatível, antes que ela entre em develop. O go.sum já é verificado pelo
+# govulncheck no CI; aqui o bloqueio é na mudança, com a licença junto --
+# Chirp é AGPL-3.0-only e relicenciado pela Fabrintek, então uma dependência
+# copyleft é licença-compatível e ainda assim inaceitável (ver LICENSING.md).
+on:
+  pull_request:
+    branches: [ develop, main ]
+
+permissions:
+  contents: read
+
+jobs:
+  review:
+    name: Review dependency changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: low
+          comment-summary-in-pr: on-failure
+          allow-licenses: Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, MIT, MPL-2.0

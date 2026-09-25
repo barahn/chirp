@@ -94,3 +94,14 @@ for that reason.
 
 Do **not** open a public issue for a security-sensitive bug. Email
 [security@mendsec.com](mailto:security@mendsec.com).
+
+## Onde a mudança entra
+
+`develop` é a branch padrão e a base de todo pull request; `main` é a branch
+de release e só recebe merge vindo de `develop` ou de um `hotfix/*`. Ambas são
+protegidas: sem push direto, sem force-push, com revisão e checks obrigatórios.
+O fluxo completo, as regras de cada branch e as práticas de segurança do
+pipeline estão em [docs/branching.md](docs/branching.md).
+
+Relato de vulnerabilidade não vai para issue pública -- ver
+[SECURITY.md](SECURITY.md).

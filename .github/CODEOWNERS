@@ -1,0 +1,14 @@
+# Revisão obrigatória por padrão: tudo tem dono.
+*                       @barahn
+
+# Superfícies sensíveis -- pipeline, automação e políticas. Uma mudança aqui
+# altera o que é verificado antes do merge, então ela própria não escapa da
+# revisão.
+/.github/               @barahn
+/scripts/               @barahn
+
+# Licenciamento: o dual-licensing da Fabrintek depende destes arquivos.
+/LICENSE                @barahn
+/LICENSING.md           @barahn
+/THIRD_PARTY_NOTICES.md @barahn
+/CONTRIBUTING.md        @barahn
