@@ -80,6 +80,14 @@ them.
 If a change seems to belong in two of them, it is usually one mechanism plus one
 policy that have not been separated yet. Split it and the arrows resolve.
 
+**A worked example: two strangers meeting by a code.** Allocating a short code,
+minting a fresh one each time a share link is used, redeeming it, throttling
+failed guesses and relaying the two peers' signalling would serve Barahn as well
+as Chirp — so that is remotekit's. That each Chirp shows its code at start, that
+the one who types it controls, how long a link lives, the limits, and the
+consent prompt's wording are Chirp's. The full split is proposed in
+[docs/rendezvous-proposal.md](docs/rendezvous-proposal.md).
+
 ## What this repository must not acquire
 
 - A dependency on the proprietary platform, in any direction, at any depth.

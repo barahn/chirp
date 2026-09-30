@@ -79,6 +79,7 @@ THIRD_PARTY_NOTICES.md
 docs/branching.md
 docs/devsecops.md
 docs/product-model.md
+docs/rendezvous-proposal.md
 go.mod
 go.sum
 scripts/gen-handoff.sh
