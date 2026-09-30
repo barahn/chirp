@@ -12,15 +12,21 @@ installation, no standing agent, no account.
 
 Read this before trying to use it.
 
-What is here today is the **session layer** — PIN generation and redemption,
-the session lifecycle state machine, and the consent flow. It is extracted, it
-is tested, and it is AGPL-3.0.
+What is here today:
+
+- **The session layer** — PIN generation and throttled redemption, the session
+  lifecycle state machine, and the consent flow.
+- **A signalling server** — a relay for WebRTC signalling between the two ends
+  of a session, with an HTTP surface for creating sessions, following their
+  state and answering consent. Written for Chirp — no multi-tenancy, no RBAC —
+  rather than taken from the proprietary Barahn control plane.
+
+Both are tested and AGPL-3.0. Nothing yet drives a session from end to end: the
+server does not move a session through connection and the consent request,
+which is the Nest's and the binary's job.
 
 What is **not** here yet:
 
-- **A signalling server.** Chirp needs its own, simplified: no multi-tenancy,
-  no RBAC. The existing one belongs to the proprietary Barahn control plane and
-  is not being relicensed.
 - **The Nest** — the `/join` page where an end user enters their PIN.
 - **A TURN relay.** Until Chirp ships one, self-hosting means bringing your own
   STUN/TURN (coturn works).

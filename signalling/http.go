@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -31,6 +32,27 @@ type Server struct {
 	// DefaultTTL is how long a newly created session lives. Zero uses the
 	// session manager's own default.
 	DefaultTTL time.Duration
+
+	// ClientIP names the origin a request's code guesses are counted against.
+	// Nil uses the connection's remote address.
+	//
+	// Behind a reverse proxy every request arrives from the proxy, so all users
+	// share one budget and throttle each other. Set this to read the proxy's
+	// forwarded-for header -- but only when that proxy is the sole way in,
+	// because a client that can reach this server directly can write the header
+	// itself and choose a fresh origin for every guess.
+	ClientIP func(*http.Request) string
+}
+
+func (s *Server) clientIP(r *http.Request) string {
+	if s.ClientIP != nil {
+		return s.ClientIP(r)
+	}
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
 }
 
 // NewServer returns a Server over sm, routing through its own hub.
@@ -108,7 +130,7 @@ type sessionView struct {
 // hostname and no consent reason -- everything it does return, the caller
 // already knew or is waiting on.
 func (s *Server) getSession(w http.ResponseWriter, r *http.Request) {
-	sess, err := s.lookup(r.PathValue("code"))
+	sess, err := s.lookup(r, r.PathValue("code"))
 	if err != nil {
 		writeSessionError(w, err)
 		return
@@ -129,12 +151,15 @@ func (s *Server) submitConsent(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "malformed body")
 		return
 	}
-	code, err := session.NormalizeCode(r.PathValue("code"))
+	// Resolved through the metered lookup first: this endpoint takes a code
+	// from the network, and a decision recorded against a guessed code is the
+	// worst thing a guess could buy.
+	found, err := s.lookup(r, r.PathValue("code"))
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "malformed code")
+		writeSessionError(w, err)
 		return
 	}
-	sess, err := s.sessions.SubmitConsent(code, req.Granted, req.Reason)
+	sess, err := s.sessions.SubmitConsent(found.Code, req.Granted, req.Reason)
 	if err != nil {
 		writeSessionError(w, err)
 		return
@@ -185,7 +210,7 @@ func (s *Server) serveWS(w http.ResponseWriter, r *http.Request) {
 	var sess *session.Session
 	var err error
 	if code := r.URL.Query().Get("code"); code != "" {
-		sess, err = s.lookup(code)
+		sess, err = s.lookup(r, code)
 	} else if id := r.URL.Query().Get("session"); id != "" {
 		sess, err = s.sessions.GetSession(id)
 	} else {
@@ -236,17 +261,25 @@ func (s *Server) serveWS(w http.ResponseWriter, r *http.Request) {
 }
 
 // lookup resolves a typed code to its session, normalising the formatting a
-// person may have copied along with it.
-func (s *Server) lookup(raw string) (*session.Session, error) {
-	code, err := session.NormalizeCode(raw)
-	if err != nil {
-		return nil, err
-	}
-	return s.sessions.GetSessionByCode(code)
+// person may have copied along with it. It is metered: every failure counts
+// against the caller's origin, so no endpoint here is an unthrottled oracle
+// for which codes are live.
+func (s *Server) lookup(r *http.Request, raw string) (*session.Session, error) {
+	return s.sessions.LookupCode(raw, s.clientIP(r))
 }
 
+// RelayErrorType is the "type" of a message the relay itself sends a peer,
+// such as the other end not being connected yet.
+//
+// It shares the "type" field with the signals the peers exchange, whose values
+// remotekit's webrtc.SignalType owns: "offer", "answer", "candidate", "close".
+// A bare word here could collide with a type remotekit adds later, and a peer
+// would then read a relay notice as a signal from the other end. The prefix
+// keeps the relay's messages in a namespace remotekit's cannot reach.
+const RelayErrorType = "chirp.error"
+
 func encodeError(err error) []byte {
-	b, _ := json.Marshal(map[string]string{"type": "error", "error": err.Error()})
+	b, _ := json.Marshal(map[string]string{"type": RelayErrorType, "error": err.Error()})
 	return b
 }
 
@@ -269,6 +302,8 @@ func writeError(w http.ResponseWriter, status int, msg string) {
 // small space to guess in.
 func writeSessionError(w http.ResponseWriter, err error) {
 	switch {
+	case errors.Is(err, session.ErrTooManyAttempts):
+		writeError(w, http.StatusTooManyRequests, "too many attempts, try again later")
 	case errors.Is(err, session.ErrSessionNotFound), errors.Is(err, session.ErrSessionExpired):
 		writeError(w, http.StatusNotFound, "no such session")
 	case errors.Is(err, ErrNotPermitted), errors.Is(err, session.ErrInvalidState),

@@ -62,6 +62,27 @@ func dial(t *testing.T, ts *httptest.Server, q url.Values) (*websocket.Conn, *ht
 	return c, resp, err
 }
 
+// waitJoined blocks until the hub has registered both ends of sessionID.
+//
+// A client's Dial returns when the server writes the upgrade response, and the
+// server joins the peer to the hub only after that, so there is a window in
+// which a peer considers itself connected and the hub does not yet know it. A
+// message forwarded to it in that window is refused with ErrNoPeer -- the
+// documented behaviour, see TestSendingBeforeTheOtherEndArrivesKeepsTheSocket.
+// A test that means to exercise two present peers has to wait out the window,
+// or it fails whenever the scheduler widens it.
+func waitJoined(t *testing.T, srv *Server, sessionID string) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		if tech, agent := srv.Hub().Connected(sessionID); tech && agent {
+			return
+		}
+		time.Sleep(time.Millisecond)
+	}
+	t.Fatal("both peers dialled, but the hub never registered them")
+}
+
 func TestCreateSessionReturnsAUsableCode(t *testing.T) {
 	_, ts := newServer(t)
 	got := create(t, ts)
@@ -81,7 +102,7 @@ func TestCreateSessionReturnsAUsableCode(t *testing.T) {
 }
 
 func TestSignallingCrossesBetweenPeers(t *testing.T) {
-	_, ts := newServer(t)
+	srv, ts := newServer(t)
 	sess := create(t, ts)
 
 	tech, _, err := dial(t, ts, url.Values{"role": {"technician"}, "session": {sess.SessionID}})
@@ -93,6 +114,7 @@ func TestSignallingCrossesBetweenPeers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("agent dial: %v", err)
 	}
+	waitJoined(t, srv, sess.SessionID)
 
 	offer := `{"type":"offer","sdp":"v=0"}`
 	if err := tech.WriteMessage(websocket.TextMessage, []byte(offer)); err != nil {
@@ -144,7 +166,7 @@ func TestSendingBeforeTheOtherEndArrivesKeepsTheSocket(t *testing.T) {
 	if err := json.Unmarshal(data, &msg); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if msg["type"] != "error" || !strings.Contains(msg["error"], "other end") {
+	if msg["type"] != RelayErrorType || !strings.Contains(msg["error"], "other end") {
 		t.Errorf("got %v, want an error naming the missing peer", msg)
 	}
 	if err := tech.WriteMessage(websocket.TextMessage, []byte(`{"type":"offer"}`)); err != nil {
@@ -223,5 +245,107 @@ func TestRoleIsRequired(t *testing.T) {
 		if resp != nil && resp.StatusCode != http.StatusBadRequest {
 			t.Errorf("role %q gave status %d, want 400", role, resp.StatusCode)
 		}
+	}
+}
+
+// get issues a GET for a code, as if from addr.
+func getFrom(h http.Handler, code, addr string) int {
+	req := httptest.NewRequest(http.MethodGet, "/api/sessions/"+code, nil)
+	req.RemoteAddr = addr
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, req)
+	return rr.Code
+}
+
+// The HTTP surface must not be an unmetered oracle for which codes are live.
+// It was, when the session layer's throttle lived only in ConnectClient: fifty
+// wrong guesses from one address all came back 404, and the fifty-first, a
+// live code, came back 200.
+func TestCodeLookupsAreThrottled(t *testing.T) {
+	sm := session.NewSessionManager(time.Minute)
+	defer sm.Close()
+	sm.SetRedemptionLimit(3, time.Minute)
+	h := NewServer(sm).Handler()
+
+	for i := 0; i < 3; i++ {
+		if got := getFrom(h, "000000", "203.0.113.7:4000"); got != http.StatusNotFound {
+			t.Fatalf("guess %d: status %d, want 404", i+1, got)
+		}
+	}
+	live, err := sm.CreateSession("tech", "Tech", time.Minute)
+	if err != nil {
+		t.Fatalf("CreateSession failed: %v", err)
+	}
+	if got := getFrom(h, live.Code, "203.0.113.7:4001"); got != http.StatusTooManyRequests {
+		t.Fatalf("a throttled address resolved a live code: status %d, want 429", got)
+	}
+	// The port is not part of the origin; the address is.
+	if got := getFrom(h, live.Code, "198.51.100.9:4000"); got != http.StatusOK {
+		t.Fatalf("an unrelated address was throttled: status %d", got)
+	}
+}
+
+// Consent submitted against a guessed code is the worst thing a guess could
+// buy, so the consent endpoint is metered too -- and it must refuse a session
+// that never asked.
+func TestConsentEndpointIsMeteredAndNeedsARequest(t *testing.T) {
+	sm := session.NewSessionManager(time.Minute)
+	defer sm.Close()
+	sm.SetRedemptionLimit(2, time.Minute)
+	h := NewServer(sm).Handler()
+
+	post := func(code, addr string) int {
+		req := httptest.NewRequest(http.MethodPost, "/api/sessions/"+code+"/consent",
+			strings.NewReader(`{"granted":true}`))
+		req.RemoteAddr = addr
+		rr := httptest.NewRecorder()
+		h.ServeHTTP(rr, req)
+		return rr.Code
+	}
+
+	pending, err := sm.CreateSession("tech", "Tech", time.Minute)
+	if err != nil {
+		t.Fatalf("CreateSession failed: %v", err)
+	}
+	if got := post(pending.Code, "192.0.2.10:1"); got != http.StatusConflict {
+		t.Fatalf("consent on a pending session: status %d, want 409", got)
+	}
+	if s, _ := sm.GetSession(pending.ID); s.State != session.StatePending {
+		t.Fatalf("consent was recorded on a pending session: state %s", s.State)
+	}
+
+	for i := 0; i < 2; i++ {
+		_ = post("000000", "192.0.2.20:1")
+	}
+	if got := post(pending.Code, "192.0.2.20:1"); got != http.StatusTooManyRequests {
+		t.Fatalf("consent guesses were not metered: status %d, want 429", got)
+	}
+}
+
+// Behind a reverse proxy the operator names the origin. The hook must be
+// what the throttle counts against.
+func TestClientIPHookSetsTheOrigin(t *testing.T) {
+	sm := session.NewSessionManager(time.Minute)
+	defer sm.Close()
+	sm.SetRedemptionLimit(1, time.Minute)
+	srv := NewServer(sm)
+	srv.ClientIP = func(r *http.Request) string { return r.Header.Get("X-Test-Origin") }
+	h := srv.Handler()
+
+	req := func(origin string) int {
+		r := httptest.NewRequest(http.MethodGet, "/api/sessions/000000", nil)
+		r.RemoteAddr = "10.0.0.1:1" // the proxy: identical for everyone
+		r.Header.Set("X-Test-Origin", origin)
+		rr := httptest.NewRecorder()
+		h.ServeHTTP(rr, r)
+		return rr.Code
+	}
+
+	_ = req("user-a")
+	if got := req("user-a"); got != http.StatusTooManyRequests {
+		t.Fatalf("origin from the hook was not throttled: status %d", got)
+	}
+	if got := req("user-b"); got != http.StatusNotFound {
+		t.Fatalf("users behind one proxy throttled each other: status %d", got)
 	}
 }
