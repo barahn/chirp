@@ -32,6 +32,18 @@ will consume it as a dependency.
 Tracking: [the separation plan](https://github.com/barahn/barahn) in the Barahn
 repository.
 
+## Where Chirp sits
+
+Chirp is one of three repositories, and the one you want depends on what you are
+looking for: the reusable mechanism is [remotekit](https://github.com/barahn/remotekit)
+(Apache-2.0), this repository is the on-demand support product (AGPL-3.0-only),
+and Fabrintek's commercial fleet platform is separate and proprietary.
+Dependencies point inwards only — Chirp may depend on remotekit, never on the
+platform.
+
+[ECOSYSTEM.md](ECOSYSTEM.md) states each repository's role, why each licence is
+the one it is, and how to decide which repository a change belongs in.
+
 ## Design commitments
 
 These are constraints on what Chirp may become, not features to be traded away:

@@ -67,7 +67,14 @@ type Session struct {
 func (s *Session) Clone() *Session {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+	return s.cloneLocked()
+}
 
+// cloneLocked is Clone for callers that already hold s.mu, for reading or for
+// writing. It must never take the lock itself: sync.RWMutex is not reentrant,
+// so a Clone() from under a held lock deadlocks rather than blocking briefly --
+// and under a write lock it deadlocks unconditionally.
+func (s *Session) cloneLocked() *Session {
 	cp := &Session{
 		ID:             s.ID,
 		Code:           s.Code,
@@ -115,6 +122,7 @@ type SessionManager struct {
 	codeIndex   map[string]*Session
 	listeners   map[string][]chan *Session
 	defaultTTL  time.Duration
+	limiter     *redemptionLimiter
 	stopReaper  chan struct{}
 	mu          sync.RWMutex
 	listenersMu sync.RWMutex
@@ -131,6 +139,7 @@ func NewSessionManager(defaultTTL time.Duration) *SessionManager {
 		codeIndex:  make(map[string]*Session),
 		listeners:  make(map[string][]chan *Session),
 		defaultTTL: defaultTTL,
+		limiter:    newRedemptionLimiter(DefaultMaxRedemptionFailures, DefaultRedemptionWindow),
 		stopReaper: make(chan struct{}),
 	}
 
@@ -145,6 +154,20 @@ func (sm *SessionManager) Close() {
 	default:
 		close(sm.stopReaper)
 	}
+}
+
+// SetRedemptionLimit replaces the throttle applied to failed code redemptions.
+// A non-positive value falls back to the corresponding default.
+//
+// Self-hosting is a design commitment, so the limit has to be tunable: an
+// operator behind a NAT that presents thousands of users as one address needs a
+// looser bound than one handing out PINs over the open internet. Call it during
+// setup, before the manager starts serving; it discards the counts recorded so
+// far.
+func (sm *SessionManager) SetRedemptionLimit(maxFailures int, window time.Duration) {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	sm.limiter = newRedemptionLimiter(maxFailures, window)
 }
 
 // CreateSession generates a new on-demand session with a unique 6-digit PIN code.
@@ -221,9 +244,28 @@ func (sm *SessionManager) GetSessionByCode(code string) (*Session, error) {
 }
 
 // ConnectClient records the connection of an ephemeral client.
+//
+// Redemption is throttled per origin (ClientInfo.RemoteIP): the PIN is the only
+// credential, so unlimited guessing walks a 900,000-code keyspace in minutes.
+// Every attempt that does not end in a connection counts as a failure, and a
+// successful one clears the origin's record. See redemption.go.
 func (sm *SessionManager) ConnectClient(code string, info *ClientInfo) (*Session, error) {
+	origin := originOf(info)
+
+	sm.mu.RLock()
+	limiter := sm.limiter
+	sm.mu.RUnlock()
+
+	now := time.Now().UTC()
+	if !limiter.allow(origin, now) {
+		return nil, ErrTooManyAttempts
+	}
+
 	norm, err := NormalizeCode(code)
 	if err != nil {
+		// A malformed code is still a guess, and refusing to count it would
+		// leave an attacker an unmetered channel for probing.
+		limiter.recordFailure(origin, now)
 		return nil, err
 	}
 
@@ -232,21 +274,23 @@ func (sm *SessionManager) ConnectClient(code string, info *ClientInfo) (*Session
 	sm.mu.Unlock()
 
 	if !ok {
+		limiter.recordFailure(origin, now)
 		return nil, ErrSessionNotFound
 	}
 
 	sess.mu.Lock()
-	if sess.State == StateExpired || time.Now().UTC().After(sess.ExpiresAt) {
+	if sess.State == StateExpired || now.After(sess.ExpiresAt) {
 		sess.State = StateExpired
 		sess.mu.Unlock()
+		limiter.recordFailure(origin, now)
 		return nil, ErrSessionExpired
 	}
 	if sess.State != StatePending {
 		sess.mu.Unlock()
+		limiter.recordFailure(origin, now)
 		return nil, ErrSessionNotPending
 	}
 
-	now := time.Now().UTC()
 	sess.State = StateConnected
 	sess.ConnectedAt = &now
 	if info != nil {
@@ -254,6 +298,8 @@ func (sm *SessionManager) ConnectClient(code string, info *ClientInfo) (*Session
 		sess.ClientInfo = &cp
 	}
 	sess.mu.Unlock()
+
+	limiter.reset(origin)
 
 	snap := sess.Clone()
 	sm.notifyListeners(snap)
@@ -449,7 +495,7 @@ func (sm *SessionManager) ListActiveSessions() []*Session {
 	for _, sess := range sm.sessions {
 		sess.mu.RLock()
 		if sess.State != StateTerminated && sess.State != StateExpired && sess.State != StateConsentDenied && now.Before(sess.ExpiresAt) {
-			list = append(list, sess.Clone())
+			list = append(list, sess.cloneLocked())
 		}
 		sess.mu.RUnlock()
 	}
@@ -527,18 +573,29 @@ func (sm *SessionManager) startReaper() {
 func (sm *SessionManager) reapExpired() {
 	now := time.Now().UTC()
 
-	sm.mu.Lock()
-	defer sm.mu.Unlock()
+	// Snapshots are collected under the lock and delivered after it is
+	// released: a listener must never be fed from inside sm.mu, and the
+	// delivery is synchronous so that an expiry event is observable the
+	// moment reapExpired returns.
+	var expired []*Session
 
+	sm.mu.Lock()
+	limiter := sm.limiter
 	for _, sess := range sm.sessions {
 		sess.mu.Lock()
 		if (sess.State == StatePending || sess.State == StateConnected || sess.State == StateConsentRequested) && now.After(sess.ExpiresAt) {
 			sess.State = StateExpired
 			end := sess.ExpiresAt
 			sess.EndedAt = &end
-			snap := sess.Clone()
-			go sm.notifyListeners(snap)
+			expired = append(expired, sess.cloneLocked())
 		}
 		sess.mu.Unlock()
+	}
+	sm.mu.Unlock()
+
+	limiter.reap(now)
+
+	for _, snap := range expired {
+		sm.notifyListeners(snap)
 	}
 }
