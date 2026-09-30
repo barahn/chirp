@@ -420,8 +420,9 @@ least-privilege workflows, harden-runner, gitleaks over the full history,
 CodeQL and dependency review gated on `CODE_SCANNING`, an SBOM, Dependabot,
 `SECURITY.md` — plus a dependency licence gate it lacked. That gate's first run
 found `github.com/hashicorp/yamux` is **MPL-2.0**, which remotekit's own policy
-does not allow; it is excepted by name there pending the maintainer's decision
-(`remotekit/docs/devsecops.md`). For Chirp the consequence is precise: **only
+does not allow; it was excepted by name there at first, and has since been **accepted
+formally** by the maintainer — barahn/remotekit#24 moves the gate to an exact
+licence list that includes MPL-2.0. For Chirp the consequence is precise: **only
 remotekit's `tunnel` package pulls in yamux.** `screen`, `input`, `clipboard`,
 `transfer` and `webrtc` — everything `cmd/chirp` needs — are clean. Chirp's
 licence gate reads imported packages (`go list -deps`), not the whole module
@@ -495,15 +496,17 @@ Still to decide or do, in order:
 
 1. **Import the rulesets** (§4.3) — `docs/branching.md` has the commands. The
    policy is decided; only an admin can apply it.
-2. **Upstream the rendezvous mechanism to remotekit.** The split is proposed in
-   `docs/rendezvous-proposal.md`: allocating and redeeming codes, minting codes
-   from a link, the per-origin throttle and the two-peer relay are mechanism;
-   the flow, defaults and consent prompt stay here. Write access to remotekit
-   now exists (barahn/remotekit#20 was pushed and merged from this work). What
-   remains is how: **move** Chirp's code, which is a relicence from AGPL to
-   Apache-2.0 — its authors are `Claude`, `Fábio Mendes` and `mendsec`, all
-   expected to be Fabrintek's, which the maintainer must confirm — or **write
-   it fresh** in remotekit against the same tests, which needs no relicence.
+2. **Adopt remotekit's `rendezvous` package** once barahn/remotekit#28 is
+   merged. It was written fresh there, by the maintainer's choice — no
+   relicence — and implements the mechanism half of
+   `docs/rendezvous-proposal.md`: codes, links minting single-use codes,
+   `Release(owner)`, and a per-origin throttle shared by redemption and
+   minting. Adopting it means Chirp's `session` package stops generating and
+   redeeming codes itself and keeps only the product: the state machine,
+   consent, and the values (5 failures per 10 minutes; a link with no ttl,
+   released when its sharer exits). This is also where the session direction
+   inverts (item 4). The two-peer relay stays in Chirp's `signalling` until
+   remotekit's Phase 2 `Signaler` exists.
 3. **Build to the decided product rules** (`docs/product-model.md`): a link
    lives while its sharer's Chirp runs, is revocable, and is replaced on
    restart; the start-up code is single-use. How a link reaches a freshly
