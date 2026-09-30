@@ -19,9 +19,17 @@ commit. They are not boilerplate — they encode hard constraints (below).
 
 ## 2. What Chirp is
 
-A technician generates a 6-digit PIN. The person being helped opens a web page
-("the Nest"), enters the PIN, grants explicit consent on their own machine, and
-the remote session begins. **No installation, no standing agent, no account.**
+**Read [`docs/product-model.md`](docs/product-model.md) first — it is the
+authoritative description.** In short: one binary, identical on both sides.
+Anyone downloads Chirp and runs it; it shows its own code and a share link.
+User 2 reads their code (or sends the link) to user 1, user 1 types it into
+their own Chirp, user 2 accepts in a prompt on their own machine, and **user 1
+controls user 2's machine**. Every use of a link mints a new single-use code.
+**No installation, no standing agent, no account.**
+
+That model supersedes an earlier one — a technician generated a PIN and the
+helped person typed it into a web page, "the Nest" — which is what the code in
+this repository still implements. See §8 for the work to bring it in line.
 
 This is deliberately the opposite of a persistent-agent RMM product. Every
 design decision should be checked against that sentence.
@@ -70,6 +78,7 @@ SECURITY.md
 THIRD_PARTY_NOTICES.md
 docs/branching.md
 docs/devsecops.md
+docs/product-model.md
 go.mod
 go.sum
 scripts/gen-handoff.sh
@@ -120,8 +129,9 @@ session/session_test.go tests for the above
 terminated`, with `consent_denied` and `expired` as terminal branches.
 `SessionManager` holds sessions in a `map` keyed by UUID plus a `codeIndex`
 keyed by the 6-digit PIN, reaps expired sessions on a 10-second ticker, and
-exposes `Subscribe(code)` returning a channel of snapshots (intended to back
-SSE/WebSocket push to the Nest page) and `WaitForConsent(ctx, code)`.
+exposes `Subscribe(code)` returning a channel of snapshots (originally meant
+to push session state to the superseded Nest page; in the product model, to the
+binary) and `WaitForConsent(ctx, code)`.
 
 ## 4. Known defects
 
@@ -223,13 +233,23 @@ against the merged tree before being fixed:
 
 **How a session now moves:** an agent taking its place in the hub moves it
 from `pending` to `connected`, recording its address and user agent, and the
-server immediately requests consent. The consent prompt lives in the Nest —
-the maintainer's decision — so the join page, polling `GET
-/api/sessions/{code}`, sees `consent_requested` together with who is asking
-and for which permissions, and answers with `POST .../consent`. Those details
+server immediately requests consent. At the time the consent prompt was to
+live in the Nest — a decision since superseded by the product model — so the
+join page, polling `GET /api/sessions/{code}`, sees `consent_requested`
+together with who is asking and for which permissions, and answers with
+`POST .../consent`. Those details
 are disclosed only in that state. A reconnecting agent changes nothing and is
 not charged against its redemption budget. `TestConsentFlowEndToEnd` drives
 the whole path through HTTP alone.
+
+**Superseded direction.** All of this was built for the earlier model, in which
+the helper created the session and the helped person answered consent from a
+web page. In the product model the helped person's Chirp allocates the code and
+shows the consent prompt itself, so `POST /api/sessions` (helper creates),
+`POST /api/sessions/{code}/consent` (web page answers) and the consent details
+in `GET /api/sessions/{code}` are all on the wrong side. The security properties
+established here — every code-keyed entry point metered, consent refused until
+requested — carry over unchanged; the endpoints themselves do not.
 
 Also found: `TestSignallingCrossesBetweenPeers` failed 2 runs in 15 under CPU
 load. A client's `Dial` returns when the server writes the upgrade response,
@@ -251,14 +271,15 @@ From `README.md`'s own "not here yet" list:
    `SessionManager`; the Barahn one is proprietary and was not ported. It
    drives a session through `connected` and `consent_requested` when the agent
    arrives, and announces each end's arrival and departure to the other (§4.4).
-   Still missing: use of
-   `Subscribe` as a push channel for session state — the join page polls
-   `GET /api/sessions/{code}` instead.
-2. **The Nest** — the `/join` page where the end user types the PIN, sees who is
-   asking and which permissions are requested (`DefaultPermissions`), and
-   allows or denies. Commit `80f5531` mentions a Nest `/join` page but no such
-   code is in the tree; assume it must be written.
-3. **A `cmd/chirp` binary.** There is no entry point at all yet.
+   Its direction is the superseded one (§4.4).
+2. ~~**The Nest** — a `/join` web page where the helped person types a PIN.~~
+   Superseded: in the product model nobody types a code into a web page, and
+   consent happens in the binary. The site only offers the download, and may
+   land people who open a share link (see open decision 2 in
+   `docs/product-model.md`).
+3. **The `cmd/chirp` binary** — the one program both sides run. It shows its own
+   code and link, redeems someone else's, shows the consent prompt, and uses
+   remotekit to share the screen. There is no entry point at all yet.
 4. **A TURN relay.** Until then, self-hosting means bring-your-own STUN/TURN
    (coturn). Document, do not vendor.
 
@@ -321,10 +342,17 @@ commitments — "any hosted service is a convenience, never a requirement". A
 hosted Chirp relay that the endpoints cannot verify around is not a
 convenience; it is the trusted third party the commitment says it must not be.
 
-So: **Chirp's signalling hub should be a relay the endpoints do not have to
-trust.** The maintainer has decided to pursue that now, before any client
-exists. But remotekit has only half of what it takes, and the other half
-changes the product.
+**Is an untrusted relay required? No — correcting an earlier version of this
+section.** It argued that a hosted relay the endpoints cannot verify around is
+"the trusted third party the design commitment rules out". The commitment says
+something narrower: *anyone may run their own relay; a hosted service is a
+convenience, never a requirement.* Self-hosting satisfies it. A self-hosted
+relay sits on the controlling user's side, whom the controlled user already
+trusts with their machine, and anyone unwilling to trust a hosted relay runs
+their own. Barahn works the same way, as does every mainstream remote-support
+tool. So the relay is trusted, openly, and what follows is **optional
+hardening** for relays run by a third party — worth keeping on record, not on
+the critical path.
 
 **Correction: signing is necessary, not sufficient.** An earlier version of
 this section said remotekit "already has the parts". It does not. A signature
@@ -372,9 +400,8 @@ Proposal, for the maintainer to decide before any client is written:
    definition — so an end must treat `chirp.*` messages as hints (presence,
    errors) and never act on them for anything security-relevant.
 
-Until then, the relay is trusted, and a hosted relay is the trusted third party
-the design commitment rules out. That is the honest state of things, and the
-reason this cannot be finished by adopting `signed.go` alone.
+Should that hardening ever be wanted, this is why it cannot be done by adopting
+`signed.go` alone.
 
 One caveat when reading that document: its status line says "proposal, not
 accepted. Nothing here has been implemented", and for its Phase 0 item 3
@@ -447,10 +474,21 @@ as §4.3 describes).
 
 Still to decide or do, in order:
 
-1. **Decide the approval policy** (§4.3), then import the rulesets. barahn/chirp#1 is closed; its four unique files are ported.
-2. **Design the authenticated key exchange before either end is written**
-   (§5.5). The maintainer chose to adopt signed signalling now. Signing alone
-   does not make the relay untrusted here, because Chirp's ends share no keys
-   in advance — only the PIN. See §5.5 for why, and for the proposal.
-3. **The Nest** — the `/join` page (§5.2).
-4. **`cmd/chirp`** — the first place remotekit becomes a dependency (§5.3, §5.5).
+1. **Decide the approval policy** (§4.3), then import the rulesets.
+2. **Upstream the rendezvous mechanism to remotekit.** The split is proposed in
+   `docs/rendezvous-proposal.md`: allocating and redeeming codes, minting codes
+   from a link, the per-origin throttle and the two-peer relay are mechanism;
+   the flow, defaults and consent prompt stay here. Needs write access to
+   remotekit, and — because the code moving is AGPL here and Apache-2.0 there —
+   a check that Fabrintek is its sole author.
+3. **Settle the open decisions** in `docs/product-model.md`: link lifetime and
+   revocation, how a link reaches a freshly downloaded binary, and whether the
+   code shown at start is single-use.
+4. **Invert the session direction** (§4.4): the code owner — the machine to be
+   controlled — allocates the code; the controller redeems it. Keep every
+   code-keyed entry point metered.
+5. **The consent prompt in the binary**, carried over remotekit's existing
+   `bark.ConsentRequestPayload` / `ConsentResponsePayload` rather than a new
+   format, showing the controller's name as self-asserted.
+6. **`cmd/chirp`** — the one binary, and the first place remotekit becomes a
+   dependency (§5.3, §5.5).
