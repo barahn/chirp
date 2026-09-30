@@ -411,6 +411,21 @@ accepted. Nothing here has been implemented", and for its Phase 0 item 3
 date — `webrtc/signed.go` implements exactly that. Trust the tree over the
 status line.
 
+**remotekit's pipeline, and a licence fact that constrains Chirp.**
+barahn/remotekit#20 brought remotekit the same DevSecOps layers Chirp has —
+least-privilege workflows, harden-runner, gitleaks over the full history,
+CodeQL and dependency review gated on `CODE_SCANNING`, an SBOM, Dependabot,
+`SECURITY.md` — plus a dependency licence gate it lacked. That gate's first run
+found `github.com/hashicorp/yamux` is **MPL-2.0**, which remotekit's own policy
+does not allow; it is excepted by name there pending the maintainer's decision
+(`remotekit/docs/devsecops.md`). For Chirp the consequence is precise: **only
+remotekit's `tunnel` package pulls in yamux.** `screen`, `input`, `clipboard`,
+`transfer` and `webrtc` — everything `cmd/chirp` needs — are clean. Chirp's
+licence gate reads imported packages (`go list -deps`), not the whole module
+graph, so it stays green as long as Chirp never imports `tunnel`; if it ever
+did, the gate would flag MPL-2.0 for review. That is a second reason, after the
+enrolment model, to keep `tunnel` out of Chirp.
+
 **Where the dependency will finally appear:** `cmd/chirp`, the agent side. It
 needs `screen`, `input`, `clipboard`, `transfer` and `webrtc.PeerSession`, and
 that is the commit where `require github.com/barahn/remotekit` lands. Nothing
@@ -479,9 +494,12 @@ Still to decide or do, in order:
 2. **Upstream the rendezvous mechanism to remotekit.** The split is proposed in
    `docs/rendezvous-proposal.md`: allocating and redeeming codes, minting codes
    from a link, the per-origin throttle and the two-peer relay are mechanism;
-   the flow, defaults and consent prompt stay here. Needs write access to
-   remotekit, and — because the code moving is AGPL here and Apache-2.0 there —
-   a check that Fabrintek is its sole author.
+   the flow, defaults and consent prompt stay here. Write access to remotekit
+   now exists (barahn/remotekit#20 was pushed and merged from this work). What
+   remains is how: **move** Chirp's code, which is a relicence from AGPL to
+   Apache-2.0 — its authors are `Claude`, `Fábio Mendes` and `mendsec`, all
+   expected to be Fabrintek's, which the maintainer must confirm — or **write
+   it fresh** in remotekit against the same tests, which needs no relicence.
 3. **Settle the open decisions** in `docs/product-model.md`: link lifetime and
    revocation, how a link reaches a freshly downloaded binary, and whether the
    code shown at start is single-use.
