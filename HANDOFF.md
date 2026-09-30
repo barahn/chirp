@@ -201,8 +201,11 @@ Consequences to know about:
   that reason. Each run warns that the gate is off. Set the variable when the
   repository goes public or Code Security is enabled; `docs/devsecops.md`
   explains, including why marking them required before then enforces nothing.
-- **Branch protection is written but not applied**, and one decision blocks
-  applying it: with one maintainer, nobody can approve their own pull requests.
+- **Branch protection is written, decided, and not yet applied.** The approval
+  policy is settled — the admin may bypass on `develop` via pull request only,
+  and `main` has no bypass (see `docs/branching.md`) — so nothing in the
+  repository blocks importing the rulesets any more. Importing them needs an
+  admin token, which this work does not have.
   The rules are versioned in `.github/rulesets/`, with the reasoning in
   `docs/branching.md`. Their first version could not have worked — `main`
   required linear history while allowing only merge commits, required a check
@@ -276,7 +279,7 @@ From `README.md`'s own "not here yet" list:
 2. ~~**The Nest** — a `/join` web page where the helped person types a PIN.~~
    Superseded: in the product model nobody types a code into a web page, and
    consent happens in the binary. The site only offers the download, and may
-   land people who open a share link (see open decision 2 in
+   land people who open a share link (see decision 3, still open, in
    `docs/product-model.md`).
 3. **The `cmd/chirp` binary** — the one program both sides run. It shows its own
    code and link, redeems someone else's, shows the consent prompt, and uses
@@ -490,7 +493,8 @@ as §4.3 describes).
 
 Still to decide or do, in order:
 
-1. **Decide the approval policy** (§4.3), then import the rulesets.
+1. **Import the rulesets** (§4.3) — `docs/branching.md` has the commands. The
+   policy is decided; only an admin can apply it.
 2. **Upstream the rendezvous mechanism to remotekit.** The split is proposed in
    `docs/rendezvous-proposal.md`: allocating and redeeming codes, minting codes
    from a link, the per-origin throttle and the two-peer relay are mechanism;
@@ -500,9 +504,10 @@ Still to decide or do, in order:
    Apache-2.0 — its authors are `Claude`, `Fábio Mendes` and `mendsec`, all
    expected to be Fabrintek's, which the maintainer must confirm — or **write
    it fresh** in remotekit against the same tests, which needs no relicence.
-3. **Settle the open decisions** in `docs/product-model.md`: link lifetime and
-   revocation, how a link reaches a freshly downloaded binary, and whether the
-   code shown at start is single-use.
+3. **Build to the decided product rules** (`docs/product-model.md`): a link
+   lives while its sharer's Chirp runs, is revocable, and is replaced on
+   restart; the start-up code is single-use. How a link reaches a freshly
+   downloaded binary is still open, until the download site exists.
 4. **Invert the session direction** (§4.4): the code owner — the machine to be
    controlled — allocates the code; the controller redeems it. Keep every
    code-keyed entry point metered.

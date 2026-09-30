@@ -65,8 +65,8 @@ These are consequences of the model, stated so nobody has to rediscover them:
   unmistakable enough that an unexpected one is declined.
 - **A link is a bearer capability that keeps working.** Codes it mints are
   single-use, but the link itself mints again until it stops being valid. Every
-  connection it creates still needs user 2's consent. How long a link lives is an
-  open decision, below.
+  connection it creates still needs user 2's consent. A link lives only while
+  its sharer's Chirp runs, and can be revoked — see Decisions, below.
 - **The relay is trusted, and self-hosting is how you avoid trusting someone
   else's.** A relay sees the codes it routes by, so it could impersonate either
   end. That is the same model as Barahn and every mainstream remote-support tool,
@@ -77,22 +77,23 @@ These are consequences of the model, stated so nobody has to rediscover them:
   means changing the code format. That is possible future hardening, not a
   requirement — see `HANDOFF.md` §5.5.
 
-## Open decisions
+## Decisions
 
-Recorded here so they are decided deliberately rather than by whoever writes the
-code first. Each has a recommended default.
+Decided by the maintainer:
 
-1. **Link lifetime and revocation.** *Recommended:* a link is valid only while
-   the sharer's Chirp is running, can be revoked from it, and is replaced on
-   restart.
-2. **How a link reaches a freshly downloaded Chirp.** With no installation there
+1. **Link lifetime and revocation.** A link is valid only while the sharer's
+   Chirp is running, can be revoked from it, and is replaced on restart.
+2. **The code shown at start is single-use.** Once it is used it is replaced,
+   for the same reason a link mints a fresh code per use: a code that has done
+   its job opens nothing.
+
+Still open, to decide when the download site exists:
+
+3. **How a link reaches a freshly downloaded Chirp.** With no installation there
    is no pre-registered handler, so the link's token has to get from the browser
    into the binary somehow: a custom URL scheme registered on first run, the
    token carried in the download itself, or pasted on first start. Each trades
    convenience against how much the download page must be trusted.
-3. **Whether the code shown at start is single-use.** Link-minted codes are. The
-   code on screen could be too — replaced as soon as it is used — or stay until
-   used. *Recommended:* single-use, for the same reason as the link's.
 
 ## Where the pieces live
 

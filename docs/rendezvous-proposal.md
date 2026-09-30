@@ -32,7 +32,7 @@ peers to meet.
 | Mechanism — remotekit | Product — Chirp |
 |---|---|
 | Allocate a short code for a peer: random, collision-free, expiring, single-use | That each Chirp shows its code at start, and when it is replaced |
-| Issue a link token for a peer; mint a fresh single-use code per use | How long a link lives, and how it is revoked (Chirp's open decision 1) |
+| Issue a link token for a peer; mint a fresh single-use code per use | How long a link lives, and how it is revoked (Chirp decided: while the sharer's Chirp runs, revocable, replaced on restart) |
 | Redeem a code, pairing the redeemer with its owner | That the redeemer controls the owner's machine |
 | Throttle failed redemptions per origin | The limits (5 per 10 minutes today) |
 | Relay opaque signalling between the paired peers; announce presence | Role names, and when a session counts as connected |
