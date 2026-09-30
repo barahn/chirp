@@ -570,8 +570,8 @@ Still to decide or do, in order:
    the owner socket, shows the consent prompt with the controller's name as a
    claim, redeems other people's codes, and uses remotekit to share the screen
    (§5.5).
-5. **Decentralised network (decision 4)** — in order: choose the code format
-   (routing part + secret part, §5.5 item 1); choose and vet a PAKE (CPace or
+5. **Decentralised network (decision 4)** — in order: code format **decided —
+   6 routing + 4 secret digits** (`docs/product-model.md`, decision 4); choose and vet a PAKE (CPace or
    SPAKE2, through the licence gate); design node discovery and node-to-node
    relaying in remotekit alongside its Phase 2 `Signaler`; then move the
    throttle and the 30-session cap to the nodes. Until then the central

@@ -72,8 +72,8 @@ These are consequences of the model, stated so nobody has to rediscover them:
   relay that saw the codes it routes by could impersonate either end, so the
   code must be split: a routing part the network may see, and a secret part
   that never leaves the two people, used in a password-authenticated key
-  exchange (PAKE) that binds the two ends. What that means for the code a
-  person reads aloud is still to be decided.
+  exchange (PAKE) that binds the two ends. The code a person reads aloud is
+  therefore ten digits (decision 4).
 
 ## Decisions
 
@@ -98,8 +98,12 @@ Decided by the maintainer:
    network, and nodes carry each other's rendezvous and signalling. Its
    consequences:
    - **A PAKE is required**, not optional hardening: without it whoever
-     carries the signalling could sit in the middle. The code gains a secret
-     part the network never sees.
+     carries the signalling could sit in the middle.
+   - **The code is 6 + 4 digits**, read as `482-913-5071`. The first six
+     locate the node and are what the network sees; the last four are the
+     secret, never sent anywhere, and are the PAKE's password. Someone in the
+     middle gets one guess in 10,000 per attempt, and a wrong guess fails
+     visibly to both ends. Links carry both parts.
    - **Finding a node is mechanism** — peer discovery and relaying between
      nodes — and belongs in remotekit, with its Phase 2 `Signaler`.
    - **Abuse limits move to the nodes.** The per-origin throttle and the
