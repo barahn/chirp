@@ -497,7 +497,16 @@ Still to decide or do, in order:
 1. **Import the rulesets** (§4.3) — `docs/branching.md` has the commands. The
    policy is decided; only an admin can apply it.
 2. **Adopt remotekit's `rendezvous` package** — merged into remotekit's
-   `develop` in barahn/remotekit#28, so this can start now. It was written fresh there, by the maintainer's choice — no
+   `develop` in barahn/remotekit#28. **Blocked on access, not on code:**
+   remotekit is a private repository, so the public Go module proxy cannot
+   fetch it (checked: `proxy.golang.org` refuses it), and a workflow's
+   `GITHUB_TOKEN` only reaches its own repository — Chirp's CI would fail
+   fetching the dependency the moment Chirp imports it. Beyond CI, Chirp is
+   AGPL and promises anyone may build and run it; a private dependency makes
+   it unbuildable from source by anyone outside Fabrintek. Resolve by making
+   remotekit public, by giving Chirp's CI a read-only credential for it, or by
+   vendoring it — a maintainer decision. Once resolved, pin remotekit at a tag
+   rather than a pseudo-version of `develop`. It was written fresh there, by the maintainer's choice — no
    relicence — and implements the mechanism half of
    `docs/rendezvous-proposal.md`: codes, links minting single-use codes,
    `Release(owner)`, and a per-origin throttle shared by redemption and
