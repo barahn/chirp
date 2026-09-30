@@ -421,7 +421,7 @@ CodeQL and dependency review gated on `CODE_SCANNING`, an SBOM, Dependabot,
 `SECURITY.md` — plus a dependency licence gate it lacked. That gate's first run
 found `github.com/hashicorp/yamux` is **MPL-2.0**, which remotekit's own policy
 does not allow; it was excepted by name there at first, and has since been **accepted
-formally** by the maintainer — barahn/remotekit#24 moves the gate to an exact
+formally** by the maintainer — barahn/remotekit#24, merged, moved the gate to an exact
 licence list that includes MPL-2.0. For Chirp the consequence is precise: **only
 remotekit's `tunnel` package pulls in yamux.** `screen`, `input`, `clipboard`,
 `transfer` and `webrtc` — everything `cmd/chirp` needs — are clean. Chirp's
@@ -496,8 +496,8 @@ Still to decide or do, in order:
 
 1. **Import the rulesets** (§4.3) — `docs/branching.md` has the commands. The
    policy is decided; only an admin can apply it.
-2. **Adopt remotekit's `rendezvous` package** once barahn/remotekit#28 is
-   merged. It was written fresh there, by the maintainer's choice — no
+2. **Adopt remotekit's `rendezvous` package** — merged into remotekit's
+   `develop` in barahn/remotekit#28, so this can start now. It was written fresh there, by the maintainer's choice — no
    relicence — and implements the mechanism half of
    `docs/rendezvous-proposal.md`: codes, links minting single-use codes,
    `Release(owner)`, and a per-origin throttle shared by redemption and
