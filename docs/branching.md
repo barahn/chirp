@@ -78,25 +78,22 @@ are worth keeping:
   every author — including the coding agents that work in this repository —
   has a signing key.
 
-## Before importing: two things to decide
+## Before importing: one thing to decide
 
-Importing these files as they stand blocks work in two ways. Both are policy,
-not defects, so they are decisions rather than fixes:
+Importing these files as they stand blocks work in one way. It is policy, not a
+defect, so it is a decision rather than a fix:
 
-1. **One maintainer cannot approve their own pull requests.** Both rulesets
-   require an approval, and `main` additionally requires it from a code owner,
-   and from someone other than the last pusher. With a single maintainer who
-   is also the author, neither branch can merge anything. The escape hatch this
-   design allows: add the administrator as a bypass actor **on `develop`
-   only**, explicitly and versioned here — never loosen `main`. That still
-   leaves releases to `main` needing a second person with write access.
-2. **The handoff refresh pushes straight to `main`.** `handoff.yml` commits the
-   regenerated `HANDOFF.md` snapshot directly, which the pull-request rule
-   refuses. A bypass for GitHub Actions would let it through, but would then
-   let *any* workflow with a write token push to `main` — and every refresh
-   commit lands on `main` without reaching `develop`, so the snapshot block
-   conflicts on every following release. The refresh needs redesigning before
-   `main` is protected, not a bypass. See `HANDOFF.md` §4.3.
+**One maintainer cannot approve their own pull requests.** Both rulesets
+require an approval, and `main` additionally requires it from a code owner,
+and from someone other than the last pusher. With a single maintainer who
+is also the author, neither branch can merge anything. The escape hatch this
+design allows: add the administrator as a bypass actor **on `develop`
+only**, explicitly and versioned here — never loosen `main`. That still
+leaves releases to `main` needing a second person with write access.
+
+Nothing else in the repository pushes to a protected branch. The `HANDOFF.md`
+snapshot used to be committed to `main` by a workflow; it is now checked in CI
+instead, so no bot needs a bypass.
 
 ## Applying the rules
 

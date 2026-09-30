@@ -6,8 +6,15 @@
 #
 # HANDOFF.md is mostly prose -- roadmap, constraints, working agreement -- and
 # that prose is hand-written and left alone. What rots is the factual snapshot:
-# the commit log, the file layout, the module and its dependencies, whether the
+# the file layout, the module and its dependencies, the packages, whether the
 # tests pass. Those live between generated markers and are rewritten here.
+#
+# The snapshot is a function of the tree alone. CI regenerates it and fails if
+# the committed copy differs, the way THIRD_PARTY_NOTICES.md is checked, so it
+# must come out identical on a pull request's head and on the merge that lands
+# it. That rules out anything read from history -- the commit log, a commit
+# count, a branch name -- because merging changes all three and not the tree.
+# For history, run git log.
 #
 # The markers are:
 #
@@ -93,11 +100,6 @@ list_direct_deps() {
 	else
 		printf -- '- none\n\n'
 	fi
-
-	printf '**Commit log** (%s commits on `%s`, newest first):\n\n```\n' \
-		"$(git rev-list --count HEAD)" "$(git rev-parse --abbrev-ref HEAD)"
-	git log --oneline --no-decorate -15
-	printf '```\n\n'
 
 	printf '**Tracked files:**\n\n```\n'
 	git ls-files

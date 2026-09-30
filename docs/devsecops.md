@@ -34,7 +34,7 @@ not CLA acceptance, and that external pull requests are not merged yet.
 
 | Workflow | Runs on | Gate |
 | --- | --- | --- |
-| `ci.yml` | push and PR to `develop`/`main`, tags | DCO, licence gate, build, vet, cross-compile, lint, `go test -race`, gosec, govulncheck |
+| `ci.yml` | push and PR to `develop`/`main`, tags | DCO, licence gate, build, vet, cross-compile, lint, `go test -race`, `HANDOFF.md` snapshot, gosec, govulncheck |
 | `codeql.yml` | push and PR, weekly — **when `CODE_SCANNING` is set** | CodeQL `security-extended` for Go |
 | `secret-scan.yml` | push and PR, weekly | gitleaks over the PR commit range, or the tree and full history |
 | `dependency-review.yml` | PR — **when `CODE_SCANNING` is set** | what the PR adds: advisories at `low` and above, denied licences |
@@ -107,9 +107,9 @@ are the half of DevSecOps that a pull request cannot deliver:
 2. **Branch protection on `develop` and `main`.** The rules live as code in
    [`.github/rulesets/`](../.github/rulesets/), and
    [branching.md](branching.md) explains each one — including why `main` has
-   neither linear history nor required signatures yet, and the two decisions
-   to take before importing them (a single maintainer cannot approve their own
-   pull requests, and the handoff refresh pushes straight to `main`). Import
+   neither linear history nor required signatures yet, and the decision to
+   take before importing them: a single maintainer cannot approve their own
+   pull requests. Import
    those files rather than configuring rules by hand: a hand-made rule that is
    not in the files is drift.
 

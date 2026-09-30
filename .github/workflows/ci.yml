@@ -120,6 +120,20 @@ jobs:
       - name: Test
         run: go test -race -coverprofile=coverage.out ./...
 
+      # HANDOFF.md's snapshot block is generated from the tree. Checked here
+      # rather than committed by a bot: a workflow pushing to main would need a
+      # bypass of the branch protection in .github/rulesets/, and its commits
+      # would reach main without reaching develop, so the block would conflict
+      # at every release. See docs/branching.md.
+      - name: HANDOFF.md snapshot is current
+        run: |
+          ./scripts/gen-handoff.sh HANDOFF.md
+          if ! git diff --exit-code --stat -- HANDOFF.md; then
+            echo "::error::HANDOFF.md's snapshot is out of date. Run ./scripts/gen-handoff.sh and commit the result."
+            git diff -- HANDOFF.md
+            exit 1
+          fi
+
       - name: SAST (gosec)
         run: go run github.com/securego/gosec/v2/cmd/gosec@v2.22.1 ./...
 
