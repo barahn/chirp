@@ -83,12 +83,15 @@ Report vulnerabilities privately to
 
 Chirp grants remote control of an end user's machine, so its pipeline treats
 that as the threat model rather than an afterthought: every pull request runs
-gosec, CodeQL, govulncheck, dependency review, gitleaks and a third-party
-licence gate, with every action pinned to a commit SHA. What each gate is for,
+gosec, govulncheck, gitleaks and a third-party licence gate, with every action
+pinned to a commit SHA. CodeQL and dependency review are wired in too, and turn
+on when the repository has code scanning available -- see
+[docs/devsecops.md](docs/devsecops.md). What each gate is for,
 and the repository settings that back it, are in
 [docs/devsecops.md](docs/devsecops.md).
 
-`develop` is the default branch; branch and open pull requests from there.
+`develop` is the integration branch: branch from it and open pull requests
+against it. `main` receives releases from `develop`.
 
 ## Licence
 

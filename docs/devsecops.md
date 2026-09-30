@@ -35,10 +35,29 @@ not CLA acceptance, and that external pull requests are not merged yet.
 | Workflow | Runs on | Gate |
 | --- | --- | --- |
 | `ci.yml` | push and PR to `develop`/`main`, tags | DCO, licence gate, build, vet, cross-compile, lint, `go test -race`, gosec, govulncheck |
-| `codeql.yml` | push and PR, weekly | CodeQL `security-extended` for Go |
+| `codeql.yml` | push and PR, weekly — **when `CODE_SCANNING` is set** | CodeQL `security-extended` for Go |
 | `secret-scan.yml` | push and PR, weekly | gitleaks over the PR commit range, or the tree and full history |
-| `dependency-review.yml` | PR | what the PR adds: advisories at `low` and above, denied licences |
+| `dependency-review.yml` | PR — **when `CODE_SCANNING` is set** | what the PR adds: advisories at `low` and above, denied licences |
 | `sbom.yml` | release tags | SPDX SBOM attached to the release |
+
+### CodeQL and dependency review are off until `CODE_SCANNING` is set
+
+This repository is private, and on a private repository GitHub runs both only
+with GitHub Advanced Security (Code Security). That was observed, not assumed:
+on barahn/chirp#1, dependency review failed with *"not supported on this
+repository ... ensure Dependency graph is enabled along with GitHub Advanced
+Security"*, and CodeQL's analysis completed but the job ended in a
+configuration error. The CodeQL licence also permits analysing private code
+only under that entitlement, so this is not a gate to force through.
+
+Both jobs therefore run only when the repository variable `CODE_SCANNING` is
+`true`. Set it once the repository is public — where both are free — or once
+Code Security is enabled. Until then each run carries a warning saying the gate
+is off, so its absence is visible rather than quietly green.
+
+Note the interaction with required checks: a skipped job **counts as passing**.
+Marking `Analyze (Go)` or `Review dependency changes` as required before
+`CODE_SCANNING` is set enforces nothing.
 
 Why the overlaps are not redundant:
 
@@ -100,6 +119,35 @@ are the half of DevSecOps that a pull request cannot deliver:
    - Block force pushes and deletions; apply the rule to administrators.
    - On `main`, additionally restrict who may push, so it can only be reached
      through a pull request from `develop`.
+
+   > **Three of these conflict with things already running. Resolve them before
+   > applying the rule, not after — each one fails loudly only once it is on.**
+   >
+   > - **Restricting pushes to `main` breaks the handoff refresh.**
+   >   `handoff.yml` commits the regenerated snapshot straight to `main` with
+   >   `GITHUB_TOKEN`. Under a pull-request-only rule that push is rejected on
+   >   every run. Either grant a bypass to a GitHub App whose token the workflow
+   >   uses, or drop the push and turn the refresh into a pull-request-time
+   >   check the way `THIRD_PARTY_NOTICES.md` already works.
+   > - **Linear history on `main` is incompatible with the `develop` → `main`
+   >   flow as it stands.** A release from a long-lived `develop` is a merge
+   >   commit, which linear history forbids. Squashing instead makes `develop`
+   >   diverge from `main` at every release, and the next release pull request
+   >   carries every previous change again. Linear history fits `develop`, where
+   >   feature branches are squashed in; on `main` it needs `develop` rewritten
+   >   after each release, which the rule on `develop` then forbids.
+   > - **Signed commits rejects both the refresh and every agent-made commit.**
+   >   A commit made with `git` inside a workflow is unsigned; so are commits
+   >   made by coding agents working in this repository. A DCO `Signed-off-by`
+   >   trailer is not a signature. Commits created through the GitHub API are
+   >   signed by GitHub, so the refresh can be moved to that; agent commits need
+   >   a signing key provisioned to the environment, or the rule scoped to
+   >   exclude them.
+   >
+   > The combination that satisfies all three: linear history on `develop`
+   > only; merge commits for `develop` → `main` releases; the refresh committed
+   > through the API by an App with a bypass on `main`. That is a
+   > recommendation, not a decision already made.
 
 3. **Code security** (Settings → Advanced Security):
    - Secret scanning **and** push protection. gitleaks in CI catches a secret
