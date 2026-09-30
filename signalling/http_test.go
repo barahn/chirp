@@ -349,3 +349,87 @@ func TestClientIPHookSetsTheOrigin(t *testing.T) {
 		t.Fatalf("users behind one proxy throttled each other: status %d", got)
 	}
 }
+
+// waitFor polls until cond holds, failing the test after five seconds.
+func waitFor(t *testing.T, what string, cond func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		if cond() {
+			return
+		}
+		time.Sleep(time.Millisecond)
+	}
+	t.Fatalf("timed out waiting for %s", what)
+}
+
+// The agent taking its place is the moment the join page waits for: the
+// session moves from pending to connected, and records where the agent is.
+func TestAgentArrivalConnectsTheSession(t *testing.T) {
+	srv, ts := newServer(t)
+	sess := create(t, ts)
+
+	if _, _, err := dial(t, ts, url.Values{"role": {"technician"}, "session": {sess.SessionID}}); err != nil {
+		t.Fatalf("technician dial: %v", err)
+	}
+	waitFor(t, "technician to join", func() bool { tech, _ := srv.Hub().Connected(sess.SessionID); return tech })
+	if got, _ := srv.sessions.GetSession(sess.SessionID); got.State != session.StatePending {
+		t.Fatalf("the technician alone moved the session to %s", got.State)
+	}
+
+	if _, _, err := dial(t, ts, url.Values{"role": {"agent"}, "code": {sess.Code}}); err != nil {
+		t.Fatalf("agent dial: %v", err)
+	}
+	waitFor(t, "session to become connected", func() bool {
+		got, _ := srv.sessions.GetSession(sess.SessionID)
+		return got.State == session.StateConnected
+	})
+
+	got, _ := srv.sessions.GetSession(sess.SessionID)
+	if got.ClientInfo == nil || got.ClientInfo.RemoteIP != "127.0.0.1" {
+		t.Errorf("client info = %+v, want the agent's address recorded", got.ClientInfo)
+	}
+	if got.ConnectedAt == nil {
+		t.Error("ConnectedAt was not recorded")
+	}
+}
+
+// An agent that drops and dials back is reconnecting, not guessing. It must be
+// let back in, the session must stay connected, and it must not be charged
+// against the redemption budget -- with a budget of one, a charge would lock
+// it out.
+func TestAgentReconnectionIsNotAnError(t *testing.T) {
+	srv, ts := newServer(t)
+	srv.sessions.SetRedemptionLimit(1, time.Minute)
+	sess := create(t, ts)
+
+	first, _, err := dial(t, ts, url.Values{"role": {"agent"}, "code": {sess.Code}})
+	if err != nil {
+		t.Fatalf("agent dial: %v", err)
+	}
+	waitFor(t, "session to become connected", func() bool {
+		got, _ := srv.sessions.GetSession(sess.SessionID)
+		return got.State == session.StateConnected
+	})
+
+	_ = first.Close()
+	waitFor(t, "agent to leave the hub", func() bool { _, agent := srv.Hub().Connected(sess.SessionID); return !agent })
+
+	for i := 0; i < 3; i++ {
+		again, resp, err := dial(t, ts, url.Values{"role": {"agent"}, "code": {sess.Code}})
+		if err != nil {
+			status := 0
+			if resp != nil {
+				status = resp.StatusCode
+			}
+			t.Fatalf("reconnection %d refused: %v (status %d)", i+1, err, status)
+		}
+		waitFor(t, "agent to rejoin", func() bool { _, agent := srv.Hub().Connected(sess.SessionID); return agent })
+		_ = again.Close()
+		waitFor(t, "agent to leave again", func() bool { _, agent := srv.Hub().Connected(sess.SessionID); return !agent })
+	}
+
+	if got, _ := srv.sessions.GetSession(sess.SessionID); got.State != session.StateConnected {
+		t.Fatalf("reconnections moved the session to %s", got.State)
+	}
+}

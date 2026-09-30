@@ -245,6 +245,13 @@ func (s *Server) serveWS(w http.ResponseWriter, r *http.Request) {
 		_ = peer.Close()
 	}()
 
+	if role == RoleAgent {
+		if err := s.agentArrived(r, sess); err != nil {
+			_ = peer.Send(encodeError(err))
+			return
+		}
+	}
+
 	for {
 		_, data, err := conn.ReadMessage()
 		if err != nil {
@@ -258,6 +265,31 @@ func (s *Server) serveWS(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+}
+
+// agentArrived moves a session from pending to connected when its agent takes
+// its place in the hub -- the moment the join page waits for between the code
+// being accepted and the agent reporting in.
+//
+// It runs only after Join has succeeded, so a second agent refused with
+// ErrRoleTaken never marks the session. And it acts only on a pending session:
+// an agent that dropped and dialled back finds the session already past
+// pending, which is a reconnection, not an error. ConnectClient counts a
+// refusal against the caller's redemption budget, so calling it on a session
+// that is not pending would charge a legitimate reconnection as a guess.
+func (s *Server) agentArrived(r *http.Request, sess *session.Session) error {
+	if sess.State != session.StatePending {
+		return nil
+	}
+	_, err := s.sessions.ConnectClient(sess.Code, &session.ClientInfo{
+		RemoteIP:  s.clientIP(r),
+		UserAgent: r.UserAgent(),
+	})
+	if errors.Is(err, session.ErrSessionNotPending) {
+		// Another request moved it on between the lookup and here.
+		return nil
+	}
+	return err
 }
 
 // lookup resolves a typed code to its session, normalising the formatting a
