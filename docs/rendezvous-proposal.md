@@ -1,7 +1,7 @@
 # Proposal: a rendezvous mechanism for remotekit
 
 **Status:** the mechanism is written, in remotekit's new `rendezvous` package —
-barahn/remotekit#28, open against `develop`. The maintainer chose to write it
+merged into remotekit's `develop` in barahn/remotekit#28. The maintainer chose to write it
 fresh there rather than move Chirp's code, so nothing was relicensed; the same
 behaviours are proven by tests rewritten in remotekit. The two-peer signalling
 relay is not in it yet: it belongs with remotekit's Phase 2 `Signaler`. Chirp
