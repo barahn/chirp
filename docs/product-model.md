@@ -87,9 +87,16 @@ Decided by the maintainer:
    for the same reason a link mints a fresh code per use: a code that has done
    its job opens nothing.
 
+3. **At most 30 simultaneous sessions per address.** One network address may
+   hold at most 30 sessions open as controller at once; the 31st redemption is
+   refused (`429`) without spending the code, and ending a session frees a
+   place. Since nobody has an account, the address is the only "user" the
+   relay can count — people behind one NAT share the 30. Operators can change
+   it (`SetMaxSessionsPerOrigin`).
+
 Still open, to decide when the download site exists:
 
-3. **How a link reaches a freshly downloaded Chirp.** With no installation there
+4. **How a link reaches a freshly downloaded Chirp.** With no installation there
    is no pre-registered handler, so the link's token has to get from the browser
    into the binary somehow: a custom URL scheme registered on first run, the
    token carried in the download itself, or pasted on first start. Each trades

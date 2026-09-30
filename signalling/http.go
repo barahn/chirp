@@ -509,6 +509,8 @@ func writeError(w http.ResponseWriter, status int, msg string) {
 // code once existed, and six digits is a small space to guess in.
 func writeSessionError(w http.ResponseWriter, err error) {
 	switch {
+	case errors.Is(err, session.ErrTooManySessions):
+		writeError(w, http.StatusTooManyRequests, "too many open sessions, end one first")
 	case errors.Is(err, session.ErrThrottled):
 		writeError(w, http.StatusTooManyRequests, "too many attempts, try again later")
 	case errors.Is(err, session.ErrCodeNotFound), errors.Is(err, session.ErrCodeExpired),

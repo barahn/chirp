@@ -324,7 +324,7 @@ func TestConcurrentAccess(t *testing.T) {
 				t.Errorf("RegisterPeer: %v", err)
 				return
 			}
-			sess, err := sm.Redeem(string(p.Code), "c", info())
+			sess, err := sm.Redeem(string(p.Code), "c", &session.ClientInfo{RemoteIP: fmt.Sprint("origin ", i)})
 			if err != nil {
 				t.Errorf("Redeem: %v", err)
 				return
@@ -362,4 +362,31 @@ func TestConsentRequiresARequest(t *testing.T) {
 			t.Fatalf("a refused consent was recorded: state %s", s.State)
 		}
 	}
+}
+
+// One origin may hold at most DefaultMaxSessionsPerOrigin open sessions; a
+// refused redemption leaves the owner's code usable, and ending a session makes
+// room again.
+func TestSessionsPerOriginAreCapped(t *testing.T) {
+	sm := session.NewSessionManager(10 * time.Minute)
+	defer sm.Close()
+
+	var first *session.Session
+	for i := 0; i < session.DefaultMaxSessionsPerOrigin; i++ {
+		_, s := open(t, sm)
+		if first == nil {
+			first = s
+		}
+	}
+	p, _ := sm.RegisterPeer("One too many")
+	if _, err := sm.Redeem(string(p.Code), "c", info()); !errors.Is(err, session.ErrTooManySessions) {
+		t.Fatalf("session %d: got %v, want ErrTooManySessions", session.DefaultMaxSessionsPerOrigin+1, err)
+	}
+	if _, err := sm.Redeem(string(p.Code), "c", &session.ClientInfo{RemoteIP: "203.0.113.9"}); err != nil {
+		t.Fatalf("the refused code was burnt, or another origin was capped: %v", err)
+	}
+	if _, err := sm.EndSession(first.ID); err != nil {
+		t.Fatal(err)
+	}
+	_, _ = open(t, sm) // fails the test if there is still no room
 }
