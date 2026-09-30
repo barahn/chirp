@@ -67,15 +67,13 @@ These are consequences of the model, stated so nobody has to rediscover them:
   single-use, but the link itself mints again until it stops being valid. Every
   connection it creates still needs user 2's consent. A link lives only while
   its sharer's Chirp runs, and can be revoked — see Decisions, below.
-- **The relay is trusted, and self-hosting is how you avoid trusting someone
-  else's.** A relay sees the codes it routes by, so it could impersonate either
-  end. That is the same model as Barahn and every mainstream remote-support tool,
-  and it is compatible with Chirp's commitment that a hosted service is a
-  convenience and never a requirement: anyone who does not want to trust a hosted
-  relay runs their own. Removing that trust entirely would need a
-  password-authenticated key exchange over a secret the relay never sees, which
-  means changing the code format. That is possible future hardening, not a
-  requirement — see `HANDOFF.md` §5.5.
+- **The public server is blind to the traffic** (decision 4). It hands out the
+  binary and links, and knows nothing of what passes between two Chirps. A
+  relay that saw the codes it routes by could impersonate either end, so the
+  code must be split: a routing part the network may see, and a secret part
+  that never leaves the two people, used in a password-authenticated key
+  exchange (PAKE) that binds the two ends. What that means for the code a
+  person reads aloud is still to be decided.
 
 ## Decisions
 
@@ -94,9 +92,27 @@ Decided by the maintainer:
    relay can count — people behind one NAT share the 30. Operators can change
    it (`SetMaxSessionsPerOrigin`).
 
-Still open, to decide when the download site exists:
+4. **The public server is blind, and every running Chirp is a node.** The
+   public server distributes the binary and links and has no knowledge of the
+   traffic passing through it. Each running Chirp becomes a node of the
+   network, and nodes carry each other's rendezvous and signalling. Its
+   consequences:
+   - **A PAKE is required**, not optional hardening: without it whoever
+     carries the signalling could sit in the middle. The code gains a secret
+     part the network never sees.
+   - **Finding a node is mechanism** — peer discovery and relaying between
+     nodes — and belongs in remotekit, with its Phase 2 `Signaler`.
+   - **Abuse limits move to the nodes.** The per-origin throttle and the
+     30-session cap (decision 3) run today in a central server. With no
+     server in the path, each node enforces them on what reaches it, and the
+     PAKE itself bounds guessing: one guess per attempt, visible to both ends.
+   - The central signalling server in this repository is **transitional**: it
+     is what runs until nodes can find each other, and remains what a
+     self-hoster may run.
 
-4. **How a link reaches a freshly downloaded Chirp.** With no installation there
+Still open:
+
+5. **How a link reaches a freshly downloaded Chirp.** With no installation there
    is no pre-registered handler, so the link's token has to get from the browser
    into the binary somehow: a custom URL scheme registered on first run, the
    token carried in the download itself, or pasted on first start. Each trades
@@ -114,7 +130,9 @@ consent prompt and the binary are Chirp's. The proposed split is in
 
 ## What the code does today
 
-The session layer and the signalling relay implement this model: a running
+The session layer and the signalling relay implement this model's flow, but
+through a central server that sees the codes — the transitional arrangement
+decision 4 replaces: a running
 Chirp registers and gets its code and link, whoever redeems the code opens a
 session to control it, and consent is asked of the owner over its own socket.
 There is no binary yet, so no prompt is drawn. `HANDOFF.md` §4.5 describes the

@@ -337,7 +337,7 @@ From `README.md`'s own "not here yet" list:
 2. ~~**The Nest** — a `/join` web page where the helped person types a PIN.~~
    Superseded: in the product model nobody types a code into a web page, and
    consent happens in the binary. The site only offers the download, and may
-   land people who open a share link (see decision 4, still open, in
+   land people who open a share link (see decision 5, still open, in
    `docs/product-model.md`).
 3. **The `cmd/chirp` binary** — the one program both sides run. It shows its own
    code and link, redeems someone else's, shows the consent prompt, and uses
@@ -403,6 +403,12 @@ commitments — "any hosted service is a convenience, never a requirement". A
 hosted Chirp relay that the endpoints cannot verify around is not a
 convenience; it is the trusted third party the commitment says it must not be.
 
+**Superseded by maintainer decision (product model, decision 4): the public
+server is blind to the traffic and every running Chirp is a node, so an
+untrusted carrier is now a requirement and the PAKE below is on the critical
+path.** The paragraph that follows is kept as the reasoning that stood until
+then.
+
 **Is an untrusted relay required? No — correcting an earlier version of this
 section.** It argued that a hosted relay the endpoints cannot verify around is
 "the trusted third party the design commitment rules out". The commitment says
@@ -443,7 +449,8 @@ magic-wormhole's codes are exactly that: a nameplate for routing, words for the
 secret. For Chirp it means the code a technician reads aloud gets longer, or
 its six digits are divided — a product decision, not an implementation detail.
 
-Proposal, for the maintainer to decide before any client is written:
+Proposal — now required by decision 4 — for the maintainer to decide before
+any client is written:
 
 1. **Choose the code format.** For example, keep six digits for routing and
    add a short secret the technician also reads out; or keep six digits total
@@ -563,5 +570,11 @@ Still to decide or do, in order:
    the owner socket, shows the consent prompt with the controller's name as a
    claim, redeems other people's codes, and uses remotekit to share the screen
    (§5.5).
-5. **How a link reaches a freshly downloaded binary** — still open, until the
-   download site exists (`docs/product-model.md`, decision 4).
+5. **Decentralised network (decision 4)** — in order: choose the code format
+   (routing part + secret part, §5.5 item 1); choose and vet a PAKE (CPace or
+   SPAKE2, through the licence gate); design node discovery and node-to-node
+   relaying in remotekit alongside its Phase 2 `Signaler`; then move the
+   throttle and the 30-session cap to the nodes. Until then the central
+   server here is transitional, and item 3 applies only to it.
+6. **How a link reaches a freshly downloaded binary** — still open, until the
+   download site exists (`docs/product-model.md`, decision 5).
