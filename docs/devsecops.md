@@ -104,50 +104,14 @@ are the half of DevSecOps that a pull request cannot deliver:
 1. **Default branch → `develop`**
    Settings → Branches → Default branch → switch to `develop`.
 
-2. **Branch protection on `develop` and `main`** (Settings → Rules → Rulesets, or
-   Branches → Add rule):
-   - Require a pull request before merging; require 1 approval.
-   - Dismiss stale approvals when new commits are pushed.
-   - Require review from Code Owners (this is what makes
-     [`.github/CODEOWNERS`](../.github/CODEOWNERS) a gate rather than a
-     suggestion).
-   - Require status checks to pass, and require branches to be up to date:
-     `Build, Test & SAST`, `Analyze (Go)`, `gitleaks`, and on `develop`,
-     `Review dependency changes`.
-   - Require signed commits.
-   - Require linear history.
-   - Block force pushes and deletions; apply the rule to administrators.
-   - On `main`, additionally restrict who may push, so it can only be reached
-     through a pull request from `develop`.
-
-   > **Three of these conflict with things already running. Resolve them before
-   > applying the rule, not after — each one fails loudly only once it is on.**
-   >
-   > - **Restricting pushes to `main` breaks the handoff refresh.**
-   >   `handoff.yml` commits the regenerated snapshot straight to `main` with
-   >   `GITHUB_TOKEN`. Under a pull-request-only rule that push is rejected on
-   >   every run. Either grant a bypass to a GitHub App whose token the workflow
-   >   uses, or drop the push and turn the refresh into a pull-request-time
-   >   check the way `THIRD_PARTY_NOTICES.md` already works.
-   > - **Linear history on `main` is incompatible with the `develop` → `main`
-   >   flow as it stands.** A release from a long-lived `develop` is a merge
-   >   commit, which linear history forbids. Squashing instead makes `develop`
-   >   diverge from `main` at every release, and the next release pull request
-   >   carries every previous change again. Linear history fits `develop`, where
-   >   feature branches are squashed in; on `main` it needs `develop` rewritten
-   >   after each release, which the rule on `develop` then forbids.
-   > - **Signed commits rejects both the refresh and every agent-made commit.**
-   >   A commit made with `git` inside a workflow is unsigned; so are commits
-   >   made by coding agents working in this repository. A DCO `Signed-off-by`
-   >   trailer is not a signature. Commits created through the GitHub API are
-   >   signed by GitHub, so the refresh can be moved to that; agent commits need
-   >   a signing key provisioned to the environment, or the rule scoped to
-   >   exclude them.
-   >
-   > The combination that satisfies all three: linear history on `develop`
-   > only; merge commits for `develop` → `main` releases; the refresh committed
-   > through the API by an App with a bypass on `main`. That is a
-   > recommendation, not a decision already made.
+2. **Branch protection on `develop` and `main`.** The rules live as code in
+   [`.github/rulesets/`](../.github/rulesets/), and
+   [branching.md](branching.md) explains each one — including why `main` has
+   neither linear history nor required signatures yet, and the two decisions
+   to take before importing them (a single maintainer cannot approve their own
+   pull requests, and the handoff refresh pushes straight to `main`). Import
+   those files rather than configuring rules by hand: a hand-made rule that is
+   not in the files is drift.
 
 3. **Code security** (Settings → Advanced Security):
    - Secret scanning **and** push protection. gitleaks in CI catches a secret
