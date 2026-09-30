@@ -321,10 +321,59 @@ hosted Chirp relay that the endpoints cannot verify around is not a
 convenience; it is the trusted third party the commitment says it must not be.
 
 So: **Chirp's signalling hub should be a relay the endpoints do not have to
-trust, and remotekit already has the parts.** That is a design decision for the
-maintainer, not a defect — but decide it before the Nest and `cmd/chirp` are
-written against an unauthenticated envelope, because retrofitting it later means
-changing both ends and the relay at once.
+trust.** The maintainer has decided to pursue that now, before any client
+exists. But remotekit has only half of what it takes, and the other half
+changes the product.
+
+**Correction: signing is necessary, not sufficient.** An earlier version of
+this section said remotekit "already has the parts". It does not. A signature
+proves a message came from the holder of a key; it removes trust in the relay
+only if each end already knows the other's key by a route the relay does not
+control. Barahn has that route — an agent generates a keypair at enrolment and
+the key is pinned then. Chirp has no enrolment. Technician and helped person
+meet for the first time, and if their public keys travel through the relay, a
+malicious relay substitutes its own and signs everything itself: every
+signature verifies, and proves nothing.
+
+**What binds the keys is a PAKE over a secret the relay never sees.** A
+password-authenticated key exchange lets two parties who share a short secret
+agree on a key such that an impersonator gets exactly one guess per attempt,
+learns nothing it can test offline, and fails visibly. That key then
+authenticates each end's signing key, and remotekit's `signed.go` — with its
+`NonceCache` — carries every signal after that. This is the shape
+magic-wormhole uses for the same first-contact problem.
+
+**The hard constraint: today the relay sees the whole PIN.** The agent joins
+with `/ws?code=`, and the relay routes by that code. A relay that knows the
+secret runs the PAKE with both ends and is the man in the middle again.
+Hashing the code does not help — 900,000 values invert instantly. So an
+untrusted relay requires **splitting the code** into a routing part the relay
+sees and a secret part used only in the PAKE and never sent to the relay.
+magic-wormhole's codes are exactly that: a nameplate for routing, words for the
+secret. For Chirp it means the code a technician reads aloud gets longer, or
+its six digits are divided — a product decision, not an implementation detail.
+
+Proposal, for the maintainer to decide before any client is written:
+
+1. **Choose the code format.** For example, keep six digits for routing and
+   add a short secret the technician also reads out; or keep six digits total
+   and split them. The secret's length sets the odds of the relay's single
+   guess per attempt, and a failed PAKE is visible to both ends.
+2. **Choose the PAKE.** CPace (an IETF CFRG draft) is the natural candidate,
+   SPAKE2 the alternative. A Go implementation must be found and vetted at
+   that point — maintenance, review history, and a permissive licence through
+   the licence gate. Do not hand-roll it.
+3. **Then the protocol:** each end runs the PAKE through the relay as opaque
+   messages, sends its ed25519 public key authenticated under the PAKE key, and
+   from then on every signal is a remotekit `SignalMessage` signed and verified
+   against the pinned key, replay-checked with `NonceCache`.
+4. **Relay messages stay unauthenticated** — they come from the relay by
+   definition — so an end must treat `chirp.*` messages as hints (presence,
+   errors) and never act on them for anything security-relevant.
+
+Until then, the relay is trusted, and a hosted relay is the trusted third party
+the design commitment rules out. That is the honest state of things, and the
+reason this cannot be finished by adopting `signed.go` alone.
 
 One caveat when reading that document: its status line says "proposal, not
 accepted. Nothing here has been implemented", and for its Phase 0 item 3
@@ -398,9 +447,9 @@ as §4.3 describes).
 Still to decide or do, in order:
 
 1. **Decide the approval policy** (§4.3), then import the rulesets. barahn/chirp#1 is closed; its four unique files are ported.
-2. **Decide the signalling protocol before either end is written against it**:
-   the signed envelope (§5.5) and a presence notice (§4.3). Both change what the
-   technician's viewer and the agent must speak, so they are cheap now and
-   expensive once a client exists.
+2. **Design the authenticated key exchange before either end is written**
+   (§5.5). The maintainer chose to adopt signed signalling now. Signing alone
+   does not make the relay untrusted here, because Chirp's ends share no keys
+   in advance — only the PIN. See §5.5 for why, and for the proposal.
 3. **The Nest** — the `/join` page (§5.2).
 4. **`cmd/chirp`** — the first place remotekit becomes a dependency (§5.3, §5.5).
