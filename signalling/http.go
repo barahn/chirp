@@ -119,6 +119,37 @@ type sessionView struct {
 	SessionID string `json:"session_id"`
 	State     string `json:"state"`
 	ExpiresIn int    `json:"expires_in_seconds"`
+
+	// Consent is present only while the session is asking for it. It is what
+	// the join page shows the person -- who is asking and for what -- and
+	// consent given without it is not informed consent.
+	Consent *consentView `json:"consent_request,omitempty"`
+}
+
+type consentView struct {
+	TechnicianName       string   `json:"technician_name"`
+	RequestedPermissions []string `json:"requested_permissions"`
+}
+
+// viewOf renders a session for the join page.
+//
+// Before consent is requested it returns nothing the caller did not already
+// know or is not waiting on. Once it is requested, who is asking and for which
+// permissions is exactly what the caller is waiting on, so it is included then
+// and at no other time.
+func viewOf(sess *session.Session) sessionView {
+	v := sessionView{
+		SessionID: sess.ID,
+		State:     string(sess.State),
+		ExpiresIn: int(sess.RemainingTTL().Seconds()),
+	}
+	if sess.State == session.StateConsentRequested {
+		v.Consent = &consentView{
+			TechnicianName:       sess.TechnicianName,
+			RequestedPermissions: append([]string(nil), session.DefaultPermissions...),
+		}
+	}
+	return v
 }
 
 // getSession lets the join page follow a session without holding a socket
@@ -135,11 +166,7 @@ func (s *Server) getSession(w http.ResponseWriter, r *http.Request) {
 		writeSessionError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, sessionView{
-		SessionID: sess.ID,
-		State:     string(sess.State),
-		ExpiresIn: int(sess.RemainingTTL().Seconds()),
-	})
+	writeJSON(w, http.StatusOK, viewOf(sess))
 }
 
 func (s *Server) submitConsent(w http.ResponseWriter, r *http.Request) {
@@ -164,11 +191,7 @@ func (s *Server) submitConsent(w http.ResponseWriter, r *http.Request) {
 		writeSessionError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, sessionView{
-		SessionID: sess.ID,
-		State:     string(sess.State),
-		ExpiresIn: int(sess.RemainingTTL().Seconds()),
-	})
+	writeJSON(w, http.StatusOK, viewOf(sess))
 }
 
 // wsConn adapts a WebSocket to the hub's Conn.
@@ -269,7 +292,12 @@ func (s *Server) serveWS(w http.ResponseWriter, r *http.Request) {
 
 // agentArrived moves a session from pending to connected when its agent takes
 // its place in the hub -- the moment the join page waits for between the code
-// being accepted and the agent reporting in.
+// being accepted and the agent reporting in -- and then asks for consent.
+//
+// The consent prompt lives in the join page, the Nest: the page the person
+// typed the code into polls the session, and shows who is asking and for what
+// once the session reaches consent_requested. So the request is made here, as
+// soon as there is a machine to consent for, and not before.
 //
 // It runs only after Join has succeeded, so a second agent refused with
 // ErrRoleTaken never marks the session. And it acts only on a pending session:
@@ -278,15 +306,35 @@ func (s *Server) serveWS(w http.ResponseWriter, r *http.Request) {
 // refusal against the caller's redemption budget, so calling it on a session
 // that is not pending would charge a legitimate reconnection as a guess.
 func (s *Server) agentArrived(r *http.Request, sess *session.Session) error {
-	if sess.State != session.StatePending {
+	state := sess.State
+	if state == session.StatePending {
+		connected, err := s.sessions.ConnectClient(sess.Code, &session.ClientInfo{
+			RemoteIP:  s.clientIP(r),
+			UserAgent: r.UserAgent(),
+		})
+		switch {
+		case errors.Is(err, session.ErrSessionNotPending):
+			// Another request moved it on between the lookup and here; read
+			// where it went rather than assume.
+			cur, getErr := s.sessions.GetSession(sess.ID)
+			if getErr != nil {
+				return getErr
+			}
+			state = cur.State
+		case err != nil:
+			return err
+		default:
+			state = connected.State
+		}
+	}
+	if state != session.StateConnected {
+		// Already asked, or already decided: a reconnecting agent changes
+		// nothing.
 		return nil
 	}
-	_, err := s.sessions.ConnectClient(sess.Code, &session.ClientInfo{
-		RemoteIP:  s.clientIP(r),
-		UserAgent: r.UserAgent(),
-	})
-	if errors.Is(err, session.ErrSessionNotPending) {
-		// Another request moved it on between the lookup and here.
+	_, err := s.sessions.RequestConsent(sess.Code)
+	if errors.Is(err, session.ErrInvalidState) {
+		// Moved on concurrently; the request it would have made was made.
 		return nil
 	}
 	return err

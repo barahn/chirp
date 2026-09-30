@@ -226,13 +226,15 @@ against the merged tree before being fixed:
   whoever guessed a code could consent in the helped person's place. It now
   requires `consent_requested`, which is what the branch's own tests assumed.
 
-**The consequence to know:** an agent taking its place in the hub now moves
-the session from `pending` to `connected`, recording its address and user
-agent. A reconnecting agent is let back in without touching the state or its
-redemption budget. Nothing yet moves a session to `consent_requested` — no
-code calls `RequestConsent` — so the consent endpoint refuses every real
-session, which is correct: consent that can be given before it is requested
-is not consent. What should trigger the request is the open question in §8.
+**How a session now moves:** an agent taking its place in the hub moves it
+from `pending` to `connected`, recording its address and user agent, and the
+server immediately requests consent. The consent prompt lives in the Nest —
+the maintainer's decision — so the join page, polling `GET
+/api/sessions/{code}`, sees `consent_requested` together with who is asking
+and for which permissions, and answers with `POST .../consent`. Those details
+are disclosed only in that state. A reconnecting agent changes nothing and is
+not charged against its redemption budget. `TestConsentFlowEndToEnd` drives
+the whole path through HTTP alone.
 
 Also found: `TestSignallingCrossesBetweenPeers` failed 2 runs in 15 under CPU
 load. A client's `Dial` returns when the server writes the upgrade response,
@@ -247,8 +249,8 @@ From `README.md`'s own "not here yet" list:
 1. **A signalling server — exists** (`signalling/`, integrated in `02cadc3`).
    A two-peer relay plus an HTTP surface, written fresh around
    `SessionManager`; the Barahn one is proprietary and was not ported. It
-   moves a session to `connected` when the agent arrives. Still missing: the
-   move to `consent_requested` (§4.4), a presence notice (§4.3), and use of
+   drives a session through `connected` and `consent_requested` when the agent
+   arrives (§4.4). Still missing: a presence notice (§4.3), and use of
    `Subscribe` as a push channel for session state — the join page polls
    `GET /api/sessions/{code}` instead.
 2. **The Nest** — the `/join` page where the end user types the PIN, sees who is
@@ -400,12 +402,5 @@ Still to decide or do, in order:
    the signed envelope (§5.5) and a presence notice (§4.3). Both change what the
    technician's viewer and the agent must speak, so they are cheap now and
    expensive once a client exists.
-3. **Decide what requests consent** (§4.4). The agent's arrival now moves a
-   session to `connected`. The move to `consent_requested` needs one answer
-   first: where the prompt lives. If it is the Nest — the page the person
-   typed the code into — the server can request consent as soon as the agent
-   arrives. If it is the agent itself, the agent must say when it has shown the
-   prompt, which is a new message in the signalling protocol and belongs with
-   decision 2.
-4. **The Nest** — the `/join` page (§5.2).
-5. **`cmd/chirp`** — the first place remotekit becomes a dependency (§5.3, §5.5).
+3. **The Nest** — the `/join` page (§5.2).
+4. **`cmd/chirp`** — the first place remotekit becomes a dependency (§5.3, §5.5).

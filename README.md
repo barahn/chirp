@@ -21,9 +21,9 @@ What is here today:
   state and answering consent. Written for Chirp — no multi-tenancy, no RBAC —
   rather than taken from the proprietary Barahn control plane.
 
-Both are tested and AGPL-3.0. Nothing yet drives a session from end to end:
-the server marks a session connected when its agent arrives, but nothing asks
-for consent yet, so no session can reach the point of being granted.
+Both are tested and AGPL-3.0. The server drives a session from the agent's
+arrival through the consent request to the person's answer, but nothing yet
+presents that request to a person — that is the Nest, below.
 
 What is **not** here yet:
 

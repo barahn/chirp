@@ -364,8 +364,8 @@ func waitFor(t *testing.T, what string, cond func() bool) {
 }
 
 // The agent taking its place is the moment the join page waits for: the
-// session moves from pending to connected, and records where the agent is.
-func TestAgentArrivalConnectsTheSession(t *testing.T) {
+// session records where the agent is and moves on to asking for consent.
+func TestAgentArrivalConnectsAndRequestsConsent(t *testing.T) {
 	srv, ts := newServer(t)
 	sess := create(t, ts)
 
@@ -380,9 +380,9 @@ func TestAgentArrivalConnectsTheSession(t *testing.T) {
 	if _, _, err := dial(t, ts, url.Values{"role": {"agent"}, "code": {sess.Code}}); err != nil {
 		t.Fatalf("agent dial: %v", err)
 	}
-	waitFor(t, "session to become connected", func() bool {
+	waitFor(t, "session to request consent", func() bool {
 		got, _ := srv.sessions.GetSession(sess.SessionID)
-		return got.State == session.StateConnected
+		return got.State == session.StateConsentRequested
 	})
 
 	got, _ := srv.sessions.GetSession(sess.SessionID)
@@ -407,9 +407,9 @@ func TestAgentReconnectionIsNotAnError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("agent dial: %v", err)
 	}
-	waitFor(t, "session to become connected", func() bool {
+	waitFor(t, "session to request consent", func() bool {
 		got, _ := srv.sessions.GetSession(sess.SessionID)
-		return got.State == session.StateConnected
+		return got.State == session.StateConsentRequested
 	})
 
 	_ = first.Close()
@@ -429,7 +429,93 @@ func TestAgentReconnectionIsNotAnError(t *testing.T) {
 		waitFor(t, "agent to leave again", func() bool { _, agent := srv.Hub().Connected(sess.SessionID); return !agent })
 	}
 
-	if got, _ := srv.sessions.GetSession(sess.SessionID); got.State != session.StateConnected {
+	if got, _ := srv.sessions.GetSession(sess.SessionID); got.State != session.StateConsentRequested {
 		t.Fatalf("reconnections moved the session to %s", got.State)
+	}
+}
+
+// getView reads the join page's view of a session.
+func getView(t *testing.T, ts *httptest.Server, code string) sessionView {
+	t.Helper()
+	resp, err := ts.Client().Get(ts.URL + "/api/sessions/" + code)
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("get: status %d", resp.StatusCode)
+	}
+	var v sessionView
+	if err := json.NewDecoder(resp.Body).Decode(&v); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	return v
+}
+
+// Consent given without knowing who asks, and for what, is not informed. The
+// join page learns both once consent is requested -- and not before, when
+// the caller is not yet waiting on them.
+func TestJoinPageSeesTheConsentRequestOnlyWhenAsked(t *testing.T) {
+	srv, ts := newServer(t)
+	resp, err := ts.Client().Post(ts.URL+"/api/sessions", "application/json",
+		bytes.NewBufferString(`{"technician_id":"t-1","technician_name":"Alice Technician"}`))
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	var created createResponse
+	_ = json.NewDecoder(resp.Body).Decode(&created)
+	_ = resp.Body.Close()
+
+	if v := getView(t, ts, created.Code); v.Consent != nil {
+		t.Fatalf("a pending session disclosed its consent request: %+v", v.Consent)
+	}
+
+	if _, _, err := dial(t, ts, url.Values{"role": {"agent"}, "code": {created.Code}}); err != nil {
+		t.Fatalf("agent dial: %v", err)
+	}
+	waitFor(t, "session to request consent", func() bool {
+		got, _ := srv.sessions.GetSession(created.SessionID)
+		return got.State == session.StateConsentRequested
+	})
+
+	v := getView(t, ts, created.Code)
+	if v.Consent == nil {
+		t.Fatal("the join page cannot see who is asking")
+	}
+	if v.Consent.TechnicianName != "Alice Technician" {
+		t.Errorf("technician = %q", v.Consent.TechnicianName)
+	}
+	if len(v.Consent.RequestedPermissions) != len(session.DefaultPermissions) {
+		t.Errorf("permissions = %v, want %v", v.Consent.RequestedPermissions, session.DefaultPermissions)
+	}
+}
+
+// The whole state machine, driven only through the server: create, the agent
+// arrives, the join page answers. Nothing here calls the session manager
+// directly -- until this flow existed, no session could reach consent_granted
+// over HTTP at all.
+func TestConsentFlowEndToEnd(t *testing.T) {
+	srv, ts := newServer(t)
+	sess := create(t, ts)
+
+	if _, _, err := dial(t, ts, url.Values{"role": {"agent"}, "code": {sess.Code}}); err != nil {
+		t.Fatalf("agent dial: %v", err)
+	}
+	waitFor(t, "the join page to see the request", func() bool {
+		return getView(t, ts, sess.Code).State == string(session.StateConsentRequested)
+	})
+
+	resp, err := ts.Client().Post(ts.URL+"/api/sessions/"+sess.Code+"/consent",
+		"application/json", bytes.NewBufferString(`{"granted":true}`))
+	if err != nil {
+		t.Fatalf("consent: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("consent: status %d, want 200", resp.StatusCode)
+	}
+	got, _ := srv.sessions.GetSession(sess.SessionID)
+	if got.State != session.StateConsentGranted || got.Consent == nil || !got.Consent.Granted {
+		t.Fatalf("state %s, consent %+v; want granted", got.State, got.Consent)
 	}
 }
