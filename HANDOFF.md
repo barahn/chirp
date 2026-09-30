@@ -85,6 +85,7 @@ signalling/http.go
 signalling/http_test.go
 signalling/hub.go
 signalling/hub_test.go
+signalling/relay.go
 ```
 
 **Packages:**
@@ -198,12 +199,6 @@ Consequences to know about:
   and those defects are fixed. The other blocker, a workflow pushing the
   handoff snapshot straight to `main`, is gone: the snapshot is now checked in
   CI instead of committed by a bot.
-- **The signalling protocol has no presence notice.** A peer that sends before
-  the other end has joined gets a `chirp.error` saying so, and nothing tells it
-  when the other end arrives — it can only retry blind. The join window above
-  makes this reachable even when both peers dial at once. A `chirp.peer_joined`
-  notice sent to the waiting peer is the natural fix; decide it with the
-  signed-envelope question (§5.5), since both change what the ends must speak.
 - `WaitForConsent` reads from a buffered channel of capacity 1, so only one
   waiter is woken per session. Fine for one technician per session; revisit if
   that stops being true.
@@ -239,8 +234,13 @@ the whole path through HTTP alone.
 Also found: `TestSignallingCrossesBetweenPeers` failed 2 runs in 15 under CPU
 load. A client's `Dial` returns when the server writes the upgrade response,
 and the server joins the peer to the hub only afterwards, so an offer sent into
-that window is refused with `ErrNoPeer` and dropped. The test now waits for both
-peers to be registered. The product half is open — see §4.3.
+that window was refused with `ErrNoPeer` and dropped — and nothing told the
+sender when to try again. Fixed in the protocol, not only the test: when the
+second end arrives the relay sends both ends `chirp.peer_joined` naming the
+other, and when one leaves the other gets `chirp.peer_left`. **A client waits
+for `chirp.peer_joined` before sending**; receiving it is proof the other end is
+registered. The relay's own messages all live in the `chirp.` namespace
+(`signalling/relay.go`), which keeps them apart from the peers' signals.
 
 ## 5. The roadmap — what is missing, in dependency order
 
@@ -250,7 +250,8 @@ From `README.md`'s own "not here yet" list:
    A two-peer relay plus an HTTP surface, written fresh around
    `SessionManager`; the Barahn one is proprietary and was not ported. It
    drives a session through `connected` and `consent_requested` when the agent
-   arrives (§4.4). Still missing: a presence notice (§4.3), and use of
+   arrives, and announces each end's arrival and departure to the other (§4.4).
+   Still missing: use of
    `Subscribe` as a push channel for session state — the join page polls
    `GET /api/sessions/{code}` instead.
 2. **The Nest** — the `/join` page where the end user types the PIN, sees who is

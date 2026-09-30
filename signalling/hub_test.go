@@ -4,6 +4,8 @@
 package signalling
 
 import (
+	"encoding/json"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -41,6 +43,40 @@ func (f *fakeConn) messages() [][]byte {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return append([][]byte(nil), f.sent...)
+}
+
+// isRelayMessage reports whether data is one of the relay's own messages
+// rather than a signal forwarded from the other end.
+func isRelayMessage(data []byte) bool {
+	var m struct {
+		Type string `json:"type"`
+	}
+	return json.Unmarshal(data, &m) == nil && strings.HasPrefix(m.Type, "chirp.")
+}
+
+// signals returns only what the other end sent, without the relay's notices,
+// so assertions about forwarding stay exact.
+func (f *fakeConn) signals() [][]byte {
+	var out [][]byte
+	for _, m := range f.messages() {
+		if !isRelayMessage(m) {
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
+// notices returns only the relay's own messages, decoded.
+func (f *fakeConn) notices() []map[string]string {
+	var out []map[string]string
+	for _, m := range f.messages() {
+		if isRelayMessage(m) {
+			var n map[string]string
+			_ = json.Unmarshal(m, &n)
+			out = append(out, n)
+		}
+	}
+	return out
 }
 
 func (f *fakeConn) isClosed() bool {
@@ -83,15 +119,15 @@ func TestForwardReachesTheOppositeEnd(t *testing.T) {
 		t.Fatalf("forward from agent: %v", err)
 	}
 
-	if got := agent.messages(); len(got) != 1 || string(got[0]) != `{"type":"offer"}` {
+	if got := agent.signals(); len(got) != 1 || string(got[0]) != `{"type":"offer"}` {
 		t.Errorf("agent received %q, want the technician's offer", got)
 	}
-	if got := tech.messages(); len(got) != 1 || string(got[0]) != `{"type":"answer"}` {
+	if got := tech.signals(); len(got) != 1 || string(got[0]) != `{"type":"answer"}` {
 		t.Errorf("technician received %q, want the agent's answer", got)
 	}
 	// A peer must never be handed its own message: that would loop an offer
 	// straight back into the sender's stack.
-	if len(tech.messages()) != 1 || len(agent.messages()) != 1 {
+	if len(tech.signals()) != 1 || len(agent.signals()) != 1 {
 		t.Error("a message was delivered to its own sender")
 	}
 }
@@ -133,7 +169,7 @@ func TestSecondPeerInTheSameRoleIsRejected(t *testing.T) {
 	if err := h.Forward(sess.ID, RoleTechnician, []byte("ping")); err != nil {
 		t.Fatalf("forward: %v", err)
 	}
-	if len(first.messages()) != 1 {
+	if len(first.signals()) != 1 {
 		t.Error("the original agent stopped receiving after the rejected join")
 	}
 }
@@ -216,8 +252,81 @@ func TestConcurrentForwardIsSafe(t *testing.T) {
 	}
 	wg.Wait()
 
-	if len(agent.messages()) != 50 || len(tech.messages()) != 50 {
+	if len(agent.signals()) != 50 || len(tech.signals()) != 50 {
 		t.Errorf("delivered %d to agent and %d to technician, want 50 each",
-			len(agent.messages()), len(tech.messages()))
+			len(agent.signals()), len(tech.signals()))
 	}
+}
+
+// When the second end arrives, both are told who is there -- the one that
+// waited, so it knows it can send, and the one that arrived, so it knows it is
+// registered. Each notice names the other end, and nothing else is sent.
+func TestArrivalIsAnnouncedToBothEnds(t *testing.T) {
+	sm, sess := newSession(t)
+	h := NewHub(sm)
+
+	tech, agent := &fakeConn{}, &fakeConn{}
+	if err := h.Join(sess.ID, RoleTechnician, tech); err != nil {
+		t.Fatalf("join technician: %v", err)
+	}
+	if n := tech.notices(); len(n) != 0 {
+		t.Fatalf("a peer alone was sent %v", n)
+	}
+	if err := h.Join(sess.ID, RoleAgent, agent); err != nil {
+		t.Fatalf("join agent: %v", err)
+	}
+
+	want := func(c *fakeConn, role Role) {
+		t.Helper()
+		n := c.notices()
+		if len(n) != 1 || n[0]["type"] != PeerJoinedType || n[0]["role"] != string(role) {
+			t.Errorf("notices = %v, want one %s naming %s", n, PeerJoinedType, role)
+		}
+	}
+	want(tech, RoleAgent)
+	want(agent, RoleTechnician)
+}
+
+// A peer turned away with ErrRoleTaken never took a place, so nobody is told
+// it arrived.
+func TestRejectedPeerIsNotAnnounced(t *testing.T) {
+	sm, sess := newSession(t)
+	h := NewHub(sm)
+
+	tech, agent, intruder := &fakeConn{}, &fakeConn{}, &fakeConn{}
+	_ = h.Join(sess.ID, RoleTechnician, tech)
+	_ = h.Join(sess.ID, RoleAgent, agent)
+	if err := h.Join(sess.ID, RoleAgent, intruder); err != ErrRoleTaken {
+		t.Fatalf("second agent = %v, want ErrRoleTaken", err)
+	}
+
+	if n := tech.notices(); len(n) != 1 {
+		t.Errorf("technician got %v; the rejected agent was announced", n)
+	}
+	if n := intruder.notices(); len(n) != 0 {
+		t.Errorf("the rejected agent was told of a peer: %v", n)
+	}
+}
+
+// The end that stays is told when the other leaves, so it stops sending into a
+// session nobody is listening to.
+func TestDepartureIsAnnouncedToTheEndThatStays(t *testing.T) {
+	sm, sess := newSession(t)
+	h := NewHub(sm)
+
+	tech, agent := &fakeConn{}, &fakeConn{}
+	_ = h.Join(sess.ID, RoleTechnician, tech)
+	_ = h.Join(sess.ID, RoleAgent, agent)
+	h.Leave(sess.ID, RoleAgent)
+
+	n := tech.notices()
+	if len(n) != 2 || n[1]["type"] != PeerLeftType || n[1]["role"] != string(RoleAgent) {
+		t.Fatalf("technician notices = %v, want %s naming agent last", n, PeerLeftType)
+	}
+	if n := agent.notices(); len(n) != 1 {
+		t.Errorf("the departing agent was sent its own departure: %v", n)
+	}
+
+	// The last one out tells nobody, and does not fail.
+	h.Leave(sess.ID, RoleTechnician)
 }

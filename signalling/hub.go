@@ -35,6 +35,14 @@ const (
 	RoleAgent Role = "agent"
 )
 
+// opposite returns the other end of a session.
+func (r Role) opposite() Role {
+	if r == RoleTechnician {
+		return RoleAgent
+	}
+	return RoleTechnician
+}
+
 var (
 	ErrRoleTaken    = errors.New("chirp/signalling: that role is already connected for this session")
 	ErrNoPeer       = errors.New("chirp/signalling: the other end is not connected")
@@ -134,8 +142,8 @@ func (h *Hub) Join(sessionID string, role Role, conn Conn) error {
 	}
 
 	h.mu.Lock()
-	defer h.mu.Unlock()
 	if h.closed {
+		h.mu.Unlock()
 		return ErrHubClosed
 	}
 
@@ -145,25 +153,45 @@ func (h *Hub) Join(sessionID string, role Role, conn Conn) error {
 		h.pairs[sessionID] = p
 	}
 	if p.get(role) != nil {
+		h.mu.Unlock()
 		return ErrRoleTaken
 	}
 	p.set(role, conn)
+	other := p.get(role.opposite())
+	h.mu.Unlock()
+
+	// Presence is announced once both ends are registered, and outside the
+	// lock, so a transport that is slow to Send cannot stall the hub. Delivery
+	// is best effort: a peer that cannot be written to is going away, and its
+	// read loop ends on its own.
+	if other != nil {
+		_ = other.Send(encodeNotice(PeerJoinedType, role))
+		_ = conn.Send(encodeNotice(PeerJoinedType, role.opposite()))
+	}
 	return nil
 }
 
 // Leave removes role from the session and drops the pair once both ends are
 // gone, so a hub that has been busy does not keep growing.
+//
+// The end that remains is told, so it stops sending into a session nobody is
+// listening to.
 func (h *Hub) Leave(sessionID string, role Role) {
 	h.mu.Lock()
-	defer h.mu.Unlock()
-
 	p, ok := h.pairs[sessionID]
 	if !ok {
+		h.mu.Unlock()
 		return
 	}
 	p.set(role, nil)
+	remaining := p.get(role.opposite())
 	if p.empty() {
 		delete(h.pairs, sessionID)
+	}
+	h.mu.Unlock()
+
+	if remaining != nil {
+		_ = remaining.Send(encodeNotice(PeerLeftType, role))
 	}
 }
 

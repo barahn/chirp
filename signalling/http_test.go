@@ -62,25 +62,22 @@ func dial(t *testing.T, ts *httptest.Server, q url.Values) (*websocket.Conn, *ht
 	return c, resp, err
 }
 
-// waitJoined blocks until the hub has registered both ends of sessionID.
-//
-// A client's Dial returns when the server writes the upgrade response, and the
-// server joins the peer to the hub only after that, so there is a window in
-// which a peer considers itself connected and the hub does not yet know it. A
-// message forwarded to it in that window is refused with ErrNoPeer -- the
-// documented behaviour, see TestSendingBeforeTheOtherEndArrivesKeepsTheSocket.
-// A test that means to exercise two present peers has to wait out the window,
-// or it fails whenever the scheduler widens it.
-func waitJoined(t *testing.T, srv *Server, sessionID string) {
+// awaitPeer reads messages from c until the relay announces the other end,
+// which is what a real client does before sending: until that notice, a
+// message may reach a hub that has not registered the other end yet, and be
+// refused. It fails the test if any other message arrives first.
+func awaitPeer(t *testing.T, c *websocket.Conn, want Role) {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
-		if tech, agent := srv.Hub().Connected(sessionID); tech && agent {
-			return
-		}
-		time.Sleep(time.Millisecond)
+	_ = c.SetReadDeadline(time.Now().Add(5 * time.Second))
+	defer func() { _ = c.SetReadDeadline(time.Time{}) }()
+	_, data, err := c.ReadMessage()
+	if err != nil {
+		t.Fatalf("waiting for %s: %v", PeerJoinedType, err)
 	}
-	t.Fatal("both peers dialled, but the hub never registered them")
+	var n map[string]string
+	if err := json.Unmarshal(data, &n); err != nil || n["type"] != PeerJoinedType || n["role"] != string(want) {
+		t.Fatalf("got %s, want %s naming %s", data, PeerJoinedType, want)
+	}
 }
 
 func TestCreateSessionReturnsAUsableCode(t *testing.T) {
@@ -102,7 +99,7 @@ func TestCreateSessionReturnsAUsableCode(t *testing.T) {
 }
 
 func TestSignallingCrossesBetweenPeers(t *testing.T) {
-	srv, ts := newServer(t)
+	_, ts := newServer(t)
 	sess := create(t, ts)
 
 	tech, _, err := dial(t, ts, url.Values{"role": {"technician"}, "session": {sess.SessionID}})
@@ -114,7 +111,9 @@ func TestSignallingCrossesBetweenPeers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("agent dial: %v", err)
 	}
-	waitJoined(t, srv, sess.SessionID)
+	// Both ends learn of each other before either sends.
+	awaitPeer(t, tech, RoleAgent)
+	awaitPeer(t, agent, RoleTechnician)
 
 	offer := `{"type":"offer","sdp":"v=0"}`
 	if err := tech.WriteMessage(websocket.TextMessage, []byte(offer)); err != nil {

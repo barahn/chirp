@@ -348,21 +348,6 @@ func (s *Server) lookup(r *http.Request, raw string) (*session.Session, error) {
 	return s.sessions.LookupCode(raw, s.clientIP(r))
 }
 
-// RelayErrorType is the "type" of a message the relay itself sends a peer,
-// such as the other end not being connected yet.
-//
-// It shares the "type" field with the signals the peers exchange, whose values
-// remotekit's webrtc.SignalType owns: "offer", "answer", "candidate", "close".
-// A bare word here could collide with a type remotekit adds later, and a peer
-// would then read a relay notice as a signal from the other end. The prefix
-// keeps the relay's messages in a namespace remotekit's cannot reach.
-const RelayErrorType = "chirp.error"
-
-func encodeError(err error) []byte {
-	b, _ := json.Marshal(map[string]string{"type": RelayErrorType, "error": err.Error()})
-	return b
-}
-
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
