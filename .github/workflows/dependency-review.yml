@@ -1,0 +1,75 @@
+name: Dependency Review
+
+# govulncheck answers "is a known vulnerability reachable from Chirp's code",
+# which is the stricter question and the one that gates CI. This job answers a
+# different one: what does this pull request *add*. A dependency added with no
+# advisory yet, or under a licence Chirp cannot carry, is a review decision
+# made before the merge, not after the next advisory lands.
+on:
+  pull_request:
+    branches: [ develop, main ]
+
+permissions:
+  contents: read
+
+# Gated on the CODE_SCANNING repository variable, which is off by default.
+#
+# This repository is private. On a private repository GitHub runs CodeQL and
+# dependency review only with GitHub Advanced Security (Code Security): without
+# it dependency review refuses outright, and CodeQL's analysis runs but its
+# upload is refused. The CodeQL licence also permits analysing private code only
+# under that entitlement, so running it here without one is not merely noisy.
+#
+# Set Settings -> Secrets and variables -> Actions -> Variables ->
+# CODE_SCANNING = true once the repository is public or Code Security is enabled.
+# Until then the gate is off -- and says so on every run, rather than going
+# quietly green. See docs/devsecops.md.
+
+jobs:
+  review:
+    name: Review dependency changes
+    if: vars.CODE_SCANNING == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      # Needed to post the summary comment on the pull request.
+      pull-requests: write
+    steps:
+      # Audit mode: harden-runner records what each job talks to without
+      # blocking it. Read the egress report on a few green runs, then turn this
+      # to `block` with an allowlist -- flipping it blind breaks the module
+      # proxy, the linter and the action downloads all at once.
+      - uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        # An observer must not be able to fail the build it observes. In audit
+        # mode this step blocks nothing, so if the agent cannot start -- as on a
+        # private repository its tier does not cover -- the job goes on without
+        # the egress report rather than going red.
+        continue-on-error: true
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: low
+          # The same rule scripts/gen-third-party-notices.sh enforces, applied
+          # to what the pull request introduces. Chirp is AGPL, so copyleft
+          # here is *licence-compatible* and still unacceptable: Fabrintek
+          # relicenses Chirp on the strength of owning all of it, and it owns
+          # none of its dependencies. See LICENSING.md.
+          deny-licenses: GPL-1.0-or-later, GPL-2.0-or-later, GPL-3.0-or-later, LGPL-2.0-or-later, LGPL-2.1-or-later, LGPL-3.0-or-later, AGPL-1.0-or-later, AGPL-3.0-or-later, MPL-2.0
+          comment-summary-in-pr: on-failure
+
+  gate-disabled:
+    name: Dependency review (disabled)
+    if: vars.CODE_SCANNING != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Report that this gate is off
+        run: |
+          echo "::warning title=Dependency review is not running::This repository is private and the CODE_SCANNING variable is not set, so Dependency review is skipped. Enable it once the repository is public or Code Security is on. See docs/devsecops.md."

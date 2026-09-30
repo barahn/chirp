@@ -213,3 +213,57 @@ func TestRedemption_ConcurrentOrigins(t *testing.T) {
 		<-done
 	}
 }
+
+// Every entry point that takes a code from the network has to be metered. An
+// unmetered lookup is an oracle: with it the keyspace can be swept however
+// tight the limit on ConnectClient is.
+func TestLookupCode_IsMetered(t *testing.T) {
+	sm := session.NewSessionManager(time.Minute)
+	defer sm.Close()
+	sm.SetRedemptionLimit(3, time.Minute)
+
+	for i := 0; i < 3; i++ {
+		if _, err := sm.LookupCode("000000", "203.0.113.7"); !errors.Is(err, session.ErrSessionNotFound) {
+			t.Fatalf("attempt %d: expected ErrSessionNotFound, got %v", i+1, err)
+		}
+	}
+	live, err := sm.CreateSession("tech", "Tech", time.Minute)
+	if err != nil {
+		t.Fatalf("CreateSession failed: %v", err)
+	}
+	if _, err := sm.LookupCode(live.Code, "203.0.113.7"); !errors.Is(err, session.ErrTooManyAttempts) {
+		t.Fatalf("a throttled origin resolved a live code: %v", err)
+	}
+
+	// Lookups and ConnectClient draw on the same budget, or an attacker simply
+	// alternates between them.
+	if _, err := sm.ConnectClient(live.Code, &session.ClientInfo{RemoteIP: "203.0.113.7"}); !errors.Is(err, session.ErrTooManyAttempts) {
+		t.Fatalf("ConnectClient did not share the lookup budget: %v", err)
+	}
+
+	got, err := sm.LookupCode(live.Code, "198.51.100.9")
+	if err != nil || got.ID != live.ID {
+		t.Fatalf("an unrelated origin could not resolve a live code: %v", err)
+	}
+}
+
+// An expired code must cost the same as a wrong one, or watching the budget
+// tells a caller which codes once existed.
+func TestLookupCode_ExpiredCountsAsFailure(t *testing.T) {
+	sm := session.NewSessionManager(time.Minute)
+	defer sm.Close()
+	sm.SetRedemptionLimit(1, time.Minute)
+
+	sess, err := sm.CreateSession("tech", "Tech", 20*time.Millisecond)
+	if err != nil {
+		t.Fatalf("CreateSession failed: %v", err)
+	}
+	time.Sleep(40 * time.Millisecond)
+
+	if _, err := sm.LookupCode(sess.Code, "192.0.2.1"); !errors.Is(err, session.ErrSessionExpired) {
+		t.Fatalf("expected ErrSessionExpired, got %v", err)
+	}
+	if _, err := sm.LookupCode("000000", "192.0.2.1"); !errors.Is(err, session.ErrTooManyAttempts) {
+		t.Fatalf("an expired code was free to probe: %v", err)
+	}
+}

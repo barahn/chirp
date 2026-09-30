@@ -243,6 +243,63 @@ func (sm *SessionManager) GetSessionByCode(code string) (*Session, error) {
 	return sess.Clone(), nil
 }
 
+// LookupCode resolves a code presented by an untrusted caller, counting the
+// attempt against origin's redemption budget exactly as ConnectClient does.
+//
+// Every entry point that takes a code from the network must come through here
+// or through ConnectClient. GetSessionByCode is unmetered, which is right for
+// callers that already hold the code legitimately and wrong for anyone else:
+// an unmetered lookup is an oracle, and with it the keyspace can be swept
+// however tight the limit on ConnectClient is.
+//
+// An expired session is reported as ErrSessionExpired and counted as a
+// failure, so that a caller cannot tell a code that has lapsed from one that
+// never existed by watching its budget.
+func (sm *SessionManager) LookupCode(code, origin string) (*Session, error) {
+	limiter := sm.redemptionLimiter()
+
+	now := time.Now().UTC()
+	if !limiter.allow(origin, now) {
+		return nil, ErrTooManyAttempts
+	}
+
+	norm, err := NormalizeCode(code)
+	if err != nil {
+		limiter.recordFailure(origin, now)
+		return nil, err
+	}
+
+	sm.mu.RLock()
+	sess, ok := sm.codeIndex[norm]
+	sm.mu.RUnlock()
+
+	if !ok {
+		limiter.recordFailure(origin, now)
+		return nil, ErrSessionNotFound
+	}
+
+	sess.mu.RLock()
+	expired := sess.State == StateExpired || now.After(sess.ExpiresAt)
+	snap := sess.cloneLocked()
+	sess.mu.RUnlock()
+
+	if expired {
+		limiter.recordFailure(origin, now)
+		return nil, ErrSessionExpired
+	}
+
+	limiter.reset(origin)
+	return snap, nil
+}
+
+// redemptionLimiter returns the limiter in force, which SetRedemptionLimit
+// may replace.
+func (sm *SessionManager) redemptionLimiter() *redemptionLimiter {
+	sm.mu.RLock()
+	defer sm.mu.RUnlock()
+	return sm.limiter
+}
+
 // ConnectClient records the connection of an ephemeral client.
 //
 // Redemption is throttled per origin (ClientInfo.RemoteIP): the PIN is the only
@@ -252,9 +309,7 @@ func (sm *SessionManager) GetSessionByCode(code string) (*Session, error) {
 func (sm *SessionManager) ConnectClient(code string, info *ClientInfo) (*Session, error) {
 	origin := originOf(info)
 
-	sm.mu.RLock()
-	limiter := sm.limiter
-	sm.mu.RUnlock()
+	limiter := sm.redemptionLimiter()
 
 	now := time.Now().UTC()
 	if !limiter.allow(origin, now) {
@@ -364,6 +419,14 @@ func (sm *SessionManager) SubmitConsent(code string, granted bool, reason string
 	if sess.Consent != nil {
 		sess.mu.Unlock()
 		return nil, ErrConsentAlreadySet
+	}
+	// Consent answers a request. Accepting it in any other state lets a
+	// decision be recorded before a machine has connected or a prompt has been
+	// shown -- by whoever holds the code, rather than on the helped person's
+	// own machine, which is the one thing Chirp's consent promises.
+	if sess.State != StateConsentRequested {
+		sess.mu.Unlock()
+		return nil, ErrInvalidState
 	}
 
 	now := time.Now().UTC()

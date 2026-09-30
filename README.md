@@ -5,20 +5,28 @@ being helped enters it, grants explicit consent, and the session begins. No
 installation, no standing agent, no account.
 
 [![License](https://img.shields.io/badge/License-AGPL--3.0-blue.svg?style=flat-square)](LICENSE)
+[![CI](https://github.com/barahn/chirp/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/barahn/chirp/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/barahn/chirp/actions/workflows/codeql.yml/badge.svg?branch=develop)](https://github.com/barahn/chirp/actions/workflows/codeql.yml)
 
 ## Status: not yet a runnable product
 
 Read this before trying to use it.
 
-What is here today is the **session layer** — PIN generation and redemption,
-the session lifecycle state machine, and the consent flow. It is extracted, it
-is tested, and it is AGPL-3.0.
+What is here today:
+
+- **The session layer** — PIN generation and throttled redemption, the session
+  lifecycle state machine, and the consent flow.
+- **A signalling server** — a relay for WebRTC signalling between the two ends
+  of a session, with an HTTP surface for creating sessions, following their
+  state and answering consent. Written for Chirp — no multi-tenancy, no RBAC —
+  rather than taken from the proprietary Barahn control plane.
+
+Both are tested and AGPL-3.0. Nothing yet drives a session from end to end: the
+server does not move a session through connection and the consent request,
+which is the Nest's and the binary's job.
 
 What is **not** here yet:
 
-- **A signalling server.** Chirp needs its own, simplified: no multi-tenancy,
-  no RBAC. The existing one belongs to the proprietary Barahn control plane and
-  is not being relicensed.
 - **The Nest** — the `/join` page where an end user enters their PIN.
 - **A TURN relay.** Until Chirp ships one, self-hosting means bringing your own
   STUN/TURN (coturn works).
@@ -72,6 +80,24 @@ Rather than accept contributions under terms that are written down in another
 repository and shown to nobody, the door stays shut until the CLA is presented
 and recorded where pull requests actually arrive. See
 [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Security
+
+Report vulnerabilities privately to
+[security@mendsec.com](mailto:security@mendsec.com) — not in a public issue. See
+[SECURITY.md](SECURITY.md).
+
+Chirp grants remote control of an end user's machine, so its pipeline treats
+that as the threat model rather than an afterthought: every pull request runs
+gosec, govulncheck, gitleaks and a third-party licence gate, with every action
+pinned to a commit SHA. CodeQL and dependency review are wired in too, and turn
+on when the repository has code scanning available -- see
+[docs/devsecops.md](docs/devsecops.md). What each gate is for,
+and the repository settings that back it, are in
+[docs/devsecops.md](docs/devsecops.md).
+
+`develop` is the integration branch: branch from it and open pull requests
+against it. `main` receives releases from `develop`.
 
 ## Licence
 

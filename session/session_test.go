@@ -290,3 +290,29 @@ func TestChirp_ConcurrentAccess(t *testing.T) {
 	}
 	wg.Wait()
 }
+
+// Consent answers a request. Recording it earlier lets whoever holds the code
+// decide before any machine has connected or any prompt has been shown.
+func TestChirp_ConsentRequiresARequest(t *testing.T) {
+	sm := session.NewSessionManager(10 * time.Minute)
+	defer sm.Close()
+
+	pending, _ := sm.CreateSession("tech-6", "Frank", 5*time.Minute)
+	if _, err := sm.SubmitConsent(pending.Code, true, ""); err != session.ErrInvalidState {
+		t.Fatalf("consent on a pending session: expected ErrInvalidState, got %v", err)
+	}
+
+	connected, _ := sm.CreateSession("tech-7", "Grace", 5*time.Minute)
+	_, _ = sm.ConnectClient(connected.Code, nil)
+	if _, err := sm.SubmitConsent(connected.Code, true, ""); err != session.ErrInvalidState {
+		t.Fatalf("consent on a connected session never asked: expected ErrInvalidState, got %v", err)
+	}
+
+	// Neither refusal may have recorded anything.
+	for _, code := range []string{pending.Code, connected.Code} {
+		s, _ := sm.GetSessionByCode(code)
+		if s.Consent != nil || s.State == session.StateConsentGranted {
+			t.Fatalf("a refused consent was recorded: state %s", s.State)
+		}
+	}
+}
