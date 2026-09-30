@@ -471,6 +471,21 @@ any client is written:
 Should that hardening ever be wanted, this is why it cannot be done by adopting
 `signed.go` alone.
 
+**PAKE candidates, surveyed 2026-09-30** (from the public Go module proxy; not
+yet audited line by line). The PAKE is mechanism and belongs in remotekit, so
+its dependency lands there, through remotekit's licence gate.
+
+| Module | Licence | State | Notes |
+|---|---|---|---|
+| `github.com/bytemare/cpace` | MIT | active (pseudo-version May 2026), no release tag | tracks the CFRG CPace draft; pulls `bytemare/ecc` and friends (edwards25519, nistec, secp256k1) |
+| `filippo.io/cpace` | BSD-3 (Google) | last commit Jan 2021, no tag | an early draft of CPace over ristretto255; unmaintained |
+| `github.com/schollz/pake/v3` | MIT | tagged, v3.2.0 | SPAKE2-style, used by croc; its default curve comes from `tscholl2/siec`, a non-standard curve |
+
+Recommendation: **`bytemare/cpace`**, pinned by pseudo-version, with an own
+review before use — it follows the draft the proposal names and is
+maintained. Not decided: a vetted choice needs its code and test vectors read
+against the draft, which has not been done.
+
 One caveat when reading that document: its status line says "proposal, not
 accepted. Nothing here has been implemented", and for its Phase 0 item 3
 ("Extend `SignalMessage` with `PubKey`, `Nonce`, `IssuedAt`, `ExpiresAt` and
