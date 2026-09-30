@@ -135,5 +135,7 @@ func openSession(sm *SessionManager) (*Session, error) {
 	if err != nil {
 		return nil, err
 	}
-	return sm.Redeem(string(p.Code), "Controller", &ClientInfo{RemoteIP: "192.0.2.1"})
+	// Each session from its own origin, so the per-origin session cap is not
+	// what these tests measure.
+	return sm.Redeem(string(p.Code), "Controller", &ClientInfo{RemoteIP: string(p.ID)})
 }

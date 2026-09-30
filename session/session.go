@@ -51,6 +51,10 @@ const (
 
 	// DefaultCodeTTL is how long a code stays redeemable once shown or minted.
 	DefaultCodeTTL = 10 * time.Minute
+
+	// DefaultMaxSessionsPerOrigin bounds how many sessions one origin may hold
+	// open at once as controller. A maintainer decision: 30.
+	DefaultMaxSessionsPerOrigin = 30
 )
 
 var (
@@ -63,6 +67,9 @@ var (
 	// ErrPeerBusy reports that the owner already has a session in progress.
 	// An owner serves one controller at a time.
 	ErrPeerBusy = errors.New("chirp: that peer is already in a session")
+	// ErrTooManySessions reports that the controller's origin already holds
+	// the maximum number of open sessions.
+	ErrTooManySessions = errors.New("chirp: too many open sessions from this origin")
 )
 
 // Rendezvous errors a caller may need to tell apart, re-exported so callers
@@ -199,6 +206,7 @@ type SessionManager struct {
 	listeners   map[string][]chan *Session
 	sessionTTL  time.Duration
 	codeTTL     time.Duration
+	maxPerOrig  int
 	stopReaper  chan struct{}
 	mu          sync.RWMutex
 	listenersMu sync.RWMutex
@@ -225,6 +233,7 @@ func NewSessionManager(sessionTTL time.Duration) *SessionManager {
 		listeners:  make(map[string][]chan *Session),
 		sessionTTL: sessionTTL,
 		codeTTL:    DefaultCodeTTL,
+		maxPerOrig: DefaultMaxSessionsPerOrigin,
 		stopReaper: make(chan struct{}),
 	}
 	go sm.startReaper()
@@ -245,6 +254,33 @@ func (sm *SessionManager) Close() {
 // limit is tunable: an operator behind a large NAT needs a looser bound.
 func (sm *SessionManager) SetRedemptionLimit(maxFailures int, window time.Duration) error {
 	return sm.reg.SetLimits(rendezvous.Limits{MaxFailures: maxFailures, Window: window})
+}
+
+// SetMaxSessionsPerOrigin replaces the bound on open sessions per origin.
+func (sm *SessionManager) SetMaxSessionsPerOrigin(n int) error {
+	if n <= 0 {
+		return errors.New("chirp: the session limit must be positive")
+	}
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	sm.maxPerOrig = n
+	return nil
+}
+
+// openFromLocked counts the sessions origin holds open as controller. A session
+// counts until it ends, is denied, or passes an undecided deadline. Called with
+// sm.mu held.
+func (sm *SessionManager) openFromLocked(origin string, now time.Time) int {
+	n := 0
+	for _, s := range sm.sessions {
+		s.mu.RLock()
+		if originOf(s.ClientInfo) == origin && !terminal(s.State) &&
+			(s.State == StateActive || s.State == StateConsentGranted || now.Before(s.ExpiresAt)) {
+			n++
+		}
+		s.mu.RUnlock()
+	}
+	return n
 }
 
 // RegisterPeer makes a running Chirp reachable. It returns the peer's secret ID,
@@ -330,13 +366,27 @@ func (sm *SessionManager) ReleasePeer(id rendezvous.PeerID) error {
 // The code is spent even if the owner turns out to be busy -- codes are
 // single-use -- and if it was the owner's start code, the owner gets a new one.
 func (sm *SessionManager) Redeem(code, controllerName string, info *ClientInfo) (*Session, error) {
-	m, err := sm.reg.Redeem(code, originOf(info))
+	origin := originOf(info)
+	// Checked before the code is consumed, so an origin at its limit does not
+	// burn the owner's code, and again below under the same lock that creates
+	// the session, so concurrent redemptions cannot overshoot it.
+	sm.mu.RLock()
+	full := sm.openFromLocked(origin, time.Now().UTC()) >= sm.maxPerOrig
+	sm.mu.RUnlock()
+	if full {
+		return nil, ErrTooManySessions
+	}
+
+	m, err := sm.reg.Redeem(code, origin)
 	if err != nil {
 		return nil, err
 	}
 
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
+	if sm.openFromLocked(origin, time.Now().UTC()) >= sm.maxPerOrig {
+		return nil, ErrTooManySessions
+	}
 	pe, ok := sm.peers[m.Owner]
 	if !ok {
 		return nil, ErrCodeNotFound

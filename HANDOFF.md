@@ -311,6 +311,12 @@ over HTTP and WebSocket only.
 **Known limits:**
 
 - **One controller per owner at a time.** Deliberate for now.
+- **At most 30 open sessions per controller origin** (maintainer decision,
+  `DefaultMaxSessionsPerOrigin`, tunable with `SetMaxSessionsPerOrigin`). A
+  session counts until it ends, is denied, or its undecided deadline passes.
+  The check runs before the code is consumed, so a refused redemption (`429`)
+  leaves the owner's code usable. Behind `Server.ClientIP` the same caveats as
+  the throttle apply: a NAT shares the 30.
 - **Registration is not metered.** Anyone can `POST /api/peers` repeatedly, and
   every registration holds a live code; enough of them would exhaust the
   900,000-code space (`rendezvous.ErrExhausted` → `503`) and make random
@@ -331,7 +337,7 @@ From `README.md`'s own "not here yet" list:
 2. ~~**The Nest** — a `/join` web page where the helped person types a PIN.~~
    Superseded: in the product model nobody types a code into a web page, and
    consent happens in the binary. The site only offers the download, and may
-   land people who open a share link (see decision 3, still open, in
+   land people who open a share link (see decision 4, still open, in
    `docs/product-model.md`).
 3. **The `cmd/chirp` binary** — the one program both sides run. It shows its own
    code and link, redeems someone else's, shows the consent prompt, and uses
@@ -558,4 +564,4 @@ Still to decide or do, in order:
    claim, redeems other people's codes, and uses remotekit to share the screen
    (§5.5).
 5. **How a link reaches a freshly downloaded binary** — still open, until the
-   download site exists (`docs/product-model.md`, decision 3).
+   download site exists (`docs/product-model.md`, decision 4).
