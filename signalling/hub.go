@@ -2,8 +2,8 @@
 // Copyright (C) 2026 Fabrintek Engenharia Digital Ltda
 
 // Package signalling routes WebRTC signalling between the two ends of a Chirp
-// session: the technician who opened it and the ephemeral agent the helped
-// person runs.
+// session: the controller, who redeemed a code, and the owner, the machine the
+// code belonged to and the one to be controlled (docs/product-model.md).
 //
 // It is deliberately small. Barahn's control plane signals for a fleet of
 // standing agents and needs tenants, roles and persistence to do it; Chirp
@@ -29,18 +29,19 @@ import (
 type Role string
 
 const (
-	// RoleTechnician is the operator who created the session.
-	RoleTechnician Role = "technician"
-	// RoleAgent is the ephemeral binary the helped person runs.
-	RoleAgent Role = "agent"
+	// RoleController is the Chirp that redeemed the code and will control.
+	RoleController Role = "controller"
+	// RoleOwner is the Chirp whose code was redeemed: the machine that is
+	// controlled, once its user consents.
+	RoleOwner Role = "owner"
 )
 
 // opposite returns the other end of a session.
 func (r Role) opposite() Role {
-	if r == RoleTechnician {
-		return RoleAgent
+	if r == RoleController {
+		return RoleOwner
 	}
-	return RoleTechnician
+	return RoleController
 }
 
 var (
@@ -65,26 +66,26 @@ type Conn interface {
 // pair is the two ends of one session. Either may be absent: peers arrive in
 // whichever order the humans happen to act.
 type pair struct {
-	technician Conn
-	agent      Conn
+	controller Conn
+	owner      Conn
 }
 
 func (p *pair) get(r Role) Conn {
-	if r == RoleTechnician {
-		return p.technician
+	if r == RoleController {
+		return p.controller
 	}
-	return p.agent
+	return p.owner
 }
 
 func (p *pair) set(r Role, c Conn) {
-	if r == RoleTechnician {
-		p.technician = c
+	if r == RoleController {
+		p.controller = c
 	} else {
-		p.agent = c
+		p.owner = c
 	}
 }
 
-func (p *pair) empty() bool { return p.technician == nil && p.agent == nil }
+func (p *pair) empty() bool { return p.controller == nil && p.owner == nil }
 
 // Admissible reports whether a session is in a state that may still signal.
 //
@@ -121,12 +122,12 @@ func NewHub(sm *session.SessionManager) *Hub {
 // run out of time should fail here rather than at the first message, when the
 // human on the other end is already waiting.
 //
-// Join returns an error if that role is already connected. Two technicians on
-// one session, or a second agent, means either a stale connection or someone
+// Join returns an error if that role is already connected. Two controllers on
+// one session, or a second owner, means either a stale connection or someone
 // else holding the code, and silently replacing the first peer would hand the
 // session over without telling anyone.
 func (h *Hub) Join(sessionID string, role Role, conn Conn) error {
-	if role != RoleTechnician && role != RoleAgent {
+	if role != RoleController && role != RoleOwner {
 		return ErrUnknownRole
 	}
 	if conn == nil {
@@ -213,10 +214,10 @@ func (h *Hub) Forward(sessionID string, from Role, data []byte) error {
 		return ErrNoPeer
 	}
 	var target Conn
-	if from == RoleTechnician {
-		target = p.agent
+	if from == RoleController {
+		target = p.owner
 	} else {
-		target = p.technician
+		target = p.controller
 	}
 	h.mu.Unlock()
 
@@ -227,14 +228,14 @@ func (h *Hub) Forward(sessionID string, from Role, data []byte) error {
 }
 
 // Connected reports which roles are currently attached to sessionID.
-func (h *Hub) Connected(sessionID string) (technician, agent bool) {
+func (h *Hub) Connected(sessionID string) (controller, owner bool) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	p, ok := h.pairs[sessionID]
 	if !ok {
 		return false, false
 	}
-	return p.technician != nil, p.agent != nil
+	return p.controller != nil, p.owner != nil
 }
 
 // Close drops every peer. Connections are closed while the lock is not held,
@@ -248,11 +249,11 @@ func (h *Hub) Close() error {
 	h.closed = true
 	var conns []Conn
 	for _, p := range h.pairs {
-		if p.technician != nil {
-			conns = append(conns, p.technician)
+		if p.controller != nil {
+			conns = append(conns, p.controller)
 		}
-		if p.agent != nil {
-			conns = append(conns, p.agent)
+		if p.owner != nil {
+			conns = append(conns, p.owner)
 		}
 	}
 	h.pairs = make(map[string]*pair)
@@ -262,4 +263,21 @@ func (h *Hub) Close() error {
 		_ = c.Close()
 	}
 	return nil
+}
+
+// Notify sends a relay message of the hub's own to one end of a session. It is
+// how the server speaks to a peer, as opposed to Forward, which carries what
+// the other end said.
+func (h *Hub) Notify(sessionID string, to Role, data []byte) error {
+	h.mu.Lock()
+	p, ok := h.pairs[sessionID]
+	var target Conn
+	if ok {
+		target = p.get(to)
+	}
+	h.mu.Unlock()
+	if target == nil {
+		return ErrNoPeer
+	}
+	return target.Send(data)
 }

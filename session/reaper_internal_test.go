@@ -22,9 +22,9 @@ func TestReapExpired_DoesNotDeadlock(t *testing.T) {
 	sm := NewSessionManager(30 * time.Millisecond)
 	defer sm.Close()
 
-	sess, err := sm.CreateSession("tech-reap", "Reaper", 30*time.Millisecond)
+	sess, err := openSession(sm)
 	if err != nil {
-		t.Fatalf("CreateSession failed: %v", err)
+		t.Fatalf("openSession failed: %v", err)
 	}
 	time.Sleep(60 * time.Millisecond)
 
@@ -61,8 +61,8 @@ func TestListActiveSessions_DoesNotDeadlockUnderWriters(t *testing.T) {
 	defer sm.Close()
 
 	for i := 0; i < 20; i++ {
-		if _, err := sm.CreateSession("tech", "Tech", time.Minute); err != nil {
-			t.Fatalf("CreateSession failed: %v", err)
+		if _, err := openSession(sm); err != nil {
+			t.Fatalf("openSession failed: %v", err)
 		}
 	}
 
@@ -84,8 +84,8 @@ func TestListActiveSessions_DoesNotDeadlockUnderWriters(t *testing.T) {
 				for j := 0; j < 50; j++ {
 					// A writer queued behind the readers is what makes a
 					// recursive RLock deadlock rather than merely work.
-					if _, err := sm.CreateSession("tech", "Tech", time.Minute); err != nil {
-						t.Errorf("CreateSession failed: %v", err)
+					if _, err := openSession(sm); err != nil {
+						t.Errorf("openSession failed: %v", err)
 						return
 					}
 				}
@@ -106,12 +106,12 @@ func TestReapExpired_NotifiesSubscribers(t *testing.T) {
 	sm := NewSessionManager(30 * time.Millisecond)
 	defer sm.Close()
 
-	sess, err := sm.CreateSession("tech-sub", "Subscriber", 30*time.Millisecond)
+	sess, err := openSession(sm)
 	if err != nil {
-		t.Fatalf("CreateSession failed: %v", err)
+		t.Fatalf("openSession failed: %v", err)
 	}
 
-	ch, unsub := sm.Subscribe(sess.Code)
+	ch, unsub := sm.Subscribe(sess.ID)
 	defer unsub()
 	<-ch // the initial snapshot emitted on subscribe
 
@@ -126,4 +126,14 @@ func TestReapExpired_NotifiesSubscribers(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("no expiry event reached the subscriber")
 	}
+}
+
+// openSession registers an owner and redeems its code, which is how every
+// session starts.
+func openSession(sm *SessionManager) (*Session, error) {
+	p, err := sm.RegisterPeer("Owner")
+	if err != nil {
+		return nil, err
+	}
+	return sm.Redeem(string(p.Code), "Controller", &ClientInfo{RemoteIP: "192.0.2.1"})
 }

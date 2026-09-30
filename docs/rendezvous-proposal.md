@@ -4,9 +4,10 @@
 merged into remotekit's `develop` in barahn/remotekit#28. The maintainer chose to write it
 fresh there rather than move Chirp's code, so nothing was relicensed; the same
 behaviours are proven by tests rewritten in remotekit. The two-peer signalling
-relay is not in it yet: it belongs with remotekit's Phase 2 `Signaler`. Chirp
-has not adopted the package; until it does, Chirp's own `session` code is what
-runs.
+relay is not in it yet: it belongs with remotekit's Phase 2 `Signaler`. **Chirp
+has adopted the package** (`HANDOFF.md` §4.5): its own code generation and
+throttle are deleted, and the sections below that name them describe the code
+as it was when this was proposed.
 
 ## Why this belongs in remotekit
 

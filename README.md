@@ -19,17 +19,19 @@ Read this before trying to use it.
 
 What is here today:
 
-- **The session layer** — code generation and throttled redemption, the session
-  lifecycle state machine, and the consent flow.
+- **The session layer** — each running Chirp registers as a peer and gets its
+  own code and share link; whoever redeems the code controls that peer's
+  machine once its user consents. Codes, links and the per-origin throttle are
+  remotekit's `rendezvous` package; the state machine, consent rules and values
+  are Chirp's.
 - **A signalling relay** — relays WebRTC signalling between the two ends of a
   session and announces each end to the other. Written for Chirp — no
   multi-tenancy, no RBAC — rather than taken from the proprietary Barahn
   control plane.
 
-Both are tested and AGPL-3.0, but they implement an **earlier model**, in which
-the helper created a session and the helped person typed its code into a web
-page. The product model runs the other way — the helped person's Chirp shows the
-code — so both need their direction inverted before they fit it.
+Both are tested, AGPL-3.0, and follow the [product model](docs/product-model.md):
+the code belongs to the machine to be controlled, and consent is asked of that
+machine's user over its own socket, as a remotekit `bark` consent request.
 
 What is **not** here yet:
 

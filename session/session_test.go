@@ -5,6 +5,8 @@ package session_test
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -12,305 +14,350 @@ import (
 	"github.com/barahn/chirp/session"
 )
 
-func TestChirp_CodeGenerationAndFormatting(t *testing.T) {
-	code, err := session.GenerateCode()
+const origin = "192.0.2.10"
+
+func info() *session.ClientInfo { return &session.ClientInfo{RemoteIP: origin} }
+
+// open registers an owner and redeems its start code.
+func open(t *testing.T, sm *session.SessionManager) (*session.Peer, *session.Session) {
+	t.Helper()
+	p, err := sm.RegisterPeer("Owner")
 	if err != nil {
-		t.Fatalf("GenerateCode failed: %v", err)
+		t.Fatalf("RegisterPeer: %v", err)
 	}
-
-	if len(code) != 6 {
-		t.Fatalf("Expected 6 digits, got %d (%s)", len(code), code)
-	}
-
-	formatted := session.FormatCode(code)
-	if len(formatted) != 7 || formatted[3] != '-' {
-		t.Fatalf("Expected formatted code XXX-XXX, got %s", formatted)
-	}
-
-	normalized, err := session.NormalizeCode(formatted)
+	sess, err := sm.Redeem(string(p.Code), "Controller", info())
 	if err != nil {
-		t.Fatalf("NormalizeCode failed: %v", err)
+		t.Fatalf("Redeem: %v", err)
 	}
-	if normalized != code {
-		t.Fatalf("Expected normalized %s, got %s", code, normalized)
-	}
+	return p, sess
+}
 
-	// Test variations
-	tests := []struct {
-		input   string
-		want    string
-		wantErr bool
-	}{
-		{"123-456", "123456", false},
-		{" 123 456 ", "123456", false},
-		{"123.456", "123456", false},
-		{"12345", "", true},   // Too short
-		{"1234567", "", true}, // Too long
-		{"12345a", "", true},  // Non-digit
-		{"", "", true},        // Empty
+// askConsent moves a fresh session to consent_requested.
+func askConsent(t *testing.T, sm *session.SessionManager, id string) {
+	t.Helper()
+	if _, err := sm.Connect(id); err != nil {
+		t.Fatalf("Connect: %v", err)
 	}
-
-	for _, tc := range tests {
-		got, err := session.NormalizeCode(tc.input)
-		if (err != nil) != tc.wantErr {
-			t.Errorf("NormalizeCode(%q) error = %v, wantErr %v", tc.input, err, tc.wantErr)
-		}
-		if !tc.wantErr && got != tc.want {
-			t.Errorf("NormalizeCode(%q) = %q, want %q", tc.input, got, tc.want)
-		}
+	if _, err := sm.RequestConsent(id); err != nil {
+		t.Fatalf("RequestConsent: %v", err)
 	}
 }
 
-func TestChirp_SessionLifecycleFlow(t *testing.T) {
+func TestRegisterPeerShowsACodeAndALink(t *testing.T) {
 	sm := session.NewSessionManager(10 * time.Minute)
 	defer sm.Close()
 
-	// 1. Create Session
-	sess, err := sm.CreateSession("tech-1", "Alice Technician", 5*time.Minute)
+	p, err := sm.RegisterPeer("Ana")
 	if err != nil {
-		t.Fatalf("CreateSession failed: %v", err)
+		t.Fatal(err)
 	}
+	if len(p.Code) != 6 || p.Link == "" || p.ID == "" {
+		t.Fatalf("incomplete peer: %+v", p)
+	}
+	if f := p.Code.Format(); len(f) != 7 || f[3] != '-' {
+		t.Fatalf("formatted code %q, want XXX-XXX", f)
+	}
+}
 
+// The redeemer controls the code's owner: the session belongs to the peer
+// whose code it was, and the controller's name is carried as given.
+func TestRedeemOpensASessionWithTheOwner(t *testing.T) {
+	sm := session.NewSessionManager(10 * time.Minute)
+	defer sm.Close()
+
+	p, err := sm.RegisterPeer("Ana")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sess, err := sm.Redeem(p.Code.Format(), "Bruno", info())
+	if err != nil {
+		t.Fatalf("Redeem of the formatted code: %v", err)
+	}
+	if sess.Owner != p.ID || sess.OwnerName != "Ana" || sess.ControllerName != "Bruno" {
+		t.Fatalf("session does not pair Bruno with Ana: %+v", sess)
+	}
 	if sess.State != session.StatePending {
-		t.Fatalf("Expected StatePending, got %s", sess.State)
+		t.Fatalf("state %s, want pending", sess.State)
 	}
-	if sess.TechnicianName != "Alice Technician" {
-		t.Fatalf("TechnicianName mismatch: %s", sess.TechnicianName)
-	}
-
-	// Retrieve by ID
-	sByID, err := sm.GetSession(sess.ID)
-	if err != nil || sByID.ID != sess.ID {
-		t.Fatalf("GetSession by ID failed: %v", err)
-	}
-
-	// Retrieve by Code
-	sByCode, err := sm.GetSessionByCode(sess.Code)
-	if err != nil || sByCode.ID != sess.ID {
-		t.Fatalf("GetSessionByCode failed: %v", err)
-	}
-
-	// Retrieve by formatted code
-	sByFmtCode, err := sm.GetSessionByCode(sess.FormattedCode)
-	if err != nil || sByFmtCode.ID != sess.ID {
-		t.Fatalf("GetSessionByCode (formatted) failed: %v", err)
-	}
-
-	// 2. Connect Client
-	clientInfo := &session.ClientInfo{
-		Hostname: "workstation-alpha",
-		OS:       "Linux Ubuntu 24.04",
-		Arch:     "x86_64",
-		RemoteIP: "192.168.1.100",
-	}
-	connected, err := sm.ConnectClient(sess.Code, clientInfo)
-	if err != nil {
-		t.Fatalf("ConnectClient failed: %v", err)
-	}
-	if connected.State != session.StateConnected {
-		t.Fatalf("Expected StateConnected, got %s", connected.State)
-	}
-	if connected.ClientInfo.Hostname != "workstation-alpha" {
-		t.Fatalf("Client hostname mismatch: %s", connected.ClientInfo.Hostname)
-	}
-
-	// 3. Request Consent
-	consentReq, err := sm.RequestConsent(sess.Code)
-	if err != nil {
-		t.Fatalf("RequestConsent failed: %v", err)
-	}
-	if consentReq.State != session.StateConsentRequested {
-		t.Fatalf("Expected StateConsentRequested, got %s", consentReq.State)
-	}
-
-	// 4. Submit Consent (Granted)
-	consentRes, err := sm.SubmitConsent(sess.Code, true, "")
-	if err != nil {
-		t.Fatalf("SubmitConsent failed: %v", err)
-	}
-	if consentRes.State != session.StateConsentGranted {
-		t.Fatalf("Expected StateConsentGranted, got %s", consentRes.State)
-	}
-	if !consentRes.Consent.Granted {
-		t.Fatalf("Expected Consent.Granted == true")
-	}
-
-	// 5. Activate Session
-	activeSess, err := sm.ActivateSession(sess.Code)
-	if err != nil {
-		t.Fatalf("ActivateSession failed: %v", err)
-	}
-	if activeSess.State != session.StateActive {
-		t.Fatalf("Expected StateActive, got %s", activeSess.State)
-	}
-
-	// List Active Sessions
-	activeList := sm.ListActiveSessions()
-	if len(activeList) != 1 {
-		t.Fatalf("Expected 1 active session, got %d", len(activeList))
-	}
-
-	// 6. Terminate Session
-	endedSess, err := sm.EndSession(sess.ID)
-	if err != nil {
-		t.Fatalf("EndSession failed: %v", err)
-	}
-	if endedSess.State != session.StateTerminated {
-		t.Fatalf("Expected StateTerminated, got %s", endedSess.State)
-	}
-
-	// Verify Active List is now empty
-	if len(sm.ListActiveSessions()) != 0 {
-		t.Fatalf("Expected 0 active sessions after termination")
+	active, err := sm.ActiveSession(p.ID)
+	if err != nil || active.ID != sess.ID {
+		t.Fatalf("ActiveSession = %v, %v", active, err)
 	}
 }
 
-func TestChirp_ConsentDeniedFlow(t *testing.T) {
+// The start code is single-use and replaced once used (product decision 2).
+func TestStartCodeIsSingleUseAndReplaced(t *testing.T) {
 	sm := session.NewSessionManager(10 * time.Minute)
 	defer sm.Close()
 
-	sess, _ := sm.CreateSession("tech-2", "Bob Tech", 5*time.Minute)
-	_, _ = sm.ConnectClient(sess.Code, nil)
-	_, _ = sm.RequestConsent(sess.Code)
-
-	denied, err := sm.SubmitConsent(sess.Code, false, "User cancelled request")
+	p, sess := open(t, sm)
+	if _, err := sm.Redeem(string(p.Code), "Again", info()); !errors.Is(err, session.ErrCodeNotFound) {
+		t.Fatalf("second redemption: got %v, want ErrCodeNotFound", err)
+	}
+	now, err := sm.Peer(p.ID)
 	if err != nil {
-		t.Fatalf("SubmitConsent failed: %v", err)
+		t.Fatal(err)
 	}
-	if denied.State != session.StateConsentDenied {
-		t.Fatalf("Expected StateConsentDenied, got %s", denied.State)
+	if now.Code == p.Code {
+		t.Fatal("the used start code is still the one shown")
 	}
-	if denied.Consent.Granted != false {
-		t.Fatalf("Expected Consent.Granted == false")
+	// The owner is busy, so the new code is spent but opens nothing.
+	if _, err := sm.Redeem(string(now.Code), "Third", info()); !errors.Is(err, session.ErrPeerBusy) {
+		t.Fatalf("redeeming while busy: got %v, want ErrPeerBusy", err)
 	}
-
-	// Activate should fail on denied consent
-	_, err = sm.ActivateSession(sess.Code)
-	if err == nil {
-		t.Fatalf("Expected error when activating a denied session, got nil")
+	if _, err := sm.EndSession(sess.ID); err != nil {
+		t.Fatal(err)
+	}
+	fresh, _ := sm.Peer(p.ID)
+	if _, err := sm.Redeem(string(fresh.Code), "Fourth", info()); err != nil {
+		t.Fatalf("redeeming after the session ended: %v", err)
 	}
 }
 
-func TestChirp_WaitForConsent(t *testing.T) {
+// Each use of a link mints a different single-use code.
+func TestLinkMintsAFreshCodePerUse(t *testing.T) {
 	sm := session.NewSessionManager(10 * time.Minute)
 	defer sm.Close()
 
-	sess, _ := sm.CreateSession("tech-3", "Charlie", 5*time.Minute)
-	_, _ = sm.ConnectClient(sess.Code, nil)
-	_, _ = sm.RequestConsent(sess.Code)
+	p, _ := sm.RegisterPeer("Ana")
+	a, err := sm.MintFromLink(p.Link, origin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := sm.MintFromLink(p.Link, origin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a == b || a == p.Code || b == p.Code {
+		t.Fatalf("codes not distinct: start %s, minted %s and %s", p.Code, a, b)
+	}
+	sess, err := sm.Redeem(string(a), "Bruno", info())
+	if err != nil || sess.Owner != p.ID {
+		t.Fatalf("minted code did not reach the owner: %v", err)
+	}
+	// Minting from a link does not spend the owner's start code.
+	if cur, _ := sm.Peer(p.ID); cur.Code != p.Code {
+		t.Fatal("a minted code replaced the start code")
+	}
+}
+
+// Releasing a peer -- its Chirp exiting -- kills its code and link and ends its
+// session.
+func TestReleasePeerRevokesEverything(t *testing.T) {
+	sm := session.NewSessionManager(10 * time.Minute)
+	defer sm.Close()
+
+	p, sess := open(t, sm)
+	cur, _ := sm.Peer(p.ID)
+	if err := sm.ReleasePeer(p.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := sm.Redeem(string(cur.Code), "X", info()); !errors.Is(err, session.ErrCodeNotFound) {
+		t.Fatalf("code after release: %v", err)
+	}
+	if _, err := sm.MintFromLink(p.Link, origin); !errors.Is(err, session.ErrCodeNotFound) {
+		t.Fatalf("link after release: %v", err)
+	}
+	if got, _ := sm.GetSession(sess.ID); got.State != session.StateTerminated {
+		t.Fatalf("session after release: %s", got.State)
+	}
+	if _, err := sm.Peer(p.ID); !errors.Is(err, session.ErrPeerNotFound) {
+		t.Fatalf("peer after release: %v", err)
+	}
+}
+
+// Chirp's values are what the registry enforces: five failures per origin, and
+// the sixth attempt is refused even for a live code. Link minting draws on the
+// same budget.
+func TestRedemptionIsThrottledWithChirpsValues(t *testing.T) {
+	sm := session.NewSessionManager(10 * time.Minute)
+	defer sm.Close()
+
+	p, _ := sm.RegisterPeer("Ana")
+	bad := &session.ClientInfo{RemoteIP: "198.51.100.7"}
+	for i := 0; i < session.DefaultMaxRedemptionFailures-1; i++ {
+		if _, err := sm.Redeem("000000", "", bad); !errors.Is(err, session.ErrCodeNotFound) &&
+			!errors.Is(err, session.ErrMalformed) {
+			t.Fatalf("attempt %d: %v", i, err)
+		}
+	}
+	if _, err := sm.MintFromLink("not-a-link", bad.RemoteIP); !errors.Is(err, session.ErrCodeNotFound) {
+		t.Fatalf("bad link: %v", err)
+	}
+	if _, err := sm.Redeem(string(p.Code), "", bad); !errors.Is(err, session.ErrThrottled) {
+		t.Fatalf("live code after the budget: got %v, want ErrThrottled", err)
+	}
+	// Another origin is unaffected.
+	if _, err := sm.Redeem(string(p.Code), "", info()); err != nil {
+		t.Fatalf("other origin: %v", err)
+	}
+}
+
+func TestSetRedemptionLimit(t *testing.T) {
+	sm := session.NewSessionManager(10 * time.Minute)
+	defer sm.Close()
+
+	if err := sm.SetRedemptionLimit(0, time.Minute); err == nil {
+		t.Fatal("a zero limit was accepted")
+	}
+	if err := sm.SetRedemptionLimit(1, time.Minute); err != nil {
+		t.Fatal(err)
+	}
+	_, _ = sm.Redeem("111111", "", info())
+	if _, err := sm.Redeem("111111", "", info()); !errors.Is(err, session.ErrThrottled) {
+		t.Fatalf("got %v, want ErrThrottled after one failure", err)
+	}
+}
+
+func TestSessionLifecycle(t *testing.T) {
+	sm := session.NewSessionManager(10 * time.Minute)
+	defer sm.Close()
+
+	p, sess := open(t, sm)
+	askConsent(t, sm, sess.ID)
+
+	granted, err := sm.SubmitConsent(sess.ID, true, "")
+	if err != nil || granted.State != session.StateConsentGranted || !granted.Consent.Granted {
+		t.Fatalf("SubmitConsent: %+v, %v", granted, err)
+	}
+	active, err := sm.ActivateSession(sess.ID)
+	if err != nil || active.State != session.StateActive {
+		t.Fatalf("ActivateSession: %v", err)
+	}
+	if n := len(sm.ListActiveSessions()); n != 1 {
+		t.Fatalf("%d active sessions, want 1", n)
+	}
+	ended, err := sm.EndSession(sess.ID)
+	if err != nil || ended.State != session.StateTerminated {
+		t.Fatalf("EndSession: %v", err)
+	}
+	if n := len(sm.ListActiveSessions()); n != 0 {
+		t.Fatalf("%d active sessions after ending, want 0", n)
+	}
+	if _, err := sm.ActiveSession(p.ID); !errors.Is(err, session.ErrSessionNotFound) {
+		t.Fatalf("owner still busy after the session ended: %v", err)
+	}
+}
+
+func TestConsentDeniedEndsTheSessionAndFreesTheOwner(t *testing.T) {
+	sm := session.NewSessionManager(10 * time.Minute)
+	defer sm.Close()
+
+	p, sess := open(t, sm)
+	askConsent(t, sm, sess.ID)
+	denied, err := sm.SubmitConsent(sess.ID, false, "not expecting anyone")
+	if err != nil || denied.State != session.StateConsentDenied || denied.Consent.Granted {
+		t.Fatalf("deny: %+v, %v", denied, err)
+	}
+	if _, err := sm.ActivateSession(sess.ID); err == nil {
+		t.Fatal("a denied session was activated")
+	}
+	if _, err := sm.ActiveSession(p.ID); !errors.Is(err, session.ErrSessionNotFound) {
+		t.Fatalf("owner still busy after denying: %v", err)
+	}
+}
+
+func TestWaitForConsent(t *testing.T) {
+	sm := session.NewSessionManager(10 * time.Minute)
+	defer sm.Close()
+
+	_, sess := open(t, sm)
+	askConsent(t, sm, sess.ID)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-
 	go func() {
-		time.Sleep(100 * time.Millisecond)
-		_, _ = sm.SubmitConsent(sess.Code, true, "")
+		time.Sleep(50 * time.Millisecond)
+		_, _ = sm.SubmitConsent(sess.ID, true, "")
 	}()
-
-	granted, err := sm.WaitForConsent(ctx, sess.Code)
-	if err != nil {
-		t.Fatalf("WaitForConsent failed: %v", err)
-	}
-	if !granted {
-		t.Fatalf("Expected granted == true")
+	granted, err := sm.WaitForConsent(ctx, sess.ID)
+	if err != nil || !granted {
+		t.Fatalf("WaitForConsent = %v, %v", granted, err)
 	}
 }
 
-func TestChirp_ExpirationTTL(t *testing.T) {
+func TestUndecidedSessionExpires(t *testing.T) {
 	sm := session.NewSessionManager(50 * time.Millisecond)
 	defer sm.Close()
 
-	sess, err := sm.CreateSession("tech-4", "Dave", 50*time.Millisecond)
-	if err != nil {
-		t.Fatalf("CreateSession failed: %v", err)
-	}
-
+	_, sess := open(t, sm)
 	time.Sleep(80 * time.Millisecond)
-
-	// Connect on expired session should return ErrSessionExpired
-	_, err = sm.ConnectClient(sess.Code, nil)
-	if err != session.ErrSessionExpired {
-		t.Fatalf("Expected ErrSessionExpired, got %v", err)
+	if _, err := sm.Connect(sess.ID); !errors.Is(err, session.ErrSessionExpired) {
+		t.Fatalf("Connect on an expired session: %v", err)
 	}
 }
 
-func TestChirp_SubscriptionEvents(t *testing.T) {
+func TestSubscriptionEvents(t *testing.T) {
 	sm := session.NewSessionManager(10 * time.Minute)
 	defer sm.Close()
 
-	sess, _ := sm.CreateSession("tech-5", "Eve", 5*time.Minute)
-
-	ch, unsub := sm.Subscribe(sess.Code)
+	_, sess := open(t, sm)
+	ch, unsub := sm.Subscribe(sess.ID)
 	defer unsub()
 
-	// Initial receive
-	select {
-	case s := <-ch:
-		if s.State != session.StatePending {
-			t.Fatalf("Expected initial state StatePending, got %s", s.State)
+	for _, want := range []session.SessionState{session.StatePending, session.StateConnected} {
+		if want == session.StateConnected {
+			go func() { _, _ = sm.Connect(sess.ID) }()
 		}
-	case <-time.After(500 * time.Millisecond):
-		t.Fatalf("Timeout waiting for initial subscription event")
-	}
-
-	// Trigger connection update
-	go func() {
-		_, _ = sm.ConnectClient(sess.Code, &session.ClientInfo{Hostname: "host-1"})
-	}()
-
-	select {
-	case s := <-ch:
-		if s.State != session.StateConnected {
-			t.Fatalf("Expected update state StateConnected, got %s", s.State)
+		select {
+		case s := <-ch:
+			if s.State != want {
+				t.Fatalf("got %s, want %s", s.State, want)
+			}
+		case <-time.After(time.Second):
+			t.Fatalf("no %s event", want)
 		}
-	case <-time.After(500 * time.Millisecond):
-		t.Fatalf("Timeout waiting for connection event")
 	}
 }
 
-func TestChirp_ConcurrentAccess(t *testing.T) {
+func TestConcurrentAccess(t *testing.T) {
 	sm := session.NewSessionManager(10 * time.Minute)
 	defer sm.Close()
 
 	var wg sync.WaitGroup
 	for i := 0; i < 50; i++ {
 		wg.Add(1)
-		go func(idx int) {
+		go func(i int) {
 			defer wg.Done()
-			sess, err := sm.CreateSession("tech", "Concurrent Tech", time.Minute)
+			p, err := sm.RegisterPeer(fmt.Sprint("peer ", i))
 			if err != nil {
-				t.Errorf("Concurrent CreateSession failed: %v", err)
+				t.Errorf("RegisterPeer: %v", err)
+				return
+			}
+			sess, err := sm.Redeem(string(p.Code), "c", info())
+			if err != nil {
+				t.Errorf("Redeem: %v", err)
 				return
 			}
 			_, _ = sm.GetSession(sess.ID)
-			_, _ = sm.GetSessionByCode(sess.Code)
-			_, _ = sm.ConnectClient(sess.Code, nil)
-			_, _ = sm.EndSession(sess.Code)
+			_, _ = sm.Connect(sess.ID)
+			_, _ = sm.Peer(p.ID)
+			_, _ = sm.EndSession(sess.ID)
+			_ = sm.ReleasePeer(p.ID)
 		}(i)
 	}
 	wg.Wait()
 }
 
-// Consent answers a request. Recording it earlier lets whoever holds the code
-// decide before any machine has connected or any prompt has been shown.
-func TestChirp_ConsentRequiresARequest(t *testing.T) {
+// Consent answers a request. Recording it earlier lets a decision exist before
+// any prompt was shown on the owner's machine.
+func TestConsentRequiresARequest(t *testing.T) {
 	sm := session.NewSessionManager(10 * time.Minute)
 	defer sm.Close()
 
-	pending, _ := sm.CreateSession("tech-6", "Frank", 5*time.Minute)
-	if _, err := sm.SubmitConsent(pending.Code, true, ""); err != session.ErrInvalidState {
-		t.Fatalf("consent on a pending session: expected ErrInvalidState, got %v", err)
+	_, pending := open(t, sm)
+	if _, err := sm.SubmitConsent(pending.ID, true, ""); !errors.Is(err, session.ErrInvalidState) {
+		t.Fatalf("consent on a pending session: %v", err)
 	}
-
-	connected, _ := sm.CreateSession("tech-7", "Grace", 5*time.Minute)
-	_, _ = sm.ConnectClient(connected.Code, nil)
-	if _, err := sm.SubmitConsent(connected.Code, true, ""); err != session.ErrInvalidState {
-		t.Fatalf("consent on a connected session never asked: expected ErrInvalidState, got %v", err)
+	_, connected := open(t, sm)
+	if _, err := sm.Connect(connected.ID); err != nil {
+		t.Fatal(err)
 	}
-
-	// Neither refusal may have recorded anything.
-	for _, code := range []string{pending.Code, connected.Code} {
-		s, _ := sm.GetSessionByCode(code)
+	if _, err := sm.SubmitConsent(connected.ID, true, ""); !errors.Is(err, session.ErrInvalidState) {
+		t.Fatalf("consent on a connected session never asked: %v", err)
+	}
+	for _, id := range []string{pending.ID, connected.ID} {
+		s, _ := sm.GetSession(id)
 		if s.Consent != nil || s.State == session.StateConsentGranted {
 			t.Fatalf("a refused consent was recorded: state %s", s.State)
 		}
