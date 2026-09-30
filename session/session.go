@@ -67,7 +67,14 @@ type Session struct {
 func (s *Session) Clone() *Session {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+	return s.cloneLocked()
+}
 
+// cloneLocked is Clone for callers that already hold s.mu, for reading or for
+// writing. It must never take the lock itself: sync.RWMutex is not reentrant,
+// so a Clone() from under a held lock deadlocks rather than blocking briefly --
+// and under a write lock it deadlocks unconditionally.
+func (s *Session) cloneLocked() *Session {
 	cp := &Session{
 		ID:             s.ID,
 		Code:           s.Code,
@@ -449,7 +456,7 @@ func (sm *SessionManager) ListActiveSessions() []*Session {
 	for _, sess := range sm.sessions {
 		sess.mu.RLock()
 		if sess.State != StateTerminated && sess.State != StateExpired && sess.State != StateConsentDenied && now.Before(sess.ExpiresAt) {
-			list = append(list, sess.Clone())
+			list = append(list, sess.cloneLocked())
 		}
 		sess.mu.RUnlock()
 	}
@@ -527,18 +534,26 @@ func (sm *SessionManager) startReaper() {
 func (sm *SessionManager) reapExpired() {
 	now := time.Now().UTC()
 
-	sm.mu.Lock()
-	defer sm.mu.Unlock()
+	// Snapshots are collected under the lock and delivered after it is
+	// released: a listener must never be fed from inside sm.mu, and the
+	// delivery is synchronous so that an expiry event is observable the
+	// moment reapExpired returns.
+	var expired []*Session
 
+	sm.mu.Lock()
 	for _, sess := range sm.sessions {
 		sess.mu.Lock()
 		if (sess.State == StatePending || sess.State == StateConnected || sess.State == StateConsentRequested) && now.After(sess.ExpiresAt) {
 			sess.State = StateExpired
 			end := sess.ExpiresAt
 			sess.EndedAt = &end
-			snap := sess.Clone()
-			go sm.notifyListeners(snap)
+			expired = append(expired, sess.cloneLocked())
 		}
 		sess.mu.Unlock()
+	}
+	sm.mu.Unlock()
+
+	for _, snap := range expired {
+		sm.notifyListeners(snap)
 	}
 }
