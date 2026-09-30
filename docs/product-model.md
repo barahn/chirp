@@ -61,7 +61,7 @@ These are consequences of the model, stated so nobody has to rediscover them:
 
 - **A code is a one-time capability.** Guessing a live code does not grant
   control, but it does put a consent prompt on a stranger's screen. The defences
-  are the per-origin redemption throttle (`session/redemption.go`) and a prompt
+  are the per-origin redemption throttle (remotekit's `rendezvous`) and a prompt
   unmistakable enough that an unexpected one is declined.
 - **A link is a bearer capability that keeps working.** Codes it mints are
   single-use, but the link itself mints again until it stops being valid. Every
@@ -107,11 +107,11 @@ consent prompt and the binary are Chirp's. The proposed split is in
 
 ## What the code does today
 
-The session layer and the signalling relay exist, but they implement an
-**earlier model** in which the helper created a session and the helped person
-typed its code into a web page (the "Nest"). That direction is the opposite of
-this one, and the Nest is superseded. `HANDOFF.md` §8 lists the work to bring
-the code in line.
+The session layer and the signalling relay implement this model: a running
+Chirp registers and gets its code and link, whoever redeems the code opens a
+session to control it, and consent is asked of the owner over its own socket.
+There is no binary yet, so no prompt is drawn. `HANDOFF.md` §4.5 describes the
+endpoints and the known limits.
 
 ---
 

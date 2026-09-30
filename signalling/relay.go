@@ -3,7 +3,11 @@
 
 package signalling
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/barahn/remotekit/bark"
+)
 
 // The relay's own vocabulary: messages the hub sends a peer itself, as opposed
 // to the signals it forwards from the other end unread.
@@ -34,6 +38,15 @@ const (
 	// PeerLeftType tells a peer that the other end has gone, naming its role.
 	// It is not sent when the hub itself closes.
 	PeerLeftType = "chirp.peer_left"
+
+	// ConsentRequestType is sent to the owner when a controller has joined its
+	// session: the owner's Chirp shows the consent prompt from it. Its
+	// "request" field is remotekit's bark.ConsentRequestPayload.
+	//
+	// The payload's technician_name is the name the controller typed. Nobody
+	// registers, so it is a claim, and "name_verified" is always false to say
+	// so on the wire as well as in the prompt.
+	ConsentRequestType = "chirp.consent_request"
 )
 
 // encodeError builds a relay error message for err.
@@ -45,5 +58,15 @@ func encodeError(err error) []byte {
 // encodeNotice builds a presence notice about the peer in role.
 func encodeNotice(kind string, role Role) []byte {
 	b, _ := json.Marshal(map[string]string{"type": kind, "role": string(role)})
+	return b
+}
+
+// encodeConsentRequest builds the consent request the owner's prompt shows.
+func encodeConsentRequest(req bark.ConsentRequestPayload) []byte {
+	b, _ := json.Marshal(struct {
+		Type         string                     `json:"type"`
+		Request      bark.ConsentRequestPayload `json:"request"`
+		NameVerified bool                       `json:"name_verified"`
+	}{Type: ConsentRequestType, Request: req})
 	return b
 }
