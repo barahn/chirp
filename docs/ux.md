@@ -55,7 +55,7 @@ and has no name of its own: it is *your bird*, as TunnelBear's is *your Bear*.
 | The OS warning is explained before it appears ("this is a standard warning… TunnelBear will NEVER do this") | Gatekeeper, SmartScreen, macOS Screen Recording and Accessibility, and the Wayland portal are explained before they appear (§ Before the system asks) |
 | "Why should I trust TunnelBear?" and a published audit | "Why should I trust Chirp?" and a list of what Chirp never does (§ Help) |
 | Feature names in the mascot's voice (VigilantBear, GhostBear, SplitBear) | A few names in the bird's voice, for help articles only (§ Feature names) |
-| A skippable Quick Guide | Hints inside the main window, so nothing has to remember that the guide was seen (open decision 1) |
+| A skippable Quick Guide | Hints inside the main window, so nothing has to remember that the guide was seen (open decision 1, barahn/chirp#49) |
 
 What Chirp does **not** take: the installer, the account, email
 verification and two-factor login. *Download it, run it, read your chirp* is
@@ -138,7 +138,7 @@ written to make an unexpected request easy to decline.
 - **The permissions are listed** in words, from `session.DefaultPermissions`.
   Granting only some of them is not possible today: remotekit's
   `bark.ConsentResponsePayload` carries a single `Granted`. Per-permission
-  consent is open decision 4.
+  consent is open decision 4 (barahn/chirp#52).
 - **A fixed warning** against the usual scam script.
 - **A countdown** to the session's deadline, after which the prompt declines
   by itself. The consent request carries only a timestamp; the deadline is
@@ -211,8 +211,8 @@ needs the same, mostly on the machine being controlled:
   code and link (decision 1). If that holds, asking for the permission after
   someone has been allowed in would end the session it was meant for. The
   main window should therefore check these permissions at start, before the
-  code is shared (open decision 3). Confirm against remotekit's `screen` on
-  macOS.
+  code is shared (open decision 3, barahn/chirp#51). Confirm against
+  remotekit's `screen` on macOS.
 - **Wayland portals.** After *Allow*, the system asks once more which screen
   to share. The prompt's last line says so, so the second dialog is expected.
 - **Windows administrator prompts** appear on a secure desktop the helper
@@ -257,17 +257,20 @@ Avoid *Nest* (a Google brand, and the name of the abandoned web page) and
 
 ## Open decisions
 
+Each has an issue, on the roadmap project.
+
 1. **Does Chirp write anything to disk** — a name, a self-hosted server
    address, a muted sound? Decision 4 treats a URL handler as installation by
    another name, and a settings file is a lighter form of the same thing. The
-   proposal assumes nothing is written, which is why hints replace a guide.
+   proposal assumes nothing is written, which is why hints replace a guide
+   (barahn/chirp#49).
 2. **Does closing the window quit Chirp?** The proposal says yes. Hiding to
    the tray with a live code would be a quiet standing agent, which the
-   product model rejects.
+   product model rejects (barahn/chirp#50).
 3. **When does Chirp ask for macOS permissions?** At start, before the code
-   is shared, if Screen Recording does require a relaunch.
+   is shared, if Screen Recording does require a relaunch (barahn/chirp#51).
 4. **Per-permission consent.** Needs a change to remotekit's `bark`
-   consent response. Out of the first runnable Chirp.
+   consent response. Out of the first runnable Chirp (barahn/chirp#52).
 
 ---
 
