@@ -412,9 +412,36 @@ func TestUndecidedSessionExpires(t *testing.T) {
 	defer sm.Close()
 
 	_, sess := open(t, sm)
+	ch, unsub := sm.Subscribe(sess.ID)
+	defer unsub()
+	if s := <-ch; s.State != session.StatePending {
+		t.Fatalf("first event %s, want %s", s.State, session.StatePending)
+	}
+
 	time.Sleep(80 * time.Millisecond)
 	if _, err := sm.Connect(sess.ID); !errors.Is(err, session.ErrSessionExpired) {
 		t.Fatalf("Connect on an expired session: %v", err)
+	}
+
+	// Expiry found by a transition must leave the session exactly as the
+	// reaper would: ended at its deadline, and announced to subscribers.
+	select {
+	case s := <-ch:
+		if s.State != session.StateExpired {
+			t.Fatalf("event %s, want %s", s.State, session.StateExpired)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("no expired event after lazy expiry")
+	}
+	got, err := sm.GetSession(sess.ID)
+	if err != nil {
+		t.Fatalf("GetSession: %v", err)
+	}
+	if got.State != session.StateExpired {
+		t.Fatalf("state %s, want %s", got.State, session.StateExpired)
+	}
+	if got.EndedAt == nil || !got.EndedAt.Equal(got.ExpiresAt) {
+		t.Fatalf("EndedAt = %v, want the deadline %v", got.EndedAt, got.ExpiresAt)
 	}
 }
 

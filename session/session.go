@@ -193,6 +193,28 @@ func (s *Session) settleLocked() {
 	}
 }
 
+// overdueLocked reports whether an undecided session has passed its deadline.
+// A session with consent granted or already streaming has no deadline.
+func (s *Session) overdueLocked(now time.Time) bool {
+	switch s.State {
+	case StatePending, StateConnected, StateConsentRequested:
+		return !now.Before(s.ExpiresAt)
+	}
+	return false
+}
+
+// expireLocked ends an overdue session at its deadline, releases its consent
+// waiters, and returns the snapshot to deliver to listeners once s.mu is
+// released. The reaper and lazy expiry in transition both end a session here,
+// so the two cannot leave it in different shapes.
+func (s *Session) expireLocked() *Session {
+	s.State = StateExpired
+	end := s.ExpiresAt
+	s.EndedAt = &end
+	s.settleLocked()
+	return s.cloneLocked()
+}
+
 // RemainingTTL returns how much time remains before the session expires.
 func (s *Session) RemainingTTL() time.Duration {
 	s.mu.RLock()
@@ -487,11 +509,11 @@ func (sm *SessionManager) transition(id string, fn func(s *Session, now time.Tim
 	}
 	now := time.Now().UTC()
 	sess.mu.Lock()
-	if !terminal(sess.State) && sess.State != StateActive && sess.State != StateConsentGranted && !now.Before(sess.ExpiresAt) {
-		sess.State = StateExpired
-		sess.settleLocked()
+	if sess.overdueLocked(now) {
+		snap := sess.expireLocked()
 		sess.mu.Unlock()
 		sm.finished(sess)
+		sm.notifyListeners(snap)
 		return nil, ErrSessionExpired
 	}
 	if err := fn(sess, now); err != nil {
@@ -652,7 +674,7 @@ func (sm *SessionManager) ListActiveSessions() []*Session {
 	var list []*Session
 	for _, sess := range sm.sessions {
 		sess.mu.RLock()
-		if !terminal(sess.State) && (sess.State == StateActive || sess.State == StateConsentGranted || now.Before(sess.ExpiresAt)) {
+		if !terminal(sess.State) && !sess.overdueLocked(now) {
 			list = append(list, sess.cloneLocked())
 		}
 		sess.mu.RUnlock()
@@ -730,12 +752,8 @@ func (sm *SessionManager) reapExpired() {
 	sm.mu.Lock()
 	for _, sess := range sm.sessions {
 		sess.mu.Lock()
-		if (sess.State == StatePending || sess.State == StateConnected || sess.State == StateConsentRequested) && !now.Before(sess.ExpiresAt) {
-			sess.State = StateExpired
-			end := sess.ExpiresAt
-			sess.EndedAt = &end
-			sess.settleLocked()
-			expired = append(expired, sess.cloneLocked())
+		if sess.overdueLocked(now) {
+			expired = append(expired, sess.expireLocked())
 			if pe, ok := sm.peers[sess.Owner]; ok && pe.active == sess.ID {
 				pe.active = ""
 			}
