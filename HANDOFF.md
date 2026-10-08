@@ -396,8 +396,8 @@ From `README.md`'s own "not here yet" list:
 2. ~~**The Nest** — a `/join` web page where the helped person types a PIN.~~
    Superseded: in the product model nobody types a code into a web page, and
    consent happens in the binary. The site only offers the download, and may
-   land people who open a share link (see decision 4, still open, in
-   `docs/product-model.md`).
+   land people who open a share link, who then paste it into Chirp (decision 4
+   in `docs/product-model.md`, barahn/chirp#16).
 3. **The `cmd/chirp` binary** — the one program both sides run. It shows its own
    code and link, redeems someone else's, shows the consent prompt, and uses
    remotekit to share the screen. There is no entry point at all yet.
@@ -650,14 +650,13 @@ Still to decide or do, in order. Each step has an issue, and the
    - barahn/chirp#19: accept or reject barahn/chirp#7 (blind public server,
      every Chirp a node). It decides whether #21 is on the critical path.
    - barahn/chirp#20: consent enforcement lives in remotekit `tunnel` (§5.5).
-   - The tray/UI library, `getlantern/systray` or Fyne (barahn/chirp#11),
+   - barahn/chirp#24: the tray/UI library, `getlantern/systray` or Fyne,
      checked against the licence gate.
-   - barahn/chirp#16: how a link reaches a freshly downloaded binary
-     (`docs/product-model.md`, decision 4).
 2. **`cmd/chirp`** (barahn/chirp#10 → #11 → #12, with barahn/remotekit#68).
    It is the one binary: it registers, shows its code and link, holds the owner
    socket, shows the consent prompt with the controller's name as a claim,
-   redeems other people's codes, and uses remotekit to share the screen (§5.5).
+   redeems other people's codes and pasted links (`docs/product-model.md`,
+   decision 4), and uses remotekit to share the screen (§5.5).
 3. **Before any public relay:** the PAKE if #19 makes it required
    (barahn/chirp#21), and bring-your-own STUN/TURN documentation
    (barahn/chirp#15).
