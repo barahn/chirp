@@ -34,14 +34,16 @@ import (
 // There are no accounts. The peer ID is the owner's credential and is returned
 // only to the owner; a live code, or a link, is the controller's. Every entry
 // point that takes a code or a link from the network is metered per origin by
-// remotekit's rendezvous registry.
+// remotekit's rendezvous registry, and registration is capped per origin by
+// the session manager, since every registration holds a code.
 type Server struct {
 	hub      *Hub
 	sessions *session.SessionManager
 	upgrader websocket.Upgrader
 
-	// ClientIP names the origin a request's code guesses are counted against.
-	// Nil uses the connection's remote address.
+	// ClientIP names the origin a request's code guesses, open sessions and
+	// registrations are counted against. Nil uses the connection's remote
+	// address.
 	//
 	// Behind a reverse proxy every request arrives from the proxy, so all users
 	// share one budget and throttle each other. Set this to read the proxy's
@@ -133,7 +135,11 @@ func (s *Server) registerPeer(w http.ResponseWriter, r *http.Request) {
 	if r.Body != nil {
 		_ = json.NewDecoder(r.Body).Decode(&req)
 	}
-	p, err := s.sessions.RegisterPeer(req.Name)
+	p, err := s.sessions.RegisterPeer(req.Name, s.clientIP(r))
+	if errors.Is(err, session.ErrTooManyPeers) {
+		writeSessionError(w, err)
+		return
+	}
 	if err != nil {
 		writeError(w, http.StatusServiceUnavailable, "could not allocate a code")
 		return
@@ -318,7 +324,9 @@ func (s *Server) serveWS(w http.ResponseWriter, r *http.Request) {
 // forwarded to the controller of the current one.
 func (s *Server) serveOwner(w http.ResponseWriter, r *http.Request) {
 	id := rendezvous.PeerID(r.URL.Query().Get("peer"))
-	if _, err := s.sessions.Peer(id); err != nil {
+	// Over the peer cap the peer has no code to show, but it still exists and
+	// its link still works, so it may hold its socket.
+	if _, err := s.sessions.Peer(id); err != nil && !errors.Is(err, session.ErrTooManyPeers) {
 		writeSessionError(w, err)
 		return
 	}
@@ -511,6 +519,8 @@ func writeSessionError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, session.ErrTooManySessions):
 		writeError(w, http.StatusTooManyRequests, "too many open sessions, end one first")
+	case errors.Is(err, session.ErrTooManyPeers):
+		writeError(w, http.StatusTooManyRequests, "too many Chirps registered from this address, try again later")
 	case errors.Is(err, session.ErrThrottled):
 		writeError(w, http.StatusTooManyRequests, "too many attempts, try again later")
 	case errors.Is(err, session.ErrCodeNotFound), errors.Is(err, session.ErrCodeExpired),

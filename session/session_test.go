@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -16,12 +17,20 @@ import (
 
 const origin = "192.0.2.10"
 
+var owners atomic.Int64
+
+// ownerOrigin gives each registration its own origin, so the per-origin peer
+// cap is not what a test measures unless it says so.
+func ownerOrigin() string {
+	return fmt.Sprint("owner ", owners.Add(1))
+}
+
 func info() *session.ClientInfo { return &session.ClientInfo{RemoteIP: origin} }
 
 // open registers an owner and redeems its start code.
 func open(t *testing.T, sm *session.SessionManager) (*session.Peer, *session.Session) {
 	t.Helper()
-	p, err := sm.RegisterPeer("Owner")
+	p, err := sm.RegisterPeer("Owner", ownerOrigin())
 	if err != nil {
 		t.Fatalf("RegisterPeer: %v", err)
 	}
@@ -47,7 +56,7 @@ func TestRegisterPeerShowsACodeAndALink(t *testing.T) {
 	sm := session.NewSessionManager(10 * time.Minute)
 	defer sm.Close()
 
-	p, err := sm.RegisterPeer("Ana")
+	p, err := sm.RegisterPeer("Ana", ownerOrigin())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,7 +74,7 @@ func TestRedeemOpensASessionWithTheOwner(t *testing.T) {
 	sm := session.NewSessionManager(10 * time.Minute)
 	defer sm.Close()
 
-	p, err := sm.RegisterPeer("Ana")
+	p, err := sm.RegisterPeer("Ana", ownerOrigin())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -119,7 +128,7 @@ func TestLinkMintsAFreshCodePerUse(t *testing.T) {
 	sm := session.NewSessionManager(10 * time.Minute)
 	defer sm.Close()
 
-	p, _ := sm.RegisterPeer("Ana")
+	p, _ := sm.RegisterPeer("Ana", ownerOrigin())
 	a, err := sm.MintFromLink(p.Link, origin)
 	if err != nil {
 		t.Fatal(err)
@@ -173,7 +182,7 @@ func TestRedemptionIsThrottledWithChirpsValues(t *testing.T) {
 	sm := session.NewSessionManager(10 * time.Minute)
 	defer sm.Close()
 
-	p, _ := sm.RegisterPeer("Ana")
+	p, _ := sm.RegisterPeer("Ana", ownerOrigin())
 	bad := &session.ClientInfo{RemoteIP: "198.51.100.7"}
 	for i := 0; i < session.DefaultMaxRedemptionFailures-1; i++ {
 		if _, err := sm.Redeem("000000", "", bad); !errors.Is(err, session.ErrCodeNotFound) &&
@@ -477,7 +486,7 @@ func TestConcurrentAccess(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			p, err := sm.RegisterPeer(fmt.Sprint("peer ", i))
+			p, err := sm.RegisterPeer(fmt.Sprint("peer ", i), ownerOrigin())
 			if err != nil {
 				t.Errorf("RegisterPeer: %v", err)
 				return
@@ -525,6 +534,75 @@ func TestConsentRequiresARequest(t *testing.T) {
 // One origin may hold at most DefaultMaxSessionsPerOrigin open sessions; a
 // refused redemption leaves the owner's code usable, and ending a session makes
 // room again.
+// One origin may hold at most DefaultMaxPeersPerOrigin live codes: every
+// registration holds one, and without a cap one origin could fill the space.
+func TestPeersPerOriginAreCapped(t *testing.T) {
+	sm := session.NewSessionManager(10 * time.Minute)
+	defer sm.Close()
+
+	const from = "198.51.100.7"
+	var first *session.Peer
+	for i := 0; i < session.DefaultMaxPeersPerOrigin; i++ {
+		p, err := sm.RegisterPeer("Owner", from)
+		if err != nil {
+			t.Fatalf("registration %d: %v", i+1, err)
+		}
+		if first == nil {
+			first = p
+		}
+	}
+	if _, err := sm.RegisterPeer("One too many", from); !errors.Is(err, session.ErrTooManyPeers) {
+		t.Fatalf("registration %d: got %v, want ErrTooManyPeers", session.DefaultMaxPeersPerOrigin+1, err)
+	}
+	if _, err := sm.RegisterPeer("Elsewhere", "198.51.100.8"); err != nil {
+		t.Fatalf("another origin was capped: %v", err)
+	}
+	if err := sm.ReleasePeer(first.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := sm.RegisterPeer("After a release", from); err != nil {
+		t.Fatalf("releasing a peer did not free its place: %v", err)
+	}
+}
+
+// The check and the allocation are one step: concurrent registrations from
+// one origin cannot all pass the check before any of them is counted.
+func TestPeerCapHoldsUnderConcurrency(t *testing.T) {
+	sm := session.NewSessionManager(10 * time.Minute)
+	defer sm.Close()
+
+	const from = "198.51.100.9"
+	var ok atomic.Int64
+	var wg sync.WaitGroup
+	for i := 0; i < 2*session.DefaultMaxPeersPerOrigin; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, err := sm.RegisterPeer("Owner", from)
+			switch {
+			case err == nil:
+				ok.Add(1)
+			case !errors.Is(err, session.ErrTooManyPeers):
+				t.Errorf("RegisterPeer: %v", err)
+			}
+		}()
+	}
+	wg.Wait()
+	if got := ok.Load(); got != session.DefaultMaxPeersPerOrigin {
+		t.Fatalf("%d registrations succeeded, want exactly %d", got, session.DefaultMaxPeersPerOrigin)
+	}
+}
+
+func TestSetMaxPeersPerOriginRejectsNonPositive(t *testing.T) {
+	sm := session.NewSessionManager(10 * time.Minute)
+	defer sm.Close()
+	for _, n := range []int{0, -1} {
+		if err := sm.SetMaxPeersPerOrigin(n); err == nil {
+			t.Fatalf("SetMaxPeersPerOrigin(%d) accepted", n)
+		}
+	}
+}
+
 func TestSessionsPerOriginAreCapped(t *testing.T) {
 	sm := session.NewSessionManager(10 * time.Minute)
 	defer sm.Close()
@@ -536,7 +614,7 @@ func TestSessionsPerOriginAreCapped(t *testing.T) {
 			first = s
 		}
 	}
-	p, _ := sm.RegisterPeer("One too many")
+	p, _ := sm.RegisterPeer("One too many", ownerOrigin())
 	if _, err := sm.Redeem(string(p.Code), "c", info()); !errors.Is(err, session.ErrTooManySessions) {
 		t.Fatalf("session %d: got %v, want ErrTooManySessions", session.DefaultMaxSessionsPerOrigin+1, err)
 	}

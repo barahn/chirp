@@ -10,7 +10,9 @@ package session
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -132,8 +134,10 @@ func TestReapExpired_NotifiesSubscribers(t *testing.T) {
 
 // openSession registers an owner and redeems its code, which is how every
 // session starts.
+var registrations atomic.Int64
+
 func openSession(sm *SessionManager) (*Session, error) {
-	p, err := sm.RegisterPeer("Owner")
+	p, err := sm.RegisterPeer("Owner", fmt.Sprint("owner ", registrations.Add(1)))
 	if err != nil {
 		return nil, err
 	}
@@ -171,5 +175,54 @@ func TestReapExpired_ReleasesConsentWaiters(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("WaitForConsent still blocked after the reaper expired its session")
+	}
+}
+
+// A Chirp that exits without releasing itself must not hold its place under
+// the peer cap forever: the place comes back when its code expires. And a
+// lapsed code cannot be revived past the cap, or an origin could register up
+// to the cap, let the codes lapse, register more, and revive them all.
+func TestPeerCapCountsLiveCodes(t *testing.T) {
+	sm := NewSessionManager(time.Minute)
+	defer sm.Close()
+	sm.codeTTL = 30 * time.Millisecond
+	if err := sm.SetMaxPeersPerOrigin(2); err != nil {
+		t.Fatal(err)
+	}
+
+	const from = "198.51.100.20"
+	lapsed, err := sm.RegisterPeer("a", from)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := sm.RegisterPeer("b", from); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := sm.RegisterPeer("c", from); !errors.Is(err, ErrTooManyPeers) {
+		t.Fatalf("third registration: got %v, want ErrTooManyPeers", err)
+	}
+
+	time.Sleep(50 * time.Millisecond) // a's and b's codes lapse
+
+	sm.codeTTL = time.Minute
+	c, err := sm.RegisterPeer("c", from)
+	if err != nil {
+		t.Fatalf("lapsed codes still held their places: %v", err)
+	}
+	if _, err := sm.RegisterPeer("d", from); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := sm.Peer(lapsed.ID); !errors.Is(err, ErrTooManyPeers) {
+		t.Fatalf("reviving a lapsed code past the cap: got %v, want ErrTooManyPeers", err)
+	}
+	if err := sm.ReleasePeer(c.ID); err != nil {
+		t.Fatal(err)
+	}
+	p, err := sm.Peer(lapsed.ID)
+	if err != nil {
+		t.Fatalf("reviving with room: %v", err)
+	}
+	if p.Code == lapsed.Code {
+		t.Fatal("the lapsed code was shown again instead of a fresh one")
 	}
 }
