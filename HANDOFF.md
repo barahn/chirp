@@ -436,16 +436,37 @@ standing-agent model Chirp rejects in its first paragraph. Do not try to reuse
 it for session signalling; the `signalling` package writing its own two-peer
 hub is the correct call, not duplication.
 
-**But `tunnel` is also where consent is enforced, and that is unresolved
-(barahn/chirp#20).** Since remotekit Phase 0–2, `tunnel.AgentStreamRunner`
-holds `Grant`, `RequireScreenViewConsent` and `RequireSignedViewers`. It also
-holds the Phase 2 transport seam: `tunnel.SignalConn` and
-`AgentStreamRunner.Serve(ctx, conn)` run a whole session over any transport
-(barahn/remotekit#68, #77). Keeping `tunnel` out of Chirp, as this section
-says, therefore means re-implementing consent enforcement. Importing it means
-taking yamux (MPL-2.0, below) and the enrolment code. The recommended way out
-is for remotekit to move the session runner out of `tunnel`. Decide before
-writing `cmd/chirp`.
+**But `tunnel` is also where consent is enforced. DECIDED: remotekit moves it
+out (barahn/chirp#20, barahn/remotekit#83).** Since remotekit Phase 0–2,
+`tunnel.AgentStreamRunner` holds `Grant`, `RequireScreenViewConsent` and
+`RequireSignedViewers`. It also holds the Phase 2 transport seam:
+`tunnel.SignalConn` and `AgentStreamRunner.Serve(ctx, conn)` run a whole
+session over any transport (barahn/remotekit#68, #77). Keeping `tunnel` out of
+Chirp would have meant re-implementing consent enforcement; importing it would
+have meant taking yamux (MPL-2.0, below) and the enrolment code.
+
+The maintainer chose option 1 of barahn/chirp#20, on 2026-10-08. remotekit
+moves the session runner out of `tunnel` and into its own package, which
+imports neither yamux nor the enrolment code: consent, viewer signing, the
+data-plane rules, `SignalConn` and `Serve` (barahn/remotekit#83). The split runs along a line
+the code already has. yamux is imported only by `client.go`, `server.go` and
+`tunnel.go`. The runner's only tie to enrolment is `AgentCredentials`, of
+which `Serve` uses just `AgentID` and `DeviceKeyPath`, so the new package
+takes an explicit ID and an in-memory signing key instead. `tunnel` keeps
+`Start` and wraps the new runner, so Barahn does not change.
+
+What this commits Chirp to:
+
+- **Chirp still never imports `tunnel`.** The licence gate keeps flagging
+  MPL-2.0 for review, and nothing in Chirp should ever need the exception.
+- **Chirp does not enforce consent itself.** `cmd/chirp` drives remotekit's
+  runner from the new package: it grants what the owner accepted in the prompt
+  (barahn/chirp#11), and serves the session over a `SignalConn` on Chirp's
+  relay socket (barahn/chirp#12). A second implementation in Chirp would drift
+  from Barahn's.
+- **Wait for the release.** #11 and #12 start once remotekit tags the release
+  that ships the package, and Chirp pins that tag as it pins `v0.3.0` today.
+  barahn/chirp#20 closes when it does.
 
 **remotekit's Phase 2 did not build the `Signaler` its plan proposed.** It
 shipped the narrower `SignalConn` above, and **`signal/nostr`**: a separate Go
@@ -696,16 +717,18 @@ Done on `develop` since, not yet released to `main`:
 Still to decide or do, in order. Each step has an issue, and the
 [Chirp roadmap](https://github.com/orgs/barahn/projects/2) project tracks them:
 
-1. **Decisions that block the binary.** None of these is an implementation
-   task. Each needs the maintainer.
-   - barahn/chirp#20: consent enforcement lives in remotekit `tunnel` (§5.5).
+1. **Decisions that block the binary: none left.** The link hand-off
+   (barahn/chirp#16), the network model (barahn/chirp#19), consent
+   enforcement (barahn/chirp#20) and the UI library (barahn/chirp#24) are
+   decided: `docs/product-model.md` decisions 4 and 5, §5.5 and §5.6.
 2. **`cmd/chirp`** (barahn/chirp#10 → #11 → #12, with barahn/remotekit#68).
    Its UI is Fyne (barahn/chirp#24, §5.6), so its pull request also moves the
-   CI build to native runners. It is the one binary: it registers, shows its
-   code and link, holds the owner socket, shows the consent prompt with the
-   controller's name as a claim,
-   redeems other people's codes and pasted links (`docs/product-model.md`,
-   decision 4), and uses remotekit to share the screen (§5.5).
+   CI build to native runners. #11 and #12 wait on barahn/remotekit#83, the
+   session runner moved out of `tunnel` (barahn/chirp#20, §5.5). It is the one
+   binary: it registers, shows its code and link, holds the owner socket,
+   shows the consent prompt with the controller's name as a claim, redeems
+   other people's codes and pasted links (`docs/product-model.md`, decision
+   4), and uses remotekit to share the screen (§5.5).
 3. **Before any public relay:** bring-your-own STUN/TURN documentation
    (barahn/chirp#15); then the *Blind public network* milestone
    (`docs/product-model.md`, decision 5, §5.5): the lookup (barahn/chirp#42,
