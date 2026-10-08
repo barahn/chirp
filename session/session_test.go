@@ -276,6 +276,45 @@ func TestWaitForConsent(t *testing.T) {
 	}
 }
 
+// Every waiter must see the decision, not only the first one woken.
+func TestWaitForConsentWakesEveryWaiter(t *testing.T) {
+	for _, grant := range []bool{true, false} {
+		t.Run(fmt.Sprintf("granted=%v", grant), func(t *testing.T) {
+			sm := session.NewSessionManager(10 * time.Minute)
+			defer sm.Close()
+
+			_, sess := open(t, sm)
+			askConsent(t, sm, sess.ID)
+
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+
+			const waiters = 3
+			type result struct {
+				granted bool
+				err     error
+			}
+			results := make(chan result, waiters)
+			for range waiters {
+				go func() {
+					granted, err := sm.WaitForConsent(ctx, sess.ID)
+					results <- result{granted, err}
+				}()
+			}
+			time.Sleep(50 * time.Millisecond)
+			if _, err := sm.SubmitConsent(sess.ID, grant, ""); err != nil {
+				t.Fatalf("SubmitConsent: %v", err)
+			}
+			for range waiters {
+				r := <-results
+				if r.err != nil || r.granted != grant {
+					t.Fatalf("WaitForConsent = %v, %v; want %v", r.granted, r.err, grant)
+				}
+			}
+		})
+	}
+}
+
 func TestUndecidedSessionExpires(t *testing.T) {
 	sm := session.NewSessionManager(50 * time.Millisecond)
 	defer sm.Close()

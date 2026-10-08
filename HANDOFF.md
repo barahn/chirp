@@ -219,13 +219,12 @@ Consequences to know about:
   second release on — and those defects are fixed. `docs/devsecops.md`
   explains why marking the code-scanning pair required before then enforces
   nothing.
-- `WaitForConsent` reads from a buffered channel of capacity 1, so only one
-  waiter is woken per session. Fine for one controller per owner; revisit if
-  that stops being true (barahn/chirp#18).
-
-Two items that used to be listed here no longer apply. The `Session` mutex
+Three items that used to be listed here no longer apply. The `Session` mutex
 carries no `json:"-"` tag any more. `CreateSession`'s retry loop went to
-remotekit's `rendezvous` with the code allocation (§4.5).
+remotekit's `rendezvous` with the code allocation (§4.5). `WaitForConsent`
+used to read from a buffered channel of capacity 1, so only one waiter was
+woken per session. The channel is now closed on the decision, which wakes
+every waiter (barahn/chirp#18).
 
 ### 4.4 What integrating the signalling server exposed — FIXED
 
