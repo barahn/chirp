@@ -603,6 +603,82 @@ func TestSetMaxPeersPerOriginRejectsNonPositive(t *testing.T) {
 	}
 }
 
+// A Chirp that exits without DELETE is released once it has been away from
+// its owner socket for the grace period, and its link stops working with it
+// (decision 1). One that is attached, or comes back in time, is kept.
+func TestReapReleasesPeersAwayPastTheirGrace(t *testing.T) {
+	sm := session.NewSessionManager(10 * time.Minute)
+	defer sm.Close()
+	const grace = 40 * time.Millisecond
+	if err := sm.SetPeerGrace(grace); err != nil {
+		t.Fatal(err)
+	}
+
+	neverAttached, _ := sm.RegisterPeer("never attached", ownerOrigin())
+	attached, _ := sm.RegisterPeer("attached", ownerOrigin())
+	if err := sm.OwnerAttached(attached.ID); err != nil {
+		t.Fatal(err)
+	}
+	left, sess := open(t, sm)
+	if err := sm.OwnerAttached(left.ID); err != nil {
+		t.Fatal(err)
+	}
+	sm.OwnerDetached(left.ID)
+	back, _ := sm.RegisterPeer("came back", ownerOrigin())
+	if err := sm.OwnerAttached(back.ID); err != nil {
+		t.Fatal(err)
+	}
+	sm.OwnerDetached(back.ID)
+
+	sm.Reap() // nobody has been away long enough yet
+	for _, p := range []*session.Peer{neverAttached, attached, left, back} {
+		if _, err := sm.Peer(p.ID); err != nil {
+			t.Fatalf("%s released inside its grace: %v", p.Name, err)
+		}
+	}
+
+	time.Sleep(grace / 2)
+	if err := sm.OwnerAttached(back.ID); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(grace)
+	sm.Reap()
+
+	for _, p := range []*session.Peer{neverAttached, left} {
+		if _, err := sm.Peer(p.ID); !errors.Is(err, session.ErrPeerNotFound) {
+			t.Fatalf("%s: Peer = %v, want ErrPeerNotFound", p.Name, err)
+		}
+		if _, err := sm.MintFromLink(p.Link, origin); err == nil {
+			t.Fatalf("%s: its link still mints codes", p.Name)
+		}
+		if err := sm.OwnerAttached(p.ID); !errors.Is(err, session.ErrPeerNotFound) {
+			t.Fatalf("%s: attaching after release = %v, want ErrPeerNotFound", p.Name, err)
+		}
+	}
+	for _, p := range []*session.Peer{attached, back} {
+		if _, err := sm.Peer(p.ID); err != nil {
+			t.Fatalf("%s was released: %v", p.Name, err)
+		}
+	}
+	got, err := sm.GetSession(sess.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.State != session.StateTerminated {
+		t.Fatalf("session of a released peer is %s, want %s", got.State, session.StateTerminated)
+	}
+}
+
+func TestSetPeerGraceRejectsNonPositive(t *testing.T) {
+	sm := session.NewSessionManager(10 * time.Minute)
+	defer sm.Close()
+	for _, d := range []time.Duration{0, -time.Second} {
+		if err := sm.SetPeerGrace(d); err == nil {
+			t.Fatalf("SetPeerGrace(%v) accepted", d)
+		}
+	}
+}
+
 func TestSessionsPerOriginAreCapped(t *testing.T) {
 	sm := session.NewSessionManager(10 * time.Minute)
 	defer sm.Close()

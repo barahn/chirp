@@ -358,16 +358,28 @@ func (s *Server) serveOwner(w http.ResponseWriter, r *http.Request) {
 		s.ownersMu.Lock()
 		oc := s.owners[id]
 		var sessionID string
-		if oc != nil && oc.conn == peer {
+		ours := oc != nil && oc.conn == peer
+		if ours {
 			sessionID = oc.session
 			delete(s.owners, id)
 		}
 		s.ownersMu.Unlock()
+		if ours {
+			// The grace period starts now: a Chirp that does not come back
+			// within it is released, and its link stops working.
+			s.sessions.OwnerDetached(id)
+		}
 		if sessionID != "" {
 			s.hub.Leave(sessionID, RoleOwner)
 		}
 		_ = peer.Close()
 	}()
+
+	// The peer may have been released between the check above and now, by
+	// the reaper or by DELETE; a socket for a peer that is gone is closed.
+	if s.sessions.OwnerAttached(id) != nil {
+		return
+	}
 
 	// A controller may have redeemed the code before this socket arrived.
 	s.attachOwner(id)
