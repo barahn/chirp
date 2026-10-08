@@ -89,6 +89,7 @@ docs/devsecops.md
 docs/product-model.md
 docs/rendezvous-proposal.md
 docs/stun-turn.md
+docs/ux.md
 go.mod
 go.sum
 scripts/gen-handoff.sh
