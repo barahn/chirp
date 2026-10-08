@@ -88,6 +88,7 @@ docs/branching.md
 docs/devsecops.md
 docs/product-model.md
 docs/rendezvous-proposal.md
+docs/stun-turn.md
 go.mod
 go.sum
 scripts/gen-handoff.sh
@@ -402,7 +403,10 @@ From `README.md`'s own "not here yet" list:
    code and link, redeems someone else's, shows the consent prompt, and uses
    remotekit to share the screen. There is no entry point at all yet.
 4. **A TURN relay.** Until then, self-hosting means bring-your-own STUN/TURN
-   (coturn). Document, do not vendor.
+   (coturn). Document, do not vendor: `docs/stun-turn.md` (barahn/chirp#15)
+   covers what breaks without it, a coturn configuration, and the rule that
+   `cmd/chirp` passes its ICE servers explicitly and never uses remotekit's
+   `DefaultPeerConfig()` (Google STUN until barahn/remotekit#63).
 
 **The remote-session mechanism is not yours to write.** Screen capture, VP8
 encoding, input injection, clipboard, file transfer, WebRTC and the reverse
@@ -729,10 +733,11 @@ Still to decide or do, in order. Each step has an issue, and the
    shows the consent prompt with the controller's name as a claim, redeems
    other people's codes and pasted links (`docs/product-model.md`, decision
    4), and uses remotekit to share the screen (§5.5).
-3. **Before any public relay:** bring-your-own STUN/TURN documentation
-   (barahn/chirp#15); then the *Blind public network* milestone
-   (`docs/product-model.md`, decision 5, §5.5): the lookup (barahn/chirp#42,
-   §4.6), the PAKE (barahn/chirp#21) and Nostr signalling (barahn/chirp#43).
+3. **Before any public relay:** per-session TURN credentials handed out by
+   the relay (`docs/stun-turn.md`, *Credentials*; barahn/remotekit#64); then
+   the *Blind public network* milestone (`docs/product-model.md`, decision 5,
+   §5.5): the lookup (barahn/chirp#42, §4.6), the PAKE (barahn/chirp#21) and
+   Nostr signalling (barahn/chirp#43).
 4. **Branch protection and code scanning** (barahn/chirp#17, §4.3). Blocked on
    making the repository public or moving to a paid plan, not on an admin
    token.

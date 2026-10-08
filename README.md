@@ -38,7 +38,7 @@ What is **not** here yet:
 - **The `cmd/chirp` binary** — the one program both sides run, which shows its
   own code and link, asks for consent, and uses remotekit to share the screen.
 - **A TURN relay.** Until Chirp ships one, self-hosting means bringing your own
-  STUN/TURN (coturn works).
+  STUN/TURN (coturn works): see [docs/stun-turn.md](docs/stun-turn.md).
 
 The remote-session mechanism — screen capture, VP8 encoding, input injection,
 clipboard, file transfer, WebRTC, the reverse tunnel — is not missing; it lives
