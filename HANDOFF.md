@@ -93,6 +93,8 @@ go.sum
 scripts/gen-handoff.sh
 scripts/gen-third-party-notices.sh
 session/consent.go
+session/lookup.go
+session/lookup_test.go
 session/reaper_internal_test.go
 session/session.go
 session/session_test.go
@@ -100,6 +102,7 @@ signalling/http.go
 signalling/http_test.go
 signalling/hub.go
 signalling/hub_test.go
+signalling/lookup.go
 signalling/relay.go
 ```
 
@@ -122,9 +125,11 @@ ok  	github.com/barahn/chirp/signalling
 
 ```
 session/consent.go      ConsentDecision, DefaultPermissions
+session/lookup.go       Contact, SetContact, Lookup, LookupLink (the blind lookup, §4.6)
 session/session.go      Peer, Session, SessionState machine, SessionManager (in-memory),
                         over remotekit's rendezvous.Registry
 signalling/hub.go       opaque two-peer relay (roles controller / owner)
+signalling/lookup.go    the lookup's HTTP endpoints (§4.6)
 signalling/relay.go     the relay's own chirp.* messages
 signalling/http.go      HTTP + WebSocket surface (§4.5)
 ```
@@ -316,6 +321,35 @@ authenticated by the peer ID, not up the owner's socket. The relay forwards
 what a peer sends without parsing it, and answering on the socket would make
 it parse the owner's messages. `TestConsentFlowEndToEnd` drives the whole flow
 over HTTP and WebSocket only.
+
+### 4.6 The lookup: the blind server's half of decision 5 (barahn/chirp#42)
+
+The same server also offers the **lookup** that decision 5 in
+`docs/product-model.md` reduces the public server to. It sits on the same
+`SessionManager`, so codes, links, the throttle, the registration cap and the
+peer grace are the same code, not copies.
+
+1. The owner registers as in §4.5, step 1, then says how it can be reached
+   over Nostr: `PUT /api/peers/{peer}/contact {key, relays}`. `key` is its
+   per-session Nostr public key (64 lowercase hex), `relays` 1 to 8
+   `ws://`/`wss://` URLs; anything else is `400`. It sends a new contact
+   whenever it makes a new session key. It keeps its owner socket open, but
+   only so the server knows it is running (decision 1, the peer grace): the
+   lookup relays nothing over it.
+2. The controller sends the code's routing part: `POST /api/lookup {code}`, or
+   uses the link: `POST /api/links/{token}/lookup`. Either returns `{key,
+   relays}` and nothing else. The code is spent exactly as `Redeem` spends it
+   (a start code is replaced, a minted one is gone), and failures are metered
+   from **the same per-origin budget** as `Redeem`, so the lookup is no cheaper
+   way to sweep codes. No session is opened and the owner is not marked busy.
+   An owner that set no contact answers `409`.
+3. From there the two Chirps meet over Nostr (barahn/chirp#43) and bind each
+   other with the PAKE over the code's secret part (barahn/chirp#21). The
+   server never sees either.
+
+`TestLookupFindsTheOwnerByCodeAndByLink` asserts that a lookup, by code and by
+link, sends nothing to the owner's socket. Until #21 lands the code is still
+six digits; the routing part *is* the code.
 
 **Known limits:**
 

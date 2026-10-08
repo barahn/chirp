@@ -127,8 +127,11 @@ consent prompt and the binary are Chirp's. The proposed split is in
 The session layer and the signalling relay implement this model: a running
 Chirp registers and gets its code and link, whoever redeems the code opens a
 session to control it, and consent is asked of the owner over its own socket.
-There is no binary yet, so no prompt is drawn. `HANDOFF.md` §4.5 describes the
-endpoints and the known limits.
+It also offers the lookup that decision 5 reduces the public server to: an
+owner registers how it can be reached over Nostr, and a code or a link returns
+exactly that, with nothing relayed. There is no binary yet, so no prompt is
+drawn. `HANDOFF.md` §4.5 and §4.6 describe the endpoints and the known
+limits.
 
 ---
 

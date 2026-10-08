@@ -103,6 +103,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/redeem", s.redeem)
 	mux.HandleFunc("POST /api/links/{token}/sessions", s.redeemLink)
 	mux.HandleFunc("GET /api/sessions/{id}", s.getSession)
+	mux.HandleFunc("PUT /api/peers/{peer}/contact", s.setContact)
+	mux.HandleFunc("POST /api/lookup", s.lookup)
+	mux.HandleFunc("POST /api/links/{token}/lookup", s.lookupLink)
 	mux.HandleFunc("GET /ws", s.serveWS)
 	return mux
 }

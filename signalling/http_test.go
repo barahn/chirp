@@ -312,6 +312,77 @@ func TestRegistrationIsCapped(t *testing.T) {
 	register(t, ts, "after a release") // fails the test if there is still no room
 }
 
+// nostrKey is shaped like a Nostr public key: 64 lowercase hex digits.
+var nostrKey = strings.Repeat("7e", 32)
+
+// The blind server's whole job: an owner says how to reach it over Nostr, and
+// a controller with the code or the link gets exactly that back. Nothing
+// reaches the owner's socket, because nothing is relayed: no session, no
+// consent request, no signal.
+func TestLookupFindsTheOwnerByCodeAndByLink(t *testing.T) {
+	_, ts := newServer(t)
+	owner := register(t, ts, "Ana")
+	ownerWS := dialOwner(t, ts, owner.PeerID)
+	body := `{"key":"` + nostrKey + `","relays":["wss://relay.example.org"]}`
+	if st := call(t, ts, "PUT", "/api/peers/"+owner.PeerID+"/contact", body, nil); st != http.StatusNoContent {
+		t.Fatalf("set contact = %d, want 204", st)
+	}
+
+	var got session.Contact
+	if st := call(t, ts, "POST", "/api/lookup", fmt.Sprintf(`{"code":%q}`, owner.Code), &got); st != http.StatusOK {
+		t.Fatalf("lookup = %d, want 200", st)
+	}
+	if got.Key != nostrKey || len(got.Relays) != 1 || got.Relays[0] != "wss://relay.example.org" {
+		t.Fatalf("lookup returned %+v", got)
+	}
+	if st := call(t, ts, "POST", "/api/lookup", fmt.Sprintf(`{"code":%q}`, owner.Code), nil); st != http.StatusNotFound {
+		t.Fatalf("second lookup of a single-use code = %d, want 404", st)
+	}
+	for i := 0; i < 2; i++ {
+		if st := call(t, ts, "POST", "/api/links/"+owner.Link+"/lookup", "", nil); st != http.StatusOK {
+			t.Fatalf("link lookup %d = %d, want 200", i+1, st)
+		}
+	}
+
+	_ = ownerWS.SetReadDeadline(time.Now().Add(200 * time.Millisecond))
+	if _, msg, err := ownerWS.ReadMessage(); err == nil {
+		t.Fatalf("a lookup sent the owner %s; it must relay nothing", msg)
+	}
+}
+
+func TestLookupErrors(t *testing.T) {
+	_, ts := newServer(t)
+	owner := register(t, ts, "Ana")
+	for name, body := range map[string]string{
+		"bad key":     `{"key":"abc","relays":["wss://relay.example.org"]}`,
+		"http relay":  `{"key":"` + nostrKey + `","relays":["https://relay.example.org"]}`,
+		"no relays":   `{"key":"` + nostrKey + `","relays":[]}`,
+		"not json":    `{`,
+		"over budget": `{"key":"` + nostrKey + `","relays":["wss://` + strings.Repeat("a", 9000) + `"]}`,
+	} {
+		if st := call(t, ts, "PUT", "/api/peers/"+owner.PeerID+"/contact", body, nil); st != http.StatusBadRequest {
+			t.Errorf("%s: set contact = %d, want 400", name, st)
+		}
+	}
+	good := `{"key":"` + nostrKey + `","relays":["wss://relay.example.org"]}`
+	if st := call(t, ts, "PUT", "/api/peers/nobody/contact", good, nil); st != http.StatusNotFound {
+		t.Fatalf("contact for an unknown peer = %d, want 404", st)
+	}
+	if st := call(t, ts, "POST", "/api/lookup", fmt.Sprintf(`{"code":%q}`, owner.Code), nil); st != http.StatusConflict {
+		t.Fatalf("lookup of an owner with no contact = %d, want 409", st)
+	}
+	for i := 0; i < session.DefaultMaxRedemptionFailures; i++ {
+		call(t, ts, "POST", "/api/lookup", `{"code":"000000"}`, nil)
+	}
+	fresh := register(t, ts, "Bia")
+	if st := call(t, ts, "POST", "/api/lookup", fmt.Sprintf(`{"code":%q}`, fresh.Code), nil); st != http.StatusTooManyRequests {
+		t.Fatalf("lookup after the failure budget = %d, want 429", st)
+	}
+	if _, st := redeem(t, ts, fresh.Code, "c"); st != http.StatusTooManyRequests {
+		t.Fatalf("redeem after failed lookups = %d, want 429: one budget", st)
+	}
+}
+
 // Redemption and link minting share one budget per origin, and a throttled
 // origin is refused even for a live code.
 func TestRedemptionIsThrottled(t *testing.T) {

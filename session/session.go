@@ -133,7 +133,8 @@ type peerEntry struct {
 	peer        Peer
 	origin      string // where it registered from, for the per-origin cap
 	codeExpires time.Time
-	active      string // session in progress, if any
+	active      string   // session in progress, if any
+	contact     *Contact // how to reach it over Nostr, if it said; see lookup.go
 
 	// attached is whether the owner socket is open. detachedSince is when it
 	// last was not: registration, or the socket closing. A peer detached for
