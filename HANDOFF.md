@@ -702,21 +702,29 @@ may become):
 
 ## 8. Suggested next milestone
 
-Released to `main` in barahn/chirp#2 and barahn/chirp#3: the deadlock (§4.1),
-redemption throttling (§4.2), the signalling server with its two security holes
-closed (§4.4), the CI branch integrated into `develop` (`ci.yml` now runs on `develop`; CodeQL, gitleaks,
-dependency review, SBOM and Dependabot are in, with the code-scanning pair gated
-as §4.3 describes).
+**Released:**
 
-Done on `develop` since, not yet released to `main`:
+- **v0.1.0** (barahn/chirp#2, barahn/chirp#3):
+  - the deadlock (§4.1) and redemption throttling (§4.2);
+  - the signalling server with its two security holes closed (§4.4);
+  - the CI branch integrated into `develop`: `ci.yml` runs on `develop`, and
+    CodeQL, gitleaks, dependency review, SBOM and Dependabot are in, with
+    the code-scanning pair gated as §4.3 describes.
+- **v0.2.0** (barahn/chirp#28, tag `v0.2.0` on `main`, 2026-10-08):
+  - remotekit's `rendezvous` adopted and the session direction inverted
+    (§4.5), with remotekit pinned at `v0.3.0`;
+  - the per-origin caps on sessions and registered peers, and the release of
+    peers away from their socket for 2 minutes (§4.5);
+  - the blind lookup (§4.6) and the consent-waiter and lazy-expiry fixes;
+  - Go 1.26.6 as the minimum;
+  - decisions 4 and 5 in `docs/product-model.md`, with §5.5 and §5.6.
 
-- remotekit's `rendezvous` adopted, and the session direction inverted
-  (barahn/chirp#5, §4.5).
-- The cap of 30 sessions per controller origin (barahn/chirp#6).
-- remotekit pinned at the `v0.3.0` tag instead of an orphaned pseudo-version.
-  `clipboard_sync` was renamed to `clipboard`, the name remotekit grants
-  (barahn/chirp#9).
-- The CI actions bumped (barahn/chirp#8).
+  The GitHub Release carries the notes, and the SBOM workflow attaches its
+  output to it.
+
+Nothing is on `develop` that is not released. A release is a pull request
+from `develop` to `main`, merged with a merge commit and tagged
+(`docs/branching.md`).
 
 Still to decide or do, in order. Each step has an issue, and the
 [Chirp roadmap](https://github.com/orgs/barahn/projects/2) project tracks them:
