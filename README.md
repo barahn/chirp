@@ -45,8 +45,8 @@ clipboard, file transfer, WebRTC, the reverse tunnel — is not missing; it live
 in [remotekit](https://github.com/barahn/remotekit) under Apache-2.0, and Chirp
 will consume it as a dependency.
 
-Tracking: [the separation plan](https://github.com/barahn/barahn) in the Barahn
-repository.
+Tracking: planned work is in this repository's issues and the
+[Chirp roadmap](https://github.com/orgs/barahn/projects/2) project.
 
 ## Where Chirp sits
 

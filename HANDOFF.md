@@ -359,8 +359,10 @@ tunnel live in [remotekit](https://github.com/barahn/remotekit) under
 Apache-2.0. Chirp consumes it as a dependency. If you find yourself
 implementing capture or encoding inside Chirp, stop — it belongs upstream.
 
-Tracking issue / separation plan: the
-[barahn/barahn](https://github.com/barahn/barahn) repository.
+Tracking: this repository's issues and the
+[Chirp roadmap](https://github.com/orgs/barahn/projects/2) project (§1, §8).
+The separation plan in the proprietary barahn/barahn repository is historical
+background only.
 
 ### 5.5 The remotekit boundary in practice
 
