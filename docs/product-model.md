@@ -34,8 +34,8 @@ user 1's own consent.
 **Shared link.** User 2 sends the link instead. Every time someone uses the
 link, a **new single-use code** is created for that one connection. A code that
 leaks after it has been used opens nothing. Someone who opens the link and does
-not have Chirp yet gets it — and from then on is a Chirp user like any other,
-with their own code and their own link.
+not have Chirp yet gets it and pastes the link into it (decision 4) — and from
+then on is a Chirp user like any other, with their own code and their own link.
 
 Both ways end at the same place: user 2's Chirp asks user 2 whether to let this
 connection in.
@@ -104,13 +104,38 @@ Decided by the maintainer:
    without saying so gives its place back when its code expires. Operators
    can change it (`SetMaxPeersPerOrigin`).
 
-Still open, to decide when the download site exists:
+4. **A link reaches a freshly downloaded Chirp by being pasted into it.** The
+   page a share link opens says what to do: if you have Chirp, open it and
+   paste this link; if not, download it, run it, and paste this link. The page
+   offers a button to copy the link. Chirp has a place to paste a link, beside
+   the place to type a code, and both lead to the same consent prompt on the
+   sharer's machine.
 
-4. **How a link reaches a freshly downloaded Chirp.** With no installation there
-   is no pre-registered handler, so the link's token has to get from the browser
-   into the binary somehow: a custom URL scheme registered on first run, the
-   token carried in the download itself, or pasted on first start. Each trades
-   convenience against how much the download page must be trusted.
+   - **The download is the same for everyone.** The token is never carried in
+     the download: not in its contents, not in its file name. Every copy of a
+     release is byte-identical, so it can be checked against the published
+     hash and signature, and the site never has to be trusted to personalise
+     a binary.
+   - **Chirp reads the clipboard only when the user pastes.** It never looks
+     at the clipboard on its own, at start or at any other time.
+   - **Chirp registers no URL handler.** A handler is a change to the system
+     that outlives the program, which is installation by another name, and it
+     would not help the first link anyway.
+   - **Pasting a link makes you the one who controls, never the one
+     controlled.** The person who pastes is user 1; the consent prompt appears
+     on the sharer's machine. "Paste this link into Chirp" therefore cannot be
+     used to take over the machine of the person who does it.
+
+   Chirp accepts the link as the page shows it or as the bare token, and
+   checks its form before contacting the relay, where every use is metered
+   (`POST /api/links/{token}/sessions`). The token should travel in the link's
+   fragment (after `#`), which browsers do not send, so that the site serving
+   the page never receives it.
+
+   The cost is one step more than a click. It was chosen over a token carried
+   in the download, which leaves the token in the downloads folder and history
+   and makes the page a party to every binary, and over reading the clipboard
+   at start, which looks at data the user did not offer.
 
 ## Where the pieces live
 
