@@ -67,15 +67,14 @@ These are consequences of the model, stated so nobody has to rediscover them:
   single-use, but the link itself mints again until it stops being valid. Every
   connection it creates still needs user 2's consent. A link lives only while
   its sharer's Chirp runs, and can be revoked — see Decisions, below.
-- **The relay is trusted, and self-hosting is how you avoid trusting someone
-  else's.** A relay sees the codes it routes by, so it could impersonate either
-  end. That is the same model as Barahn and every mainstream remote-support tool,
-  and it is compatible with Chirp's commitment that a hosted service is a
-  convenience and never a requirement: anyone who does not want to trust a hosted
-  relay runs their own. Removing that trust entirely would need a
-  password-authenticated key exchange over a secret the relay never sees, which
-  means changing the code format. That is possible future hardening, not a
-  requirement — see `HANDOFF.md` §5.5.
+- **Today the relay is trusted; before any public relay it must not be.** A
+  relay that sees the codes it routes by could impersonate either end. That is
+  acceptable for a relay its users run or trust themselves, which is what the
+  first runnable Chirp ships with. It is not acceptable for a public service
+  run for strangers, so no public relay is offered on that model. Decision 5
+  removes the trust: a secret part of the code that the network never sees,
+  and a password-authenticated key exchange (PAKE) over it that binds the two
+  ends.
 
 ## Decisions
 
@@ -137,6 +136,41 @@ Decided by the maintainer:
    and makes the page a party to every binary, and over reading the clipboard
    at start, which looks at data the user did not offer.
 
+5. **The public server is blind to the traffic, and signalling travels over
+   Nostr relays. It comes after the first runnable Chirp.** This replaces the
+   idea that every running Chirp would be a node relaying for others: remotekit
+   already carries signalling over public Nostr relays, encrypted end to end,
+   so no node network has to be invented to get a carrier that sees nothing.
+
+   - **The code becomes 6 + 4 digits**, read as `482-913-5071`. The first six
+     are the *routing* part: the network sees them, and they lead to the
+     owner. The last four are the *secret*: they never leave the two people,
+     and are the password of a PAKE that binds the two ends. Someone in the
+     middle gets one guess in 10,000 per attempt, and a wrong guess fails
+     visibly to both ends. A link carries both parts.
+   - **Chirp's public server does three things only:** it offers the download,
+     serves the page a link opens, and looks up a routing part. The lookup
+     returns the owner's session key and the relays it listens on, which the
+     owner's Chirp registered when it started. It never sees the secret or a
+     single signalling message.
+   - **Signalling goes over Nostr relays** through remotekit's `signal/nostr`.
+     Every message is gift-wrapped and encrypted to the other end under keys
+     made for that session. A relay learns that a key received something,
+     when and how much, and nothing of the content. remotekit's signed
+     signalling and consent enforcement run on top, as they do today.
+   - **Abuse limits stay where the requests arrive.** The lookup keeps the
+     per-origin throttle on routing parts and the cap on registrations
+     (decision 3), and the PAKE bounds guessing the secret.
+   - **Self-hosting keeps working with zero restrictions.** A self-hoster runs
+     their own lookup and, if they want, their own Nostr relay. The relay that
+     exists today also remains, for anyone who prefers a single server they
+     trust.
+   - **The order of work.** The first runnable Chirp ships with today's relay
+     and six-digit codes, for a relay its users trust. The blind design is the
+     next milestone, and it must be in place before Chirp offers a public
+     relay to anyone. Changing the code format then is accepted: Chirp is
+     pre-1.0.
+
 ## Where the pieces live
 
 The mechanism behind this — allocating and redeeming codes, minting codes from a
@@ -149,14 +183,15 @@ consent prompt and the binary are Chirp's. The proposed split is in
 
 ## What the code does today
 
-The session layer and the signalling relay implement this model: a running
-Chirp registers and gets its code and link, whoever redeems the code opens a
-session to control it, and consent is asked of the owner over its own socket.
-It also offers the lookup that decision 5 reduces the public server to: an
-owner registers how it can be reached over Nostr, and a code or a link returns
-exactly that, with nothing relayed. There is no binary yet, so no prompt is
-drawn. `HANDOFF.md` §4.5 and §4.6 describe the endpoints and the known
-limits.
+The session layer and the signalling relay implement this model, through a
+relay that sees the codes (the trusted arrangement decision 5 replaces before
+any public relay): a running Chirp registers and gets its code and link,
+whoever redeems the code opens a session to control it, and consent is asked
+of the owner over its own socket. It also offers the lookup that decision 5
+reduces the public server to: an owner registers how it can be reached over
+Nostr, and a code or a link returns exactly that, with nothing relayed. There
+is no binary yet, so no prompt is drawn. `HANDOFF.md` §4.5 and §4.6 describe
+the endpoints and the known limits.
 
 ---
 

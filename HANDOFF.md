@@ -490,14 +490,20 @@ convenience, never a requirement.* Self-hosting satisfies it. A self-hosted
 relay sits on the controlling user's side, whom the controlled user already
 trusts with their machine, and anyone unwilling to trust a hosted relay runs
 their own. Barahn works the same way, as does every mainstream remote-support
-tool. So the relay is trusted, openly, and what follows is **optional
-hardening** for relays run by a third party — worth keeping on record, not on
-the critical path.
+tool. So a relay its users run or trust is trusted, openly. A public relay
+run for strangers is the case the commitment does not cover, and for it what
+follows is **required**, not optional: see the decision below.
 
-> **Open: barahn/chirp#7 proposes reversing this** (a public server blind to
-> the traffic, every running Chirp a node, a 6 + 4 digit code). If it is
-> accepted, the PAKE below moves onto the critical path. The decision is
-> tracked in barahn/chirp#19, and the PAKE work in barahn/chirp#21.
+> **Decided (barahn/chirp#19, 2026-10-08): not for the first runnable Chirp,
+> yes before any public relay** (`docs/product-model.md`, decision 5). The
+> MVP ships with this trusted relay. Before Chirp offers a public one, the
+> public server becomes blind: a lookup that maps a code's six-digit routing
+> part to the owner's session key and relays (barahn/chirp#42), signalling
+> over Nostr relays through remotekit's `signal/nostr` (barahn/chirp#43), and
+> a PAKE over the code's four-digit secret (barahn/chirp#21). All three are in
+> the *Blind public network* milestone. barahn/chirp#7's "every Chirp is a
+> node" was not adopted: Nostr relays already give a carrier that sees
+> nothing, without a node network to design.
 
 **Correction: signing is necessary, not sufficient.** An earlier version of
 this section said remotekit "already has the parts". It does not. A signature
@@ -527,26 +533,36 @@ magic-wormhole's codes are exactly that: a nameplate for routing, words for the
 secret. For Chirp it means the code a technician reads aloud gets longer, or
 its six digits are divided — a product decision, not an implementation detail.
 
-Proposal, for the maintainer to decide before any client is written:
+The plan, with what decision 5 settled:
 
-1. **Choose the code format.** For example, keep six digits for routing and
-   add a short secret the technician also reads out; or keep six digits total
-   and split them. The secret's length sets the odds of the relay's single
-   guess per attempt, and a failed PAKE is visible to both ends.
-2. **Choose the PAKE.** CPace (an IETF CFRG draft) is the natural candidate,
-   SPAKE2 the alternative. A Go implementation must be found and vetted at
-   that point — maintenance, review history, and a permissive licence through
-   the licence gate. Do not hand-roll it.
-3. **Then the protocol:** each end runs the PAKE through the relay as opaque
-   messages, sends its ed25519 public key authenticated under the PAKE key, and
-   from then on every signal is a remotekit `SignalMessage` signed and verified
-   against the pinned key, replay-checked with `NonceCache`.
+1. **The code format — decided: 6 + 4 digits**, read as `482-913-5071`. Six
+   for routing, which the lookup sees; four for the secret, which nothing
+   but the two people ever sees. A relay in the middle gets one guess in
+   10,000 per attempt, and a failed PAKE is visible to both ends.
+2. **Choose the PAKE** (barahn/chirp#21). CPace (an IETF CFRG draft) is the
+   natural candidate, SPAKE2 the alternative. A Go implementation must be
+   vetted — maintenance, review history, test vectors against the draft, and a
+   permissive licence through the licence gate. Do not hand-roll it. Surveyed
+   on 2026-09-30 from the module proxy, not yet audited:
+
+   | Module | Licence | State | Notes |
+   | --- | --- | --- | --- |
+   | `github.com/bytemare/cpace` | MIT | active, no release tag | tracks the CFRG CPace draft; pulls `bytemare/ecc` and friends |
+   | `filippo.io/cpace` | BSD-3 | last commit Jan 2021, no tag | early draft over ristretto255; unmaintained |
+   | `github.com/schollz/pake/v3` | MIT | tagged v3.2.0 | SPAKE2-style, used by croc; default curve is the non-standard `siec` |
+
+   The PAKE is mechanism, so it belongs in remotekit, through remotekit's
+   licence gate.
+3. **Then the protocol:** each end runs the PAKE over the Nostr connection
+   (barahn/chirp#43) as opaque messages, sends its ed25519 public key
+   authenticated under the PAKE key, and from then on every signal is a
+   remotekit `SignalMessage` signed and verified against the pinned key,
+   replay-checked with `NonceCache`.
 4. **Relay messages stay unauthenticated** — they come from the relay by
    definition — so an end must treat `chirp.*` messages as hints (presence,
    errors) and never act on them for anything security-relevant.
 
-Should that hardening ever be wanted, this is why it cannot be done by adopting
-`signed.go` alone.
+This is why decision 5 cannot be met by adopting `signed.go` alone.
 
 One caveat when reading that document: its status line says "proposal, not
 accepted. Nothing here has been implemented", and for its Phase 0 item 3
@@ -647,8 +663,6 @@ Still to decide or do, in order. Each step has an issue, and the
 
 1. **Decisions that block the binary.** None of these is an implementation
    task. Each needs the maintainer.
-   - barahn/chirp#19: accept or reject barahn/chirp#7 (blind public server,
-     every Chirp a node). It decides whether #21 is on the critical path.
    - barahn/chirp#20: consent enforcement lives in remotekit `tunnel` (§5.5).
    - barahn/chirp#24: the tray/UI library, `getlantern/systray` or Fyne,
      checked against the licence gate.
@@ -657,9 +671,10 @@ Still to decide or do, in order. Each step has an issue, and the
    socket, shows the consent prompt with the controller's name as a claim,
    redeems other people's codes and pasted links (`docs/product-model.md`,
    decision 4), and uses remotekit to share the screen (§5.5).
-3. **Before any public relay:** the PAKE if #19 makes it required
-   (barahn/chirp#21), and bring-your-own STUN/TURN documentation
-   (barahn/chirp#15).
+3. **Before any public relay:** bring-your-own STUN/TURN documentation
+   (barahn/chirp#15); then the *Blind public network* milestone
+   (`docs/product-model.md`, decision 5, §5.5): the lookup (barahn/chirp#42,
+   §4.6), the PAKE (barahn/chirp#21) and Nostr signalling (barahn/chirp#43).
 4. **Branch protection and code scanning** (barahn/chirp#17, §4.3). Blocked on
    making the repository public or moving to a paid plan, not on an admin
    token.
