@@ -55,6 +55,14 @@ const (
 	// DefaultMaxSessionsPerOrigin bounds how many sessions one origin may hold
 	// open at once as controller. A maintainer decision: 30.
 	DefaultMaxSessionsPerOrigin = 30
+
+	// DefaultMaxPeersPerOrigin bounds how many peers registered from one
+	// origin may hold a live code at once. Every registration holds a code, so
+	// without it one origin could fill the 900,000-code space. It counts live
+	// codes rather than registrations so that a Chirp which exits without
+	// releasing itself gives its place back when its code expires. A
+	// maintainer decision: 30.
+	DefaultMaxPeersPerOrigin = 30
 )
 
 var (
@@ -71,6 +79,9 @@ var (
 	// ErrTooManySessions reports that the controller's origin already holds
 	// the maximum number of open sessions.
 	ErrTooManySessions = errors.New("chirp: too many open sessions from this origin")
+	// ErrTooManyPeers reports that the origin a peer registered from already
+	// has the maximum number of peers holding a live code.
+	ErrTooManyPeers = errors.New("chirp: too many peers registered from this origin")
 )
 
 // Rendezvous errors a caller may need to tell apart, re-exported so callers
@@ -113,6 +124,7 @@ type Peer struct {
 
 type peerEntry struct {
 	peer        Peer
+	origin      string // where it registered from, for the per-origin cap
 	codeExpires time.Time
 	active      string // session in progress, if any
 }
@@ -243,6 +255,7 @@ type SessionManager struct {
 	sessionTTL  time.Duration
 	codeTTL     time.Duration
 	maxPerOrig  int
+	maxPeers    int
 	stopReaper  chan struct{}
 	mu          sync.RWMutex
 	listenersMu sync.RWMutex
@@ -270,6 +283,7 @@ func NewSessionManager(sessionTTL time.Duration) *SessionManager {
 		sessionTTL: sessionTTL,
 		codeTTL:    DefaultCodeTTL,
 		maxPerOrig: DefaultMaxSessionsPerOrigin,
+		maxPeers:   DefaultMaxPeersPerOrigin,
 		stopReaper: make(chan struct{}),
 	}
 	go sm.startReaper()
@@ -319,11 +333,47 @@ func (sm *SessionManager) openFromLocked(origin string, now time.Time) int {
 	return n
 }
 
+// SetMaxPeersPerOrigin changes how many peers registered from one origin may
+// hold a live code at once.
+func (sm *SessionManager) SetMaxPeersPerOrigin(n int) error {
+	if n <= 0 {
+		return errors.New("chirp: the peer limit must be positive")
+	}
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	sm.maxPeers = n
+	return nil
+}
+
+// livePeersFromLocked counts the peers registered from origin whose code is
+// still live. Called with sm.mu held.
+func (sm *SessionManager) livePeersFromLocked(origin string, now time.Time) int {
+	n := 0
+	for _, pe := range sm.peers {
+		if pe.origin == origin && now.Before(pe.codeExpires) {
+			n++
+		}
+	}
+	return n
+}
+
 // RegisterPeer makes a running Chirp reachable. It returns the peer's secret ID,
 // a single-use code to show, and a link that mints a fresh code per use and
-// lives until the peer is released.
-func (sm *SessionManager) RegisterPeer(name string) (*Peer, error) {
+// lives until the peer is released. origin is where the request came from: one
+// origin may hold at most DefaultMaxPeersPerOrigin live codes (tunable with
+// SetMaxPeersPerOrigin), and an empty origin is one shared origin rather than
+// an exemption.
+func (sm *SessionManager) RegisterPeer(name, origin string) (*Peer, error) {
 	id := rendezvous.PeerID(uuid.New().String())
+
+	// The count and the allocation happen under one lock, so concurrent
+	// registrations from one origin cannot all pass the check at once.
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	now := time.Now().UTC()
+	if sm.livePeersFromLocked(origin, now) >= sm.maxPeers {
+		return nil, ErrTooManyPeers
+	}
 	code, err := sm.reg.Allocate(id, sm.codeTTL)
 	if err != nil {
 		return nil, err
@@ -333,12 +383,8 @@ func (sm *SessionManager) RegisterPeer(name string) (*Peer, error) {
 		sm.reg.Release(id)
 		return nil, err
 	}
-	now := time.Now().UTC()
 	p := Peer{ID: id, Name: name, Code: code, Link: link, RegisteredAt: now}
-
-	sm.mu.Lock()
-	sm.peers[id] = &peerEntry{peer: p, codeExpires: now.Add(sm.codeTTL)}
-	sm.mu.Unlock()
+	sm.peers[id] = &peerEntry{peer: p, origin: origin, codeExpires: now.Add(sm.codeTTL)}
 
 	cp := p
 	return &cp, nil
@@ -347,6 +393,11 @@ func (sm *SessionManager) RegisterPeer(name string) (*Peer, error) {
 // Peer returns a peer by its ID, with the code it should be showing now: a
 // code that has been used or has expired is replaced first, so the peer never
 // displays a code that opens nothing.
+//
+// Replacing an expired code takes a place under the per-origin peer cap again,
+// since the expired one had given its place up: otherwise an origin could
+// register up to the cap, let the codes lapse, register more, and then revive
+// them all. Over the cap, Peer returns ErrTooManyPeers; the peer still exists.
 func (sm *SessionManager) Peer(id rendezvous.PeerID) (*Peer, error) {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
@@ -354,7 +405,10 @@ func (sm *SessionManager) Peer(id rendezvous.PeerID) (*Peer, error) {
 	if !ok {
 		return nil, ErrPeerNotFound
 	}
-	if !time.Now().UTC().Before(pe.codeExpires) {
+	if now := time.Now().UTC(); !now.Before(pe.codeExpires) {
+		if sm.livePeersFromLocked(pe.origin, now) >= sm.maxPeers {
+			return nil, ErrTooManyPeers
+		}
 		if err := sm.renewCodeLocked(pe); err != nil {
 			return nil, err
 		}

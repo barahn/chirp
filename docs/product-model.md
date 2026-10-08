@@ -94,6 +94,11 @@ Decided by the maintainer:
    relay can count — people behind one NAT share the 30. Operators can change
    it (`SetMaxSessionsPerOrigin`).
 
+   The same address may also have at most 30 running Chirps registered with
+   a live code at once; the 31st is refused (`429`). A Chirp that quits
+   without saying so gives its place back when its code expires. Operators
+   can change it (`SetMaxPeersPerOrigin`).
+
 Still open, to decide when the download site exists:
 
 4. **How a link reaches a freshly downloaded Chirp.** With no installation there

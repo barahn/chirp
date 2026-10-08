@@ -93,7 +93,7 @@ func newSession(t *testing.T) (*session.SessionManager, *session.Session) {
 	t.Helper()
 	sm := session.NewSessionManager(10 * time.Minute)
 	t.Cleanup(sm.Close)
-	p, err := sm.RegisterPeer("Ana")
+	p, err := sm.RegisterPeer("Ana", "192.0.2.50")
 	if err != nil {
 		t.Fatalf("RegisterPeer: %v", err)
 	}

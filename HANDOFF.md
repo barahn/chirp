@@ -324,11 +324,22 @@ over HTTP and WebSocket only.
   The check runs before the code is consumed, so a refused redemption (`429`)
   leaves the owner's code usable. Behind `Server.ClientIP` the same caveats as
   the throttle apply: a NAT shares the 30.
-- **Registration is not metered.** Anyone can `POST /api/peers` repeatedly, and
-  every registration holds a live code; enough of them would exhaust the
-  900,000-code space (`rendezvous.ErrExhausted` → `503`) and make random
-  guesses likelier to hit. A self-hosted relay is exposed only to its users; a
-  public one needs a per-origin cap on registrations before it launches.
+- **At most 30 registered peers with a live code per origin** (maintainer
+  decision, `DefaultMaxPeersPerOrigin`, tunable with `SetMaxPeersPerOrigin`;
+  barahn/chirp#14). Every registration holds a code, so without a cap one
+  origin could exhaust the 900,000-code space (`rendezvous.ErrExhausted` →
+  `503`) and make random guesses likelier to hit. The 31st `POST /api/peers`
+  gets `429`. The cap counts live codes, not registrations: a Chirp that exits
+  without `DELETE` gives its place back when its code expires, ten minutes
+  later. Replacing a lapsed code in `GET /api/peers/{peer}` takes a place
+  again and gets `429` over the cap; otherwise an origin could register to the
+  cap, let the codes lapse, register more and revive them all. Such a peer
+  still exists, keeps its owner socket and its link. The origin is the same
+  `Server.ClientIP` as the throttle, with the same NAT caveat.
+- **Peers are never reaped.** A peer that exits without `DELETE` stays in
+  memory, with its link, until the relay restarts. Its code lapses and stops
+  counting, so this is not the code-space exhaustion above, but it does grow
+  the peer map.
 - Controller identity is self-asserted by design (`docs/product-model.md`).
 
 ## 5. The roadmap — what is missing, in dependency order
@@ -606,8 +617,7 @@ Still to decide or do, in order. Each step has an issue, and the
    It is the one binary: it registers, shows its code and link, holds the owner
    socket, shows the consent prompt with the controller's name as a claim,
    redeems other people's codes, and uses remotekit to share the screen (§5.5).
-3. **Before any public relay:** meter registration per origin
-   (barahn/chirp#14, §4.5 known limits), the PAKE if #19 makes it required
+3. **Before any public relay:** the PAKE if #19 makes it required
    (barahn/chirp#21), and bring-your-own STUN/TURN documentation
    (barahn/chirp#15).
 4. **Branch protection and code scanning** (barahn/chirp#17, §4.3). Blocked on

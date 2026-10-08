@@ -291,6 +291,26 @@ func TestBadCodesAreIndistinguishable(t *testing.T) {
 	}
 }
 
+// Registration is metered per origin: past the cap the relay answers 429, and
+// releasing a peer gives its place back.
+func TestRegistrationIsCapped(t *testing.T) {
+	_, ts := newServer(t)
+	var first peerView
+	for i := 0; i < session.DefaultMaxPeersPerOrigin; i++ {
+		p := register(t, ts, fmt.Sprint("peer ", i))
+		if i == 0 {
+			first = p
+		}
+	}
+	if st := call(t, ts, "POST", "/api/peers", `{"name":"one too many"}`, nil); st != http.StatusTooManyRequests {
+		t.Fatalf("registration %d = %d, want 429", session.DefaultMaxPeersPerOrigin+1, st)
+	}
+	if st := call(t, ts, "DELETE", "/api/peers/"+first.PeerID, "", nil); st != http.StatusNoContent {
+		t.Fatalf("release = %d, want 204", st)
+	}
+	register(t, ts, "after a release") // fails the test if there is still no room
+}
+
 // Redemption and link minting share one budget per origin, and a throttled
 // origin is refused even for a live code.
 func TestRedemptionIsThrottled(t *testing.T) {
