@@ -315,6 +315,98 @@ func TestWaitForConsentWakesEveryWaiter(t *testing.T) {
 	}
 }
 
+type waitResult struct {
+	granted bool
+	err     error
+}
+
+// waitAsync starts a WaitForConsent and returns where its result arrives.
+func waitAsync(ctx context.Context, sm *session.SessionManager, id string) <-chan waitResult {
+	ch := make(chan waitResult, 1)
+	go func() {
+		granted, err := sm.WaitForConsent(ctx, id)
+		ch <- waitResult{granted, err}
+	}()
+	return ch
+}
+
+// A session that ends without a decision must release its waiters with the
+// reason, not leave them blocked until their context gives up.
+func TestWaitForConsentReturnsWhenSessionEndsUndecided(t *testing.T) {
+	cases := []struct {
+		name string
+		ttl  time.Duration
+		end  func(sm *session.SessionManager, p *session.Peer, id string)
+		want error
+	}{
+		{"EndSession", 10 * time.Minute, func(sm *session.SessionManager, _ *session.Peer, id string) {
+			if _, err := sm.EndSession(id); err != nil {
+				t.Errorf("EndSession: %v", err)
+			}
+		}, session.ErrSessionEnded},
+		{"ReleasePeer", 10 * time.Minute, func(sm *session.SessionManager, p *session.Peer, _ string) {
+			if err := sm.ReleasePeer(p.ID); err != nil {
+				t.Errorf("ReleasePeer: %v", err)
+			}
+		}, session.ErrSessionEnded},
+		{"expiry on the next transition", 100 * time.Millisecond, func(sm *session.SessionManager, _ *session.Peer, id string) {
+			time.Sleep(150 * time.Millisecond)
+			if _, err := sm.SubmitConsent(id, true, ""); !errors.Is(err, session.ErrSessionExpired) {
+				t.Errorf("SubmitConsent after the deadline: %v", err)
+			}
+		}, session.ErrSessionExpired},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			sm := session.NewSessionManager(tc.ttl)
+			defer sm.Close()
+
+			p, sess := open(t, sm)
+			askConsent(t, sm, sess.ID)
+
+			// No deadline: before the fix, this waiter never returned.
+			res := waitAsync(context.Background(), sm, sess.ID)
+			time.Sleep(20 * time.Millisecond)
+			tc.end(sm, p, sess.ID)
+
+			select {
+			case r := <-res:
+				if r.granted || !errors.Is(r.err, tc.want) {
+					t.Fatalf("WaitForConsent = %v, %v; want false, %v", r.granted, r.err, tc.want)
+				}
+			case <-time.After(2 * time.Second):
+				t.Fatal("WaitForConsent still blocked after the session ended")
+			}
+
+			// A caller arriving afterwards gets the same answer at once, even
+			// with a context that has already ended.
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
+			if granted, err := sm.WaitForConsent(ctx, sess.ID); granted || !errors.Is(err, tc.want) {
+				t.Fatalf("late WaitForConsent = %v, %v; want false, %v", granted, err, tc.want)
+			}
+		})
+	}
+}
+
+// Ending a session after consent was granted does not rewrite the decision.
+func TestWaitForConsentKeepsADecisionAfterTheSessionEnds(t *testing.T) {
+	sm := session.NewSessionManager(10 * time.Minute)
+	defer sm.Close()
+
+	_, sess := open(t, sm)
+	askConsent(t, sm, sess.ID)
+	if _, err := sm.SubmitConsent(sess.ID, true, ""); err != nil {
+		t.Fatalf("SubmitConsent: %v", err)
+	}
+	if _, err := sm.EndSession(sess.ID); err != nil {
+		t.Fatalf("EndSession: %v", err)
+	}
+	if granted, err := sm.WaitForConsent(context.Background(), sess.ID); !granted || err != nil {
+		t.Fatalf("WaitForConsent = %v, %v; want true, nil", granted, err)
+	}
+}
+
 func TestUndecidedSessionExpires(t *testing.T) {
 	sm := session.NewSessionManager(50 * time.Millisecond)
 	defer sm.Close()

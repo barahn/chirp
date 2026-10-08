@@ -8,6 +8,8 @@
 package session
 
 import (
+	"context"
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -138,4 +140,36 @@ func openSession(sm *SessionManager) (*Session, error) {
 	// Each session from its own origin, so the per-origin session cap is not
 	// what these tests measure.
 	return sm.Redeem(string(p.Code), "Controller", &ClientInfo{RemoteIP: string(p.ID)})
+}
+
+// The reaper is the only thing that expires a session nobody touches, such as
+// an owner who never answers the prompt. Its waiters must be released too.
+func TestReapExpired_ReleasesConsentWaiters(t *testing.T) {
+	sm := NewSessionManager(30 * time.Millisecond)
+	defer sm.Close()
+
+	sess, err := openSession(sm)
+	if err != nil {
+		t.Fatalf("openSession failed: %v", err)
+	}
+	type result struct {
+		granted bool
+		err     error
+	}
+	res := make(chan result, 1)
+	go func() {
+		granted, err := sm.WaitForConsent(context.Background(), sess.ID)
+		res <- result{granted, err}
+	}()
+	time.Sleep(60 * time.Millisecond)
+	sm.reapExpired()
+
+	select {
+	case r := <-res:
+		if r.granted || !errors.Is(r.err, ErrSessionExpired) {
+			t.Fatalf("WaitForConsent = %v, %v; want false, %v", r.granted, r.err, ErrSessionExpired)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("WaitForConsent still blocked after the reaper expired its session")
+	}
 }

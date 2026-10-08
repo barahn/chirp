@@ -60,6 +60,7 @@ const (
 var (
 	ErrSessionNotFound   = errors.New("chirp: session not found")
 	ErrSessionExpired    = errors.New("chirp: session has expired")
+	ErrSessionEnded      = errors.New("chirp: session ended without a consent decision")
 	ErrSessionNotPending = errors.New("chirp: session is no longer pending")
 	ErrConsentAlreadySet = errors.New("chirp: consent decision has already been submitted")
 	ErrInvalidState      = errors.New("chirp: invalid state transition")
@@ -135,9 +136,10 @@ type Session struct {
 	Consent        *ConsentDecision `json:"consent,omitempty"`
 
 	mu sync.RWMutex
-	// decided is closed, under mu, when Consent is set. Closing wakes every
+	// settled is closed, under mu, once the consent question has an answer:
+	// Consent is set, or the session ended without one. Closing wakes every
 	// WaitForConsent at once, where a send would wake only one of them.
-	decided chan struct{}
+	settled chan struct{}
 }
 
 // Clone returns a thread-safe snapshot of the session state.
@@ -179,6 +181,16 @@ func (s *Session) cloneLocked() *Session {
 		cp.Consent = &c
 	}
 	return cp
+}
+
+// settleLocked closes settled unless it already is. Callers hold s.mu for
+// writing, so the check and the close cannot race.
+func (s *Session) settleLocked() {
+	select {
+	case <-s.settled:
+	default:
+		close(s.settled)
+	}
 }
 
 // RemainingTTL returns how much time remains before the session expires.
@@ -412,7 +424,7 @@ func (sm *SessionManager) Redeem(code, controllerName string, info *ClientInfo) 
 		State:          StatePending,
 		CreatedAt:      now,
 		ExpiresAt:      now.Add(sm.sessionTTL),
-		decided:        make(chan struct{}),
+		settled:        make(chan struct{}),
 	}
 	if info != nil {
 		ci := *info
@@ -477,6 +489,7 @@ func (sm *SessionManager) transition(id string, fn func(s *Session, now time.Tim
 	sess.mu.Lock()
 	if !terminal(sess.State) && sess.State != StateActive && sess.State != StateConsentGranted && !now.Before(sess.ExpiresAt) {
 		sess.State = StateExpired
+		sess.settleLocked()
 		sess.mu.Unlock()
 		sm.finished(sess)
 		return nil, ErrSessionExpired
@@ -547,34 +560,50 @@ func (sm *SessionManager) SubmitConsent(id string, granted bool, reason string) 
 			s.State = StateConsentDenied
 			s.EndedAt = &now
 		}
-		close(s.decided)
+		s.settleLocked()
 		return nil
 	})
 }
 
-// WaitForConsent blocks until the owner decides or ctx ends. Any number of
-// callers may wait on the same session; all of them see the decision.
+// WaitForConsent blocks until the owner decides, the session ends without a
+// decision, or ctx ends. Any number of callers may wait on the same session;
+// all of them see the outcome. A session that ends undecided returns
+// ErrSessionExpired if its deadline passed and ErrSessionEnded otherwise, at
+// once for a caller that arrives after it ended.
 func (sm *SessionManager) WaitForConsent(ctx context.Context, id string) (bool, error) {
 	sess, err := sm.get(id)
 	if err != nil {
 		return false, err
 	}
 	sess.mu.RLock()
-	if sess.Consent != nil {
-		granted := sess.Consent.Granted
-		sess.mu.RUnlock()
-		return granted, nil
-	}
-	decided := sess.decided
+	settled := sess.settled
 	sess.mu.RUnlock()
 
+	// An outcome already known wins over a context that has also ended.
+	select {
+	case <-settled:
+		return sess.consentOutcome()
+	default:
+	}
 	select {
 	case <-ctx.Done():
 		return false, ctx.Err()
-	case <-decided:
-		sess.mu.RLock()
-		defer sess.mu.RUnlock()
-		return sess.Consent.Granted, nil
+	case <-settled:
+		return sess.consentOutcome()
+	}
+}
+
+// consentOutcome reports what a settled session settled on.
+func (s *Session) consentOutcome() (bool, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	switch {
+	case s.Consent != nil:
+		return s.Consent.Granted, nil
+	case s.State == StateExpired:
+		return false, ErrSessionExpired
+	default:
+		return false, ErrSessionEnded
 	}
 }
 
@@ -606,6 +635,7 @@ func (sm *SessionManager) EndSession(id string) (*Session, error) {
 	now := time.Now().UTC()
 	sess.State = StateTerminated
 	sess.EndedAt = &now
+	sess.settleLocked()
 	snap := sess.cloneLocked()
 	sess.mu.Unlock()
 
@@ -704,6 +734,7 @@ func (sm *SessionManager) reapExpired() {
 			sess.State = StateExpired
 			end := sess.ExpiresAt
 			sess.EndedAt = &end
+			sess.settleLocked()
 			expired = append(expired, sess.cloneLocked())
 			if pe, ok := sm.peers[sess.Owner]; ok && pe.active == sess.ID {
 				pe.active = ""
