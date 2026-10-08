@@ -6,6 +6,7 @@ package signalling
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -14,6 +15,8 @@ import (
 	"time"
 
 	"github.com/barahn/chirp/session"
+	"github.com/barahn/remotekit/bark"
+	"github.com/barahn/remotekit/rendezvous"
 	"github.com/gorilla/websocket"
 )
 
@@ -32,26 +35,48 @@ func newServer(t *testing.T) (*Server, *httptest.Server) {
 	return srv, ts
 }
 
-func create(t *testing.T, ts *httptest.Server) createResponse {
+// call sends a JSON request and decodes a JSON response into out, if given.
+func call(t *testing.T, ts *httptest.Server, method, path, body string, out any) int {
 	t.Helper()
-	resp, err := ts.Client().Post(ts.URL+"/api/sessions", "application/json",
-		strings.NewReader(`{"technician_id":"t-1","technician_name":"Ana"}`))
+	req, err := http.NewRequest(method, ts.URL+path, strings.NewReader(body))
 	if err != nil {
-		t.Fatalf("create: %v", err)
+		t.Fatal(err)
+	}
+	resp, err := ts.Client().Do(req)
+	if err != nil {
+		t.Fatalf("%s %s: %v", method, path, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
-	if resp.StatusCode != http.StatusCreated {
-		t.Fatalf("create status = %d, want 201", resp.StatusCode)
+	if out != nil && resp.StatusCode < 300 {
+		if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
+			t.Fatalf("decode %s: %v", path, err)
+		}
 	}
-	var out createResponse
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	return out
+	return resp.StatusCode
 }
 
-// dial opens a signalling socket. q is the query that identifies the peer:
-// the technician has a session id, the agent has only the typed code.
+func register(t *testing.T, ts *httptest.Server, name string) peerView {
+	t.Helper()
+	var p peerView
+	if st := call(t, ts, "POST", "/api/peers", fmt.Sprintf(`{"name":%q}`, name), &p); st != http.StatusCreated {
+		t.Fatalf("register status = %d, want 201", st)
+	}
+	return p
+}
+
+func redeem(t *testing.T, ts *httptest.Server, code, name string) (sessionView, int) {
+	t.Helper()
+	var v sessionView
+	st := call(t, ts, "POST", "/api/redeem", fmt.Sprintf(`{"code":%q,"name":%q}`, code, name), &v)
+	return v, st
+}
+
+func consent(t *testing.T, ts *httptest.Server, peer, sessionID string, granted bool) int {
+	t.Helper()
+	b, _ := json.Marshal(bark.ConsentResponsePayload{SessionID: sessionID, Granted: granted})
+	return call(t, ts, "POST", "/api/peers/"+peer+"/consent", string(b), nil)
+}
+
 func dial(t *testing.T, ts *httptest.Server, q url.Values) (*websocket.Conn, *http.Response, error) {
 	t.Helper()
 	u := "ws" + strings.TrimPrefix(ts.URL, "http") + "/ws?" + q.Encode()
@@ -62,290 +87,528 @@ func dial(t *testing.T, ts *httptest.Server, q url.Values) (*websocket.Conn, *ht
 	return c, resp, err
 }
 
-// waitJoined blocks until the hub has registered both ends of sessionID.
-//
-// A client's Dial returns when the server writes the upgrade response, and the
-// server joins the peer to the hub only after that, so there is a window in
-// which a peer considers itself connected and the hub does not yet know it. A
-// message forwarded to it in that window is refused with ErrNoPeer -- the
-// documented behaviour, see TestSendingBeforeTheOtherEndArrivesKeepsTheSocket.
-// A test that means to exercise two present peers has to wait out the window,
-// or it fails whenever the scheduler widens it.
-func waitJoined(t *testing.T, srv *Server, sessionID string) {
+func dialOwner(t *testing.T, ts *httptest.Server, peer string) *websocket.Conn {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
-		if tech, agent := srv.Hub().Connected(sessionID); tech && agent {
-			return
-		}
-		time.Sleep(time.Millisecond)
+	c, _, err := dial(t, ts, url.Values{"role": {"owner"}, "peer": {peer}})
+	if err != nil {
+		t.Fatalf("owner dial: %v", err)
 	}
-	t.Fatal("both peers dialled, but the hub never registered them")
+	return c
 }
 
-func TestCreateSessionReturnsAUsableCode(t *testing.T) {
-	_, ts := newServer(t)
-	got := create(t, ts)
-
-	if len(got.Code) != 6 {
-		t.Errorf("code = %q, want six digits", got.Code)
+func dialController(t *testing.T, ts *httptest.Server, sessionID string) *websocket.Conn {
+	t.Helper()
+	c, _, err := dial(t, ts, url.Values{"role": {"controller"}, "session": {sessionID}})
+	if err != nil {
+		t.Fatalf("controller dial: %v", err)
 	}
-	if got.SessionID == "" {
-		t.Error("no session id returned")
-	}
-	// The formatted form is what a technician reads aloud; it has to
-	// normalise back to the code the agent will send.
-	back, err := session.NormalizeCode(got.Formatted)
-	if err != nil || back != got.Code {
-		t.Errorf("formatted %q does not normalise back to %q (err %v)", got.Formatted, got.Code, err)
-	}
+	return c
 }
 
-func TestSignallingCrossesBetweenPeers(t *testing.T) {
-	srv, ts := newServer(t)
-	sess := create(t, ts)
-
-	tech, _, err := dial(t, ts, url.Values{"role": {"technician"}, "session": {sess.SessionID}})
-	if err != nil {
-		t.Fatalf("technician dial: %v", err)
-	}
-	// The agent joins with the code, because that is all the person typed.
-	agent, _, err := dial(t, ts, url.Values{"role": {"agent"}, "code": {sess.Formatted}})
-	if err != nil {
-		t.Fatalf("agent dial: %v", err)
-	}
-	waitJoined(t, srv, sess.SessionID)
-
-	offer := `{"type":"offer","sdp":"v=0"}`
-	if err := tech.WriteMessage(websocket.TextMessage, []byte(offer)); err != nil {
-		t.Fatalf("write offer: %v", err)
-	}
-	_ = agent.SetReadDeadline(time.Now().Add(5 * time.Second))
-	_, got, err := agent.ReadMessage()
-	if err != nil {
-		t.Fatalf("agent read: %v", err)
-	}
-	if string(got) != offer {
-		t.Errorf("agent got %q, want the offer unchanged", got)
-	}
-
-	answer := `{"type":"answer","sdp":"v=0"}`
-	if err := agent.WriteMessage(websocket.TextMessage, []byte(answer)); err != nil {
-		t.Fatalf("write answer: %v", err)
-	}
-	_ = tech.SetReadDeadline(time.Now().Add(5 * time.Second))
-	_, got, err = tech.ReadMessage()
-	if err != nil {
-		t.Fatalf("technician read: %v", err)
-	}
-	if string(got) != answer {
-		t.Errorf("technician got %q, want the answer unchanged", got)
-	}
-}
-
-func TestSendingBeforeTheOtherEndArrivesKeepsTheSocket(t *testing.T) {
-	_, ts := newServer(t)
-	sess := create(t, ts)
-
-	tech, _, err := dial(t, ts, url.Values{"role": {"technician"}, "session": {sess.SessionID}})
-	if err != nil {
-		t.Fatalf("dial: %v", err)
-	}
-	if err := tech.WriteMessage(websocket.TextMessage, []byte(`{"type":"offer"}`)); err != nil {
-		t.Fatalf("write: %v", err)
-	}
-
-	// A technician who opens the viewer before the person has run the binary
-	// must be told, and must not be disconnected for it.
-	_ = tech.SetReadDeadline(time.Now().Add(5 * time.Second))
-	_, data, err := tech.ReadMessage()
+// read returns the next message on c as raw bytes and as a decoded object.
+func read(t *testing.T, c *websocket.Conn) ([]byte, map[string]any) {
+	t.Helper()
+	_ = c.SetReadDeadline(time.Now().Add(5 * time.Second))
+	defer func() { _ = c.SetReadDeadline(time.Time{}) }()
+	_, data, err := c.ReadMessage()
 	if err != nil {
 		t.Fatalf("read: %v", err)
 	}
-	var msg map[string]string
-	if err := json.Unmarshal(data, &msg); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if msg["type"] != RelayErrorType || !strings.Contains(msg["error"], "other end") {
-		t.Errorf("got %v, want an error naming the missing peer", msg)
-	}
-	if err := tech.WriteMessage(websocket.TextMessage, []byte(`{"type":"offer"}`)); err != nil {
-		t.Errorf("socket did not survive the error: %v", err)
+	var m map[string]any
+	_ = json.Unmarshal(data, &m)
+	return data, m
+}
+
+// awaitPeer reads until the relay announces the other end, which is what a
+// real client does before sending. It fails on any other message first.
+func awaitPeer(t *testing.T, c *websocket.Conn, want Role) {
+	t.Helper()
+	data, m := read(t, c)
+	if m["type"] != PeerJoinedType || m["role"] != string(want) {
+		t.Fatalf("got %s, want %s naming %s", data, PeerJoinedType, want)
 	}
 }
 
-func TestUnknownAndExpiredCodesAreIndistinguishable(t *testing.T) {
+// awaitConsentRequest reads the consent request the owner's prompt is built
+// from.
+func awaitConsentRequest(t *testing.T, c *websocket.Conn) (bark.ConsentRequestPayload, bool) {
+	t.Helper()
+	data, _ := read(t, c)
+	var msg struct {
+		Type         string                     `json:"type"`
+		Request      bark.ConsentRequestPayload `json:"request"`
+		NameVerified bool                       `json:"name_verified"`
+	}
+	if err := json.Unmarshal(data, &msg); err != nil || msg.Type != ConsentRequestType {
+		t.Fatalf("got %s, want %s", data, ConsentRequestType)
+	}
+	return msg.Request, msg.NameVerified
+}
+
+func state(t *testing.T, ts *httptest.Server, id string) string {
+	t.Helper()
+	var v sessionView
+	if st := call(t, ts, "GET", "/api/sessions/"+id, "", &v); st != http.StatusOK {
+		t.Fatalf("get session status = %d", st)
+	}
+	return v.State
+}
+
+func waitFor(t *testing.T, what string, cond func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for !cond() {
+		if time.Now().After(deadline) {
+			t.Fatalf("timed out waiting for %s", what)
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
+func TestRegisterReturnsACodeALinkAndACredential(t *testing.T) {
 	_, ts := newServer(t)
-
-	resp, err := ts.Client().Get(ts.URL + "/api/sessions/000000")
-	if err != nil {
-		t.Fatalf("get: %v", err)
+	p := register(t, ts, "Ana")
+	if len(p.Code) != 6 || p.Link == "" || p.PeerID == "" {
+		t.Fatalf("incomplete registration: %+v", p)
 	}
-	defer func() { _ = resp.Body.Close() }()
-
-	// Six digits is a small space to guess in, so a wrong code must not be
-	// distinguishable from one that existed and ran out.
-	if resp.StatusCode != http.StatusNotFound {
-		t.Errorf("status = %d, want 404", resp.StatusCode)
-	}
-	var body map[string]string
-	_ = json.NewDecoder(resp.Body).Decode(&body)
-	if strings.Contains(strings.ToLower(body["error"]), "expire") {
-		t.Errorf("error %q reveals whether the code existed", body["error"])
+	if p.Formatted != p.Code[:3]+"-"+p.Code[3:] {
+		t.Fatalf("formatted %q does not match code %q", p.Formatted, p.Code)
 	}
 }
 
-func TestConsentDenialIsRecorded(t *testing.T) {
-	srv, ts := newServer(t)
-	sess := create(t, ts)
+// The whole product flow, over HTTP and WebSocket only: the owner shows a
+// code, the controller types it, the owner is asked and grants, and signals
+// cross in both directions.
+func TestConsentFlowEndToEnd(t *testing.T) {
+	_, ts := newServer(t)
+	owner := register(t, ts, "Ana")
+	ownerWS := dialOwner(t, ts, owner.PeerID)
 
-	if _, err := srv.sessions.ConnectClient(sess.Code, &session.ClientInfo{Hostname: "kitchen-pc"}); err != nil {
-		t.Fatalf("ConnectClient: %v", err)
+	sess, st := redeem(t, ts, owner.Formatted, "Bruno")
+	if st != http.StatusCreated {
+		t.Fatalf("redeem status = %d", st)
 	}
-	if _, err := srv.sessions.RequestConsent(sess.Code); err != nil {
-		t.Fatalf("RequestConsent: %v", err)
+	if sess.OwnerName != "Ana" {
+		t.Fatalf("owner name %q", sess.OwnerName)
+	}
+	ctrlWS := dialController(t, ts, sess.SessionID)
+
+	awaitPeer(t, ctrlWS, RoleOwner)
+	awaitPeer(t, ownerWS, RoleController)
+	req, verified := awaitConsentRequest(t, ownerWS)
+	if req.SessionID != sess.SessionID || req.TechnicianName != "Bruno" || verified {
+		t.Fatalf("consent request %+v (verified %v)", req, verified)
+	}
+	if len(req.RequestedPermissions) != len(session.DefaultPermissions) {
+		t.Fatalf("permissions %v", req.RequestedPermissions)
+	}
+	if got := state(t, ts, sess.SessionID); got != string(session.StateConsentRequested) {
+		t.Fatalf("state %s before the answer", got)
 	}
 
-	resp, err := ts.Client().Post(ts.URL+"/api/sessions/"+sess.Code+"/consent",
-		"application/json", bytes.NewBufferString(`{"granted":false,"reason":"not now"}`))
-	if err != nil {
-		t.Fatalf("consent: %v", err)
+	if st := consent(t, ts, owner.PeerID, sess.SessionID, true); st != http.StatusOK {
+		t.Fatalf("consent status = %d", st)
 	}
-	defer func() { _ = resp.Body.Close() }()
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("status = %d, want 200", resp.StatusCode)
-	}
-	var view sessionView
-	_ = json.NewDecoder(resp.Body).Decode(&view)
-	if view.State != string(session.StateConsentDenied) {
-		t.Errorf("state = %q, want consent_denied", view.State)
+	if got := state(t, ts, sess.SessionID); got != string(session.StateConsentGranted) {
+		t.Fatalf("state %s after granting", got)
 	}
 
-	// Refusal has to be final: a denied session must not accept peers
-	// afterwards, or "no" becomes "no, until you retry".
-	if _, _, err := dial(t, ts, url.Values{"role": {"agent"}, "code": {sess.Code}}); err == nil {
-		t.Error("agent joined a session whose consent was denied")
+	offer := `{"type":"offer","sdp":"v=0"}`
+	if err := ctrlWS.WriteMessage(websocket.TextMessage, []byte(offer)); err != nil {
+		t.Fatal(err)
+	}
+	if data, _ := read(t, ownerWS); string(data) != offer {
+		t.Fatalf("owner received %s, want the offer", data)
+	}
+	answer := `{"type":"answer","sdp":"v=0"}`
+	if err := ownerWS.WriteMessage(websocket.TextMessage, []byte(answer)); err != nil {
+		t.Fatal(err)
+	}
+	if data, _ := read(t, ctrlWS); string(data) != answer {
+		t.Fatalf("controller received %s, want the answer", data)
+	}
+}
+
+// The owner's socket may arrive after the code was redeemed; the session and
+// the prompt still reach it.
+func TestOwnerArrivingLateStillGetsThePrompt(t *testing.T) {
+	_, ts := newServer(t)
+	owner := register(t, ts, "Ana")
+	sess, _ := redeem(t, ts, owner.Code, "Bruno")
+	ctrlWS := dialController(t, ts, sess.SessionID)
+	ownerWS := dialOwner(t, ts, owner.PeerID)
+
+	awaitPeer(t, ctrlWS, RoleOwner)
+	awaitPeer(t, ownerWS, RoleController)
+	if req, _ := awaitConsentRequest(t, ownerWS); req.SessionID != sess.SessionID {
+		t.Fatalf("prompt for %s, want %s", req.SessionID, sess.SessionID)
+	}
+}
+
+func TestACodeOpensOneSessionOnly(t *testing.T) {
+	_, ts := newServer(t)
+	owner := register(t, ts, "Ana")
+	if _, st := redeem(t, ts, owner.Code, "Bruno"); st != http.StatusCreated {
+		t.Fatalf("first redeem = %d", st)
+	}
+	if _, st := redeem(t, ts, owner.Code, "Carla"); st != http.StatusNotFound {
+		t.Fatalf("second redeem = %d, want 404", st)
+	}
+	var now peerView
+	call(t, ts, "GET", "/api/peers/"+owner.PeerID, "", &now)
+	if now.Code == owner.Code {
+		t.Fatal("the used code is still the one shown")
+	}
+	// The owner is busy with Bruno, so its next code does not open a second
+	// session over the first.
+	if _, st := redeem(t, ts, now.Code, "Carla"); st != http.StatusConflict {
+		t.Fatalf("redeem while busy = %d, want 409", st)
+	}
+}
+
+func TestLinkOpensASession(t *testing.T) {
+	_, ts := newServer(t)
+	owner := register(t, ts, "Ana")
+	var v sessionView
+	if st := call(t, ts, "POST", "/api/links/"+owner.Link+"/sessions", `{"name":"Bruno"}`, &v); st != http.StatusCreated {
+		t.Fatalf("link status = %d", st)
+	}
+	if v.OwnerName != "Ana" {
+		t.Fatalf("link reached %q", v.OwnerName)
+	}
+	if st := call(t, ts, "POST", "/api/links/not-a-link/sessions", `{}`, nil); st != http.StatusNotFound {
+		t.Fatalf("bad link = %d, want 404", st)
+	}
+}
+
+// Unknown, expired and malformed codes are all 404: telling them apart would
+// tell a guesser which codes once existed.
+func TestBadCodesAreIndistinguishable(t *testing.T) {
+	_, ts := newServer(t)
+	for _, code := range []string{"000000", "12ab56", ""} {
+		if _, st := redeem(t, ts, code, ""); st != http.StatusNotFound {
+			t.Fatalf("redeem %q = %d, want 404", code, st)
+		}
+	}
+}
+
+// Registration is metered per origin: past the cap the relay answers 429, and
+// releasing a peer gives its place back.
+func TestRegistrationIsCapped(t *testing.T) {
+	_, ts := newServer(t)
+	var first peerView
+	for i := 0; i < session.DefaultMaxPeersPerOrigin; i++ {
+		p := register(t, ts, fmt.Sprint("peer ", i))
+		if i == 0 {
+			first = p
+		}
+	}
+	if st := call(t, ts, "POST", "/api/peers", `{"name":"one too many"}`, nil); st != http.StatusTooManyRequests {
+		t.Fatalf("registration %d = %d, want 429", session.DefaultMaxPeersPerOrigin+1, st)
+	}
+	if st := call(t, ts, "DELETE", "/api/peers/"+first.PeerID, "", nil); st != http.StatusNoContent {
+		t.Fatalf("release = %d, want 204", st)
+	}
+	register(t, ts, "after a release") // fails the test if there is still no room
+}
+
+// nostrKey is shaped like a Nostr public key: 64 lowercase hex digits.
+var nostrKey = strings.Repeat("7e", 32)
+
+// The blind server's whole job: an owner says how to reach it over Nostr, and
+// a controller with the code or the link gets exactly that back. Nothing
+// reaches the owner's socket, because nothing is relayed: no session, no
+// consent request, no signal.
+func TestLookupFindsTheOwnerByCodeAndByLink(t *testing.T) {
+	_, ts := newServer(t)
+	owner := register(t, ts, "Ana")
+	ownerWS := dialOwner(t, ts, owner.PeerID)
+	body := `{"key":"` + nostrKey + `","relays":["wss://relay.example.org"]}`
+	if st := call(t, ts, "PUT", "/api/peers/"+owner.PeerID+"/contact", body, nil); st != http.StatusNoContent {
+		t.Fatalf("set contact = %d, want 204", st)
+	}
+
+	var got session.Contact
+	if st := call(t, ts, "POST", "/api/lookup", fmt.Sprintf(`{"code":%q}`, owner.Code), &got); st != http.StatusOK {
+		t.Fatalf("lookup = %d, want 200", st)
+	}
+	if got.Key != nostrKey || len(got.Relays) != 1 || got.Relays[0] != "wss://relay.example.org" {
+		t.Fatalf("lookup returned %+v", got)
+	}
+	if st := call(t, ts, "POST", "/api/lookup", fmt.Sprintf(`{"code":%q}`, owner.Code), nil); st != http.StatusNotFound {
+		t.Fatalf("second lookup of a single-use code = %d, want 404", st)
+	}
+	for i := 0; i < 2; i++ {
+		if st := call(t, ts, "POST", "/api/links/"+owner.Link+"/lookup", "", nil); st != http.StatusOK {
+			t.Fatalf("link lookup %d = %d, want 200", i+1, st)
+		}
+	}
+
+	_ = ownerWS.SetReadDeadline(time.Now().Add(200 * time.Millisecond))
+	if _, msg, err := ownerWS.ReadMessage(); err == nil {
+		t.Fatalf("a lookup sent the owner %s; it must relay nothing", msg)
+	}
+}
+
+func TestLookupErrors(t *testing.T) {
+	_, ts := newServer(t)
+	owner := register(t, ts, "Ana")
+	for name, body := range map[string]string{
+		"bad key":     `{"key":"abc","relays":["wss://relay.example.org"]}`,
+		"http relay":  `{"key":"` + nostrKey + `","relays":["https://relay.example.org"]}`,
+		"no relays":   `{"key":"` + nostrKey + `","relays":[]}`,
+		"not json":    `{`,
+		"over budget": `{"key":"` + nostrKey + `","relays":["wss://` + strings.Repeat("a", 9000) + `"]}`,
+	} {
+		if st := call(t, ts, "PUT", "/api/peers/"+owner.PeerID+"/contact", body, nil); st != http.StatusBadRequest {
+			t.Errorf("%s: set contact = %d, want 400", name, st)
+		}
+	}
+	good := `{"key":"` + nostrKey + `","relays":["wss://relay.example.org"]}`
+	if st := call(t, ts, "PUT", "/api/peers/nobody/contact", good, nil); st != http.StatusNotFound {
+		t.Fatalf("contact for an unknown peer = %d, want 404", st)
+	}
+	if st := call(t, ts, "POST", "/api/lookup", fmt.Sprintf(`{"code":%q}`, owner.Code), nil); st != http.StatusConflict {
+		t.Fatalf("lookup of an owner with no contact = %d, want 409", st)
+	}
+	for i := 0; i < session.DefaultMaxRedemptionFailures; i++ {
+		call(t, ts, "POST", "/api/lookup", `{"code":"000000"}`, nil)
+	}
+	fresh := register(t, ts, "Bia")
+	if st := call(t, ts, "POST", "/api/lookup", fmt.Sprintf(`{"code":%q}`, fresh.Code), nil); st != http.StatusTooManyRequests {
+		t.Fatalf("lookup after the failure budget = %d, want 429", st)
+	}
+	if _, st := redeem(t, ts, fresh.Code, "c"); st != http.StatusTooManyRequests {
+		t.Fatalf("redeem after failed lookups = %d, want 429: one budget", st)
+	}
+}
+
+// Redemption and link minting share one budget per origin, and a throttled
+// origin is refused even for a live code.
+func TestRedemptionIsThrottled(t *testing.T) {
+	_, ts := newServer(t)
+	owner := register(t, ts, "Ana")
+	for i := 0; i < session.DefaultMaxRedemptionFailures-1; i++ {
+		redeem(t, ts, "000000", "")
+	}
+	call(t, ts, "POST", "/api/links/nope/sessions", `{}`, nil)
+	if _, st := redeem(t, ts, owner.Code, ""); st != http.StatusTooManyRequests {
+		t.Fatalf("live code after the budget = %d, want 429", st)
+	}
+}
+
+func TestClientIPHookSetsTheOrigin(t *testing.T) {
+	srv, _ := newServer(t)
+	srv.ClientIP = func(r *http.Request) string { return r.Header.Get("X-Test-Origin") }
+	h := srv.Handler()
+
+	do := func(origin string) int {
+		r := httptest.NewRequest("POST", "/api/redeem", bytes.NewBufferString(`{"code":"000000"}`))
+		r.Header.Set("X-Test-Origin", origin)
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		return w.Code
+	}
+	for i := 0; i < session.DefaultMaxRedemptionFailures; i++ {
+		do("a")
+	}
+	if st := do("a"); st != http.StatusTooManyRequests {
+		t.Fatalf("origin a = %d, want 429", st)
+	}
+	if st := do("b"); st != http.StatusNotFound {
+		t.Fatalf("origin b = %d, want 404: the hook did not separate origins", st)
+	}
+}
+
+// Consent is the owner's, answers a prompt that was shown, and applies to the
+// owner's current session only.
+func TestConsentNeedsTheOwnerAndARequest(t *testing.T) {
+	_, ts := newServer(t)
+	owner := register(t, ts, "Ana")
+	sess, _ := redeem(t, ts, owner.Code, "Bruno")
+
+	if st := consent(t, ts, owner.PeerID, sess.SessionID, true); st != http.StatusConflict {
+		t.Fatalf("consent before any prompt = %d, want 409", st)
+	}
+	if st := consent(t, ts, "someone-else", sess.SessionID, true); st != http.StatusNotFound {
+		t.Fatalf("consent from a stranger = %d, want 404", st)
+	}
+
+	ownerWS := dialOwner(t, ts, owner.PeerID)
+	ctrlWS := dialController(t, ts, sess.SessionID)
+	awaitPeer(t, ctrlWS, RoleOwner)
+	awaitPeer(t, ownerWS, RoleController)
+	awaitConsentRequest(t, ownerWS)
+
+	if st := consent(t, ts, owner.PeerID, "another-session", true); st != http.StatusConflict {
+		t.Fatalf("consent for another session = %d, want 409", st)
+	}
+	if got := state(t, ts, sess.SessionID); got != string(session.StateConsentRequested) {
+		t.Fatalf("a refused answer changed the state to %s", got)
+	}
+}
+
+func TestDenialEndsTheSession(t *testing.T) {
+	_, ts := newServer(t)
+	owner := register(t, ts, "Ana")
+	ownerWS := dialOwner(t, ts, owner.PeerID)
+	sess, _ := redeem(t, ts, owner.Code, "Bruno")
+	ctrlWS := dialController(t, ts, sess.SessionID)
+	awaitPeer(t, ctrlWS, RoleOwner)
+	awaitPeer(t, ownerWS, RoleController)
+	awaitConsentRequest(t, ownerWS)
+
+	if st := consent(t, ts, owner.PeerID, sess.SessionID, false); st != http.StatusOK {
+		t.Fatalf("deny = %d", st)
+	}
+	if got := state(t, ts, sess.SessionID); got != string(session.StateConsentDenied) {
+		t.Fatalf("state %s after denying", got)
+	}
+	_ = ctrlWS.Close()
+	if _, resp, err := dial(t, ts, url.Values{"role": {"controller"}, "session": {sess.SessionID}}); err == nil ||
+		resp == nil || resp.StatusCode != http.StatusConflict {
+		t.Fatalf("controller rejoining a denied session: err %v", err)
+	}
+	// Denying frees the owner for the next person.
+	var now peerView
+	call(t, ts, "GET", "/api/peers/"+owner.PeerID, "", &now)
+	if _, st := redeem(t, ts, now.Code, "Carla"); st != http.StatusCreated {
+		t.Fatalf("redeem after a denial = %d", st)
 	}
 }
 
 func TestRoleIsRequired(t *testing.T) {
 	_, ts := newServer(t)
-	sess := create(t, ts)
-
-	for _, role := range []string{"", "admin", "Technician"} {
-		q := url.Values{"session": {sess.SessionID}}
-		if role != "" {
-			q.Set("role", role)
-		}
-		_, resp, err := dial(t, ts, q)
-		if err == nil {
-			t.Errorf("role %q was accepted", role)
-			continue
-		}
-		if resp != nil && resp.StatusCode != http.StatusBadRequest {
-			t.Errorf("role %q gave status %d, want 400", role, resp.StatusCode)
+	for _, role := range []string{"", "technician", "agent"} {
+		_, resp, err := dial(t, ts, url.Values{"role": {role}})
+		if err == nil || resp == nil || resp.StatusCode != http.StatusBadRequest {
+			t.Fatalf("role %q: err %v", role, err)
 		}
 	}
 }
 
-// get issues a GET for a code, as if from addr.
-func getFrom(h http.Handler, code, addr string) int {
-	req := httptest.NewRequest(http.MethodGet, "/api/sessions/"+code, nil)
-	req.RemoteAddr = addr
-	rr := httptest.NewRecorder()
-	h.ServeHTTP(rr, req)
-	return rr.Code
-}
-
-// The HTTP surface must not be an unmetered oracle for which codes are live.
-// It was, when the session layer's throttle lived only in ConnectClient: fifty
-// wrong guesses from one address all came back 404, and the fifty-first, a
-// live code, came back 200.
-func TestCodeLookupsAreThrottled(t *testing.T) {
-	sm := session.NewSessionManager(time.Minute)
-	defer sm.Close()
-	sm.SetRedemptionLimit(3, time.Minute)
-	h := NewServer(sm).Handler()
-
-	for i := 0; i < 3; i++ {
-		if got := getFrom(h, "000000", "203.0.113.7:4000"); got != http.StatusNotFound {
-			t.Fatalf("guess %d: status %d, want 404", i+1, got)
+func TestOwnerSocketNeedsItsCredential(t *testing.T) {
+	_, ts := newServer(t)
+	if _, resp, err := dial(t, ts, url.Values{"role": {"owner"}, "peer": {"nobody"}}); err == nil ||
+		resp == nil || resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("unknown peer: err %v", err)
+	}
+	owner := register(t, ts, "Ana")
+	first := dialOwner(t, ts, owner.PeerID)
+	// A second socket for the same peer is refused -- before the upgrade, or
+	// on it if the first was still registering -- and the first stays.
+	c, _, err := dial(t, ts, url.Values{"role": {"owner"}, "peer": {owner.PeerID}})
+	if err == nil {
+		if _, m := read(t, c); m["type"] != RelayErrorType {
+			t.Fatalf("second owner socket got %v, want a relay error", m)
 		}
 	}
-	live, err := sm.CreateSession("tech", "Tech", time.Minute)
-	if err != nil {
-		t.Fatalf("CreateSession failed: %v", err)
+	sess, _ := redeem(t, ts, owner.Code, "Bruno")
+	ctrl := dialController(t, ts, sess.SessionID)
+	awaitPeer(t, ctrl, RoleOwner)
+	awaitPeer(t, first, RoleController)
+}
+
+// A Chirp whose owner socket goes away and stays away is released by the
+// reaper, as if it had sent DELETE; one that keeps its socket open is not.
+func TestOwnerAwayPastTheGraceIsReleased(t *testing.T) {
+	srv, ts := newServer(t)
+	const grace = 40 * time.Millisecond
+	if err := srv.sessions.SetPeerGrace(grace); err != nil {
+		t.Fatal(err)
 	}
-	if got := getFrom(h, live.Code, "203.0.113.7:4001"); got != http.StatusTooManyRequests {
-		t.Fatalf("a throttled address resolved a live code: status %d, want 429", got)
+	gone := register(t, ts, "Ana")
+	stays := register(t, ts, "Bia")
+	_ = dialOwner(t, ts, stays.PeerID)
+	ws := dialOwner(t, ts, gone.PeerID)
+	_ = ws.Close()
+	waitFor(t, "the relay to notice the socket closed", func() bool {
+		srv.ownersMu.Lock()
+		defer srv.ownersMu.Unlock()
+		_, open := srv.owners[rendezvous.PeerID(gone.PeerID)]
+		return !open
+	})
+
+	time.Sleep(grace + 10*time.Millisecond)
+	srv.sessions.Reap()
+
+	if st := call(t, ts, "GET", "/api/peers/"+gone.PeerID, "", nil); st != http.StatusNotFound {
+		t.Fatalf("peer away past its grace = %d, want 404", st)
 	}
-	// The port is not part of the origin; the address is.
-	if got := getFrom(h, live.Code, "198.51.100.9:4000"); got != http.StatusOK {
-		t.Fatalf("an unrelated address was throttled: status %d", got)
+	if st := call(t, ts, "POST", "/api/links/"+gone.Link+"/sessions", `{}`, nil); st != http.StatusNotFound {
+		t.Fatalf("its link = %d, want 404", st)
+	}
+	if st := call(t, ts, "GET", "/api/peers/"+stays.PeerID, "", nil); st != http.StatusOK {
+		t.Fatalf("peer with its socket open = %d, want 200", st)
 	}
 }
 
-// Consent submitted against a guessed code is the worst thing a guess could
-// buy, so the consent endpoint is metered too -- and it must refuse a session
-// that never asked.
-func TestConsentEndpointIsMeteredAndNeedsARequest(t *testing.T) {
-	sm := session.NewSessionManager(time.Minute)
-	defer sm.Close()
-	sm.SetRedemptionLimit(2, time.Minute)
-	h := NewServer(sm).Handler()
-
-	post := func(code, addr string) int {
-		req := httptest.NewRequest(http.MethodPost, "/api/sessions/"+code+"/consent",
-			strings.NewReader(`{"granted":true}`))
-		req.RemoteAddr = addr
-		rr := httptest.NewRecorder()
-		h.ServeHTTP(rr, req)
-		return rr.Code
+func TestReleaseRevokesTheCodeAndClosesTheSocket(t *testing.T) {
+	_, ts := newServer(t)
+	owner := register(t, ts, "Ana")
+	ownerWS := dialOwner(t, ts, owner.PeerID)
+	if st := call(t, ts, "DELETE", "/api/peers/"+owner.PeerID, "", nil); st != http.StatusNoContent {
+		t.Fatalf("release = %d", st)
 	}
-
-	pending, err := sm.CreateSession("tech", "Tech", time.Minute)
-	if err != nil {
-		t.Fatalf("CreateSession failed: %v", err)
+	if _, st := redeem(t, ts, owner.Code, "Bruno"); st != http.StatusNotFound {
+		t.Fatalf("code after release = %d, want 404", st)
 	}
-	if got := post(pending.Code, "192.0.2.10:1"); got != http.StatusConflict {
-		t.Fatalf("consent on a pending session: status %d, want 409", got)
+	if st := call(t, ts, "POST", "/api/links/"+owner.Link+"/sessions", `{}`, nil); st != http.StatusNotFound {
+		t.Fatalf("link after release = %d, want 404", st)
 	}
-	if s, _ := sm.GetSession(pending.ID); s.State != session.StatePending {
-		t.Fatalf("consent was recorded on a pending session: state %s", s.State)
-	}
-
-	for i := 0; i < 2; i++ {
-		_ = post("000000", "192.0.2.20:1")
-	}
-	if got := post(pending.Code, "192.0.2.20:1"); got != http.StatusTooManyRequests {
-		t.Fatalf("consent guesses were not metered: status %d, want 429", got)
+	_ = ownerWS.SetReadDeadline(time.Now().Add(5 * time.Second))
+	if _, _, err := ownerWS.ReadMessage(); err == nil {
+		t.Fatal("owner socket still open after release")
 	}
 }
 
-// Behind a reverse proxy the operator names the origin. The hook must be
-// what the throttle counts against.
-func TestClientIPHookSetsTheOrigin(t *testing.T) {
-	sm := session.NewSessionManager(time.Minute)
-	defer sm.Close()
-	sm.SetRedemptionLimit(1, time.Minute)
-	srv := NewServer(sm)
-	srv.ClientIP = func(r *http.Request) string { return r.Header.Get("X-Test-Origin") }
-	h := srv.Handler()
+// Sending before the other end is present is refused with a relay error, and
+// the socket stays open for when it arrives.
+func TestSendingBeforeTheOtherEndArrivesKeepsTheSocket(t *testing.T) {
+	srv, ts := newServer(t)
+	owner := register(t, ts, "Ana")
+	sess, _ := redeem(t, ts, owner.Code, "Bruno")
+	ctrl := dialController(t, ts, sess.SessionID)
+	waitFor(t, "controller joined", func() bool { c, _ := srv.Hub().Connected(sess.SessionID); return c })
 
-	req := func(origin string) int {
-		r := httptest.NewRequest(http.MethodGet, "/api/sessions/000000", nil)
-		r.RemoteAddr = "10.0.0.1:1" // the proxy: identical for everyone
-		r.Header.Set("X-Test-Origin", origin)
-		rr := httptest.NewRecorder()
-		h.ServeHTTP(rr, r)
-		return rr.Code
+	if err := ctrl.WriteMessage(websocket.TextMessage, []byte(`{"type":"offer"}`)); err != nil {
+		t.Fatal(err)
 	}
+	if _, m := read(t, ctrl); m["type"] != RelayErrorType {
+		t.Fatalf("got %v, want a relay error", m)
+	}
+	ownerWS := dialOwner(t, ts, owner.PeerID)
+	awaitPeer(t, ctrl, RoleOwner)
+	awaitPeer(t, ownerWS, RoleController)
+}
 
-	_ = req("user-a")
-	if got := req("user-a"); got != http.StatusTooManyRequests {
-		t.Fatalf("origin from the hook was not throttled: status %d", got)
+// A controller that drops and dials back is a reconnection: the owner is not
+// asked a second time.
+func TestControllerReconnectionDoesNotAskAgain(t *testing.T) {
+	srv, ts := newServer(t)
+	owner := register(t, ts, "Ana")
+	ownerWS := dialOwner(t, ts, owner.PeerID)
+	sess, _ := redeem(t, ts, owner.Code, "Bruno")
+	ctrl := dialController(t, ts, sess.SessionID)
+	awaitPeer(t, ctrl, RoleOwner)
+	awaitPeer(t, ownerWS, RoleController)
+	awaitConsentRequest(t, ownerWS)
+
+	_ = ctrl.Close()
+	if _, m := read(t, ownerWS); m["type"] != PeerLeftType {
+		t.Fatalf("got %v, want %s", m, PeerLeftType)
 	}
-	if got := req("user-b"); got != http.StatusNotFound {
-		t.Fatalf("users behind one proxy throttled each other: status %d", got)
+	waitFor(t, "controller left", func() bool { c, _ := srv.Hub().Connected(sess.SessionID); return !c })
+
+	again := dialController(t, ts, sess.SessionID)
+	awaitPeer(t, again, RoleOwner)
+	awaitPeer(t, ownerWS, RoleController)
+	if got := state(t, ts, sess.SessionID); got != string(session.StateConsentRequested) {
+		t.Fatalf("state %s after reconnecting", got)
+	}
+	// Nothing else is waiting for the owner: a second prompt would be here.
+	_ = ownerWS.SetReadDeadline(time.Now().Add(200 * time.Millisecond))
+	if _, data, err := ownerWS.ReadMessage(); err == nil {
+		t.Fatalf("owner got %s after a reconnection", data)
 	}
 }

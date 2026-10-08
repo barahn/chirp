@@ -40,15 +40,15 @@ advisory unless they ask not to be.
 ## Supported versions
 
 Chirp is **not yet a runnable product** (see [README.md](README.md)): there is
-no `cmd/chirp` binary and no tagged release. Until the first release, only the
-tip of `develop` is supported, and the answer to "which versions get fixes" is
-"the one you get by pulling".
+no `cmd/chirp` binary yet. Until there is, only the tip of `develop` and the
+last integration on `main` are supported, and the answer to "which versions get
+fixes" is "the one you get by pulling".
 
 | Version | Supported |
 | --- | --- |
 | `develop` (tip) | ✅ |
 | `main` (last integrated) | ✅ |
-| anything tagged | none exist yet |
+| `v0.1.0` | fixes land on `develop`; no backports. It predates the reaper deadlock fix and the redemption throttle — do not run it. |
 
 ## What is in scope
 
@@ -66,19 +66,22 @@ own policy.
 
 ## What this pipeline enforces, and what it does not
 
-Every pull request into `develop` or `main` runs, and must pass:
+| Gate | Question it answers | Runs |
+| --- | --- | --- |
+| `go vet`, golangci-lint | Is the code well-formed | every push and PR |
+| `go test -race` | Do the tests pass, free of data races | every push and PR |
+| gosec | Does the code match a known-bad Go pattern | every push and PR |
+| govulncheck | Is a known vulnerability reachable from Chirp's own code | every push and PR |
+| gitleaks | Is a credential being committed | every push and PR, weekly |
+| Third-party licence gate | Can Fabrintek pass every dependency on | every push and PR |
+| DCO sign-off | Is the origin of each commit certified | every PR |
+| CodeQL (`security-extended`) | Does untrusted data reach a dangerous sink | once `CODE_SCANNING` is set |
+| Dependency Review | What does this pull request *add*, and under what licence | once `CODE_SCANNING` is set |
 
-| Gate | Question it answers |
-| --- | --- |
-| `go vet`, golangci-lint | Is the code well-formed |
-| `go test -race` | Do the tests pass, free of data races |
-| gosec | Does the code match a known-bad Go pattern |
-| CodeQL (`security-extended`) | Does untrusted data reach a dangerous sink |
-| govulncheck | Is a known vulnerability reachable from Chirp's own code |
-| Dependency Review | What does this pull request *add*, and under what licence |
-| gitleaks | Is a credential being committed |
-| Third-party licence gate | Can Fabrintek pass every dependency on |
-| DCO sign-off | Is the origin of each commit certified |
+CodeQL and dependency review need GitHub Advanced Security on a private
+repository, so they are wired in but off until the `CODE_SCANNING` variable is
+set, and every run warns while they are; see
+[docs/devsecops.md](docs/devsecops.md).
 
 None of these is a substitute for reading the diff. They catch the classes of
 mistake a reviewer reliably misses; they do not catch a consent check that is

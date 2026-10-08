@@ -15,7 +15,7 @@ change that looks right from one side is often the arrow pointing the wrong way.
 | Repository | Licence | Role |
 |---|---|---|
 | [remotekit](https://github.com/barahn/remotekit) | Apache-2.0 | The mechanism. Screen capture and VP8 encoding, input injection, clipboard, chunked file transfer, a WebRTC wrapper, a reverse tunnel, tray and OS-service installation. |
-| [chirp](https://github.com/barahn/chirp) | AGPL-3.0-only | On-demand remote support. A technician generates a 6-digit PIN, the helped person enters it and grants consent on their own machine, the session begins, and nothing is left installed. |
+| [chirp](https://github.com/barahn/chirp) | AGPL-3.0-only | On-demand remote support. One binary, the same on both sides, with nothing to install and no account: it shows its own code and share link; whoever types someone's code controls that machine once its owner consents there. |
 | [barahn](https://github.com/barahn/barahn) | Proprietary | Fabrintek's commercial platform: fleet management over standing agents, with tenancy, roles and persistence. |
 
 **This repository is Chirp** — the AGPL-3.0-only on-demand support layer.
@@ -79,6 +79,14 @@ them.
 
 If a change seems to belong in two of them, it is usually one mechanism plus one
 policy that have not been separated yet. Split it and the arrows resolve.
+
+**A worked example: two strangers meeting by a code.** Allocating a short code,
+minting a fresh one each time a share link is used, redeeming it, throttling
+failed guesses and relaying the two peers' signalling would serve Barahn as well
+as Chirp — so that is remotekit's. That each Chirp shows its code at start, that
+the one who types it controls, how long a link lives, the limits, and the
+consent prompt's wording are Chirp's. The full split is proposed in
+[docs/rendezvous-proposal.md](docs/rendezvous-proposal.md).
 
 ## What this repository must not acquire
 

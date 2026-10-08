@@ -4,6 +4,8 @@
 package signalling
 
 import (
+	"encoding/json"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -43,6 +45,40 @@ func (f *fakeConn) messages() [][]byte {
 	return append([][]byte(nil), f.sent...)
 }
 
+// isRelayMessage reports whether data is one of the relay's own messages
+// rather than a signal forwarded from the other end.
+func isRelayMessage(data []byte) bool {
+	var m struct {
+		Type string `json:"type"`
+	}
+	return json.Unmarshal(data, &m) == nil && strings.HasPrefix(m.Type, "chirp.")
+}
+
+// signals returns only what the other end sent, without the relay's notices,
+// so assertions about forwarding stay exact.
+func (f *fakeConn) signals() [][]byte {
+	var out [][]byte
+	for _, m := range f.messages() {
+		if !isRelayMessage(m) {
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
+// notices returns only the relay's own messages, decoded.
+func (f *fakeConn) notices() []map[string]string {
+	var out []map[string]string
+	for _, m := range f.messages() {
+		if isRelayMessage(m) {
+			var n map[string]string
+			_ = json.Unmarshal(m, &n)
+			out = append(out, n)
+		}
+	}
+	return out
+}
+
 func (f *fakeConn) isClosed() bool {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -57,9 +93,13 @@ func newSession(t *testing.T) (*session.SessionManager, *session.Session) {
 	t.Helper()
 	sm := session.NewSessionManager(10 * time.Minute)
 	t.Cleanup(sm.Close)
-	sess, err := sm.CreateSession("tech-1", "Ana", 10*time.Minute)
+	p, err := sm.RegisterPeer("Ana", "192.0.2.50")
 	if err != nil {
-		t.Fatalf("CreateSession: %v", err)
+		t.Fatalf("RegisterPeer: %v", err)
+	}
+	sess, err := sm.Redeem(string(p.Code), "Bruno", &session.ClientInfo{RemoteIP: "192.0.2.1"})
+	if err != nil {
+		t.Fatalf("Redeem: %v", err)
 	}
 	return sm, sess
 }
@@ -68,30 +108,30 @@ func TestForwardReachesTheOppositeEnd(t *testing.T) {
 	sm, sess := newSession(t)
 	h := NewHub(sm)
 
-	tech, agent := &fakeConn{}, &fakeConn{}
-	if err := h.Join(sess.ID, RoleTechnician, tech); err != nil {
-		t.Fatalf("join technician: %v", err)
+	ctrl, owner := &fakeConn{}, &fakeConn{}
+	if err := h.Join(sess.ID, RoleController, ctrl); err != nil {
+		t.Fatalf("join controller: %v", err)
 	}
-	if err := h.Join(sess.ID, RoleAgent, agent); err != nil {
-		t.Fatalf("join agent: %v", err)
-	}
-
-	if err := h.Forward(sess.ID, RoleTechnician, []byte(`{"type":"offer"}`)); err != nil {
-		t.Fatalf("forward from technician: %v", err)
-	}
-	if err := h.Forward(sess.ID, RoleAgent, []byte(`{"type":"answer"}`)); err != nil {
-		t.Fatalf("forward from agent: %v", err)
+	if err := h.Join(sess.ID, RoleOwner, owner); err != nil {
+		t.Fatalf("join owner: %v", err)
 	}
 
-	if got := agent.messages(); len(got) != 1 || string(got[0]) != `{"type":"offer"}` {
-		t.Errorf("agent received %q, want the technician's offer", got)
+	if err := h.Forward(sess.ID, RoleController, []byte(`{"type":"offer"}`)); err != nil {
+		t.Fatalf("forward from controller: %v", err)
 	}
-	if got := tech.messages(); len(got) != 1 || string(got[0]) != `{"type":"answer"}` {
-		t.Errorf("technician received %q, want the agent's answer", got)
+	if err := h.Forward(sess.ID, RoleOwner, []byte(`{"type":"answer"}`)); err != nil {
+		t.Fatalf("forward from owner: %v", err)
+	}
+
+	if got := owner.signals(); len(got) != 1 || string(got[0]) != `{"type":"offer"}` {
+		t.Errorf("owner received %q, want the controller's offer", got)
+	}
+	if got := ctrl.signals(); len(got) != 1 || string(got[0]) != `{"type":"answer"}` {
+		t.Errorf("controller received %q, want the owner's answer", got)
 	}
 	// A peer must never be handed its own message: that would loop an offer
 	// straight back into the sender's stack.
-	if len(tech.messages()) != 1 || len(agent.messages()) != 1 {
+	if len(ctrl.signals()) != 1 || len(owner.signals()) != 1 {
 		t.Error("a message was delivered to its own sender")
 	}
 }
@@ -100,16 +140,16 @@ func TestForwardWithoutTheOtherEndFails(t *testing.T) {
 	sm, sess := newSession(t)
 	h := NewHub(sm)
 
-	tech := &fakeConn{}
-	if err := h.Join(sess.ID, RoleTechnician, tech); err != nil {
+	ctrl := &fakeConn{}
+	if err := h.Join(sess.ID, RoleController, ctrl); err != nil {
 		t.Fatalf("join: %v", err)
 	}
 
-	// The technician often connects before the helped person has run the
+	// The controller often connects before the owner has joined the
 	// binary. Sending then must report that nobody is there, not pretend the
 	// message was delivered.
-	if err := h.Forward(sess.ID, RoleTechnician, []byte("x")); err != ErrNoPeer {
-		t.Errorf("forward with no agent = %v, want ErrNoPeer", err)
+	if err := h.Forward(sess.ID, RoleController, []byte("x")); err != ErrNoPeer {
+		t.Errorf("forward with no owner = %v, want ErrNoPeer", err)
 	}
 }
 
@@ -118,23 +158,23 @@ func TestSecondPeerInTheSameRoleIsRejected(t *testing.T) {
 	h := NewHub(sm)
 
 	first, second := &fakeConn{}, &fakeConn{}
-	if err := h.Join(sess.ID, RoleAgent, first); err != nil {
+	if err := h.Join(sess.ID, RoleOwner, first); err != nil {
 		t.Fatalf("join: %v", err)
 	}
-	// Someone else holding the code must not be able to displace the agent
+	// Someone else holding the code must not be able to displace the owner
 	// already in the session by connecting after it.
-	if err := h.Join(sess.ID, RoleAgent, second); err != ErrRoleTaken {
-		t.Fatalf("second agent = %v, want ErrRoleTaken", err)
+	if err := h.Join(sess.ID, RoleOwner, second); err != ErrRoleTaken {
+		t.Fatalf("second owner = %v, want ErrRoleTaken", err)
 	}
 
-	if err := h.Join(sess.ID, RoleTechnician, second); err != nil {
-		t.Fatalf("technician should still be able to join: %v", err)
+	if err := h.Join(sess.ID, RoleController, second); err != nil {
+		t.Fatalf("controller should still be able to join: %v", err)
 	}
-	if err := h.Forward(sess.ID, RoleTechnician, []byte("ping")); err != nil {
+	if err := h.Forward(sess.ID, RoleController, []byte("ping")); err != nil {
 		t.Fatalf("forward: %v", err)
 	}
-	if len(first.messages()) != 1 {
-		t.Error("the original agent stopped receiving after the rejected join")
+	if len(first.signals()) != 1 {
+		t.Error("the original owner stopped receiving after the rejected join")
 	}
 }
 
@@ -142,16 +182,16 @@ func TestLeaveFreesTheRoleAndDropsThePair(t *testing.T) {
 	sm, sess := newSession(t)
 	h := NewHub(sm)
 
-	if err := h.Join(sess.ID, RoleAgent, &fakeConn{}); err != nil {
+	if err := h.Join(sess.ID, RoleOwner, &fakeConn{}); err != nil {
 		t.Fatalf("join: %v", err)
 	}
-	h.Leave(sess.ID, RoleAgent)
+	h.Leave(sess.ID, RoleOwner)
 
-	if _, agent := h.Connected(sess.ID); agent {
-		t.Error("agent still connected after Leave")
+	if _, owner := h.Connected(sess.ID); owner {
+		t.Error("owner still connected after Leave")
 	}
 	// Reconnecting after a dropped socket is the common case and must work.
-	if err := h.Join(sess.ID, RoleAgent, &fakeConn{}); err != nil {
+	if err := h.Join(sess.ID, RoleOwner, &fakeConn{}); err != nil {
 		t.Errorf("rejoin after leave: %v", err)
 	}
 }
@@ -165,7 +205,7 @@ func TestEndedSessionRefusesPeers(t *testing.T) {
 	}
 	// Failing at join, rather than at the first message, is what puts the
 	// error in front of the person while they are still looking at the page.
-	if err := h.Join(sess.ID, RoleAgent, &fakeConn{}); err != ErrNotPermitted {
+	if err := h.Join(sess.ID, RoleOwner, &fakeConn{}); err != ErrNotPermitted {
 		t.Errorf("join on ended session = %v, want ErrNotPermitted", err)
 	}
 }
@@ -174,7 +214,7 @@ func TestUnknownSessionIsRejected(t *testing.T) {
 	sm, _ := newSession(t)
 	h := NewHub(sm)
 
-	if err := h.Join("no-such-session", RoleAgent, &fakeConn{}); err == nil {
+	if err := h.Join("no-such-session", RoleOwner, &fakeConn{}); err == nil {
 		t.Error("join on unknown session succeeded")
 	}
 }
@@ -183,17 +223,17 @@ func TestCloseDropsEveryPeer(t *testing.T) {
 	sm, sess := newSession(t)
 	h := NewHub(sm)
 
-	tech, agent := &fakeConn{}, &fakeConn{}
-	_ = h.Join(sess.ID, RoleTechnician, tech)
-	_ = h.Join(sess.ID, RoleAgent, agent)
+	ctrl, owner := &fakeConn{}, &fakeConn{}
+	_ = h.Join(sess.ID, RoleController, ctrl)
+	_ = h.Join(sess.ID, RoleOwner, owner)
 
 	if err := h.Close(); err != nil {
 		t.Fatalf("Close: %v", err)
 	}
-	if !tech.isClosed() || !agent.isClosed() {
+	if !ctrl.isClosed() || !owner.isClosed() {
 		t.Error("Close left a connection open")
 	}
-	if err := h.Join(sess.ID, RoleAgent, &fakeConn{}); err != ErrHubClosed {
+	if err := h.Join(sess.ID, RoleOwner, &fakeConn{}); err != ErrHubClosed {
 		t.Errorf("join after close = %v, want ErrHubClosed", err)
 	}
 }
@@ -202,22 +242,95 @@ func TestConcurrentForwardIsSafe(t *testing.T) {
 	sm, sess := newSession(t)
 	h := NewHub(sm)
 
-	tech, agent := &fakeConn{}, &fakeConn{}
-	_ = h.Join(sess.ID, RoleTechnician, tech)
-	_ = h.Join(sess.ID, RoleAgent, agent)
+	ctrl, owner := &fakeConn{}, &fakeConn{}
+	_ = h.Join(sess.ID, RoleController, ctrl)
+	_ = h.Join(sess.ID, RoleOwner, owner)
 
 	// ICE candidates arrive in bursts from both ends at once; this is the
 	// normal case, not an edge case.
 	var wg sync.WaitGroup
 	for i := 0; i < 50; i++ {
 		wg.Add(2)
-		go func() { defer wg.Done(); _ = h.Forward(sess.ID, RoleTechnician, []byte("c")) }()
-		go func() { defer wg.Done(); _ = h.Forward(sess.ID, RoleAgent, []byte("c")) }()
+		go func() { defer wg.Done(); _ = h.Forward(sess.ID, RoleController, []byte("c")) }()
+		go func() { defer wg.Done(); _ = h.Forward(sess.ID, RoleOwner, []byte("c")) }()
 	}
 	wg.Wait()
 
-	if len(agent.messages()) != 50 || len(tech.messages()) != 50 {
-		t.Errorf("delivered %d to agent and %d to technician, want 50 each",
-			len(agent.messages()), len(tech.messages()))
+	if len(owner.signals()) != 50 || len(ctrl.signals()) != 50 {
+		t.Errorf("delivered %d to owner and %d to controller, want 50 each",
+			len(owner.signals()), len(ctrl.signals()))
 	}
+}
+
+// When the second end arrives, both are told who is there -- the one that
+// waited, so it knows it can send, and the one that arrived, so it knows it is
+// registered. Each notice names the other end, and nothing else is sent.
+func TestArrivalIsAnnouncedToBothEnds(t *testing.T) {
+	sm, sess := newSession(t)
+	h := NewHub(sm)
+
+	ctrl, owner := &fakeConn{}, &fakeConn{}
+	if err := h.Join(sess.ID, RoleController, ctrl); err != nil {
+		t.Fatalf("join controller: %v", err)
+	}
+	if n := ctrl.notices(); len(n) != 0 {
+		t.Fatalf("a peer alone was sent %v", n)
+	}
+	if err := h.Join(sess.ID, RoleOwner, owner); err != nil {
+		t.Fatalf("join owner: %v", err)
+	}
+
+	want := func(c *fakeConn, role Role) {
+		t.Helper()
+		n := c.notices()
+		if len(n) != 1 || n[0]["type"] != PeerJoinedType || n[0]["role"] != string(role) {
+			t.Errorf("notices = %v, want one %s naming %s", n, PeerJoinedType, role)
+		}
+	}
+	want(ctrl, RoleOwner)
+	want(owner, RoleController)
+}
+
+// A peer turned away with ErrRoleTaken never took a place, so nobody is told
+// it arrived.
+func TestRejectedPeerIsNotAnnounced(t *testing.T) {
+	sm, sess := newSession(t)
+	h := NewHub(sm)
+
+	ctrl, owner, intruder := &fakeConn{}, &fakeConn{}, &fakeConn{}
+	_ = h.Join(sess.ID, RoleController, ctrl)
+	_ = h.Join(sess.ID, RoleOwner, owner)
+	if err := h.Join(sess.ID, RoleOwner, intruder); err != ErrRoleTaken {
+		t.Fatalf("second owner = %v, want ErrRoleTaken", err)
+	}
+
+	if n := ctrl.notices(); len(n) != 1 {
+		t.Errorf("controller got %v; the rejected owner was announced", n)
+	}
+	if n := intruder.notices(); len(n) != 0 {
+		t.Errorf("the rejected owner was told of a peer: %v", n)
+	}
+}
+
+// The end that stays is told when the other leaves, so it stops sending into a
+// session nobody is listening to.
+func TestDepartureIsAnnouncedToTheEndThatStays(t *testing.T) {
+	sm, sess := newSession(t)
+	h := NewHub(sm)
+
+	ctrl, owner := &fakeConn{}, &fakeConn{}
+	_ = h.Join(sess.ID, RoleController, ctrl)
+	_ = h.Join(sess.ID, RoleOwner, owner)
+	h.Leave(sess.ID, RoleOwner)
+
+	n := ctrl.notices()
+	if len(n) != 2 || n[1]["type"] != PeerLeftType || n[1]["role"] != string(RoleOwner) {
+		t.Fatalf("controller notices = %v, want %s naming owner last", n, PeerLeftType)
+	}
+	if n := owner.notices(); len(n) != 1 {
+		t.Errorf("the departing owner was sent its own departure: %v", n)
+	}
+
+	// The last one out tells nobody, and does not fail.
+	h.Leave(sess.ID, RoleController)
 }

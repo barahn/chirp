@@ -36,7 +36,7 @@ jobs:
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # Both ends of the DCO commit range have to be local, and nothing is
           # fetched later: persist-credentials is false, so a fetch would
@@ -44,7 +44,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: '1.26'
 
@@ -119,6 +119,20 @@ jobs:
 
       - name: Test
         run: go test -race -coverprofile=coverage.out ./...
+
+      # HANDOFF.md's snapshot block is generated from the tree. Checked here
+      # rather than committed by a bot: a workflow pushing to main would need a
+      # bypass of the branch protection in .github/rulesets/, and its commits
+      # would reach main without reaching develop, so the block would conflict
+      # at every release. See docs/branching.md.
+      - name: HANDOFF.md snapshot is current
+        run: |
+          ./scripts/gen-handoff.sh HANDOFF.md
+          if ! git diff --exit-code --stat -- HANDOFF.md; then
+            echo "::error::HANDOFF.md's snapshot is out of date. Run ./scripts/gen-handoff.sh and commit the result."
+            git diff -- HANDOFF.md
+            exit 1
+          fi
 
       - name: SAST (gosec)
         run: go run github.com/securego/gosec/v2/cmd/gosec@v2.22.1 ./...

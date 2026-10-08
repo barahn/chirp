@@ -35,7 +35,7 @@ anything configured on GitHub that is not there is drift.
 | Direct push | blocked | blocked |
 | Force-push / deletion | blocked | blocked |
 | Pull request required | yes | yes |
-| Approvals | 1, from a code owner | 1 |
+| Approvals | 1, from a code owner | 1 — the admin may bypass, via pull request only |
 | Approval dismissed on each push | yes | yes |
 | Last push needs another person's approval | yes | no |
 | Review threads resolved | yes | yes |
@@ -51,7 +51,8 @@ skipped until the `CODE_SCANNING` variable is set — see
 [devsecops.md](devsecops.md) — and a skipped required check counts as
 passing, so they enforce nothing until then.
 
-`bypass_actors` is empty on purpose: the rules bind administrators too.
+On `main`, `bypass_actors` is empty on purpose: the rules bind administrators
+too. On `develop` the repository admin may bypass them — see below.
 
 ### Why the rules differ between the branches
 
@@ -78,25 +79,31 @@ are worth keeping:
   every author — including the coding agents that work in this repository —
   has a signing key.
 
-## Before importing: two things to decide
+## The approval policy, as decided
 
-Importing these files as they stand blocks work in two ways. Both are policy,
-not defects, so they are decisions rather than fixes:
+**One maintainer cannot approve their own pull requests**, so both rulesets as
+first written would have blocked every merge. The maintainer's decision:
 
-1. **One maintainer cannot approve their own pull requests.** Both rulesets
-   require an approval, and `main` additionally requires it from a code owner,
-   and from someone other than the last pusher. With a single maintainer who
-   is also the author, neither branch can merge anything. The escape hatch this
-   design allows: add the administrator as a bypass actor **on `develop`
-   only**, explicitly and versioned here — never loosen `main`. That still
-   leaves releases to `main` needing a second person with write access.
-2. **The handoff refresh pushes straight to `main`.** `handoff.yml` commits the
-   regenerated `HANDOFF.md` snapshot directly, which the pull-request rule
-   refuses. A bypass for GitHub Actions would let it through, but would then
-   let *any* workflow with a write token push to `main` — and every refresh
-   commit lands on `main` without reaching `develop`, so the snapshot block
-   conflicts on every following release. The refresh needs redesigning before
-   `main` is protected, not a bypass. See `HANDOFF.md` §4.3.
+- **`develop`: the repository admin may bypass, via pull request only.** In
+  `develop-protected.json` that is `bypass_actors` with `actor_type`
+  `RepositoryRole`, `actor_id` `5` and `bypass_mode` `pull_request`. The admin
+  can merge a pull request into `develop` without a second approval, but cannot
+  push to it directly. Role `5` is the repository admin role as far as this
+  file's author knows; **after importing, confirm in the UI that the bypass
+  list names "Repository admin"**, since the numeric role ids were not checked
+  against the API.
+- **`main`: no bypass.** A release still needs a second person with write
+  access to approve it.
+
+What the bypass costs, stated so it is a known trade: GitHub's bypass lifts
+*every* rule in the ruleset for that actor, not only the approval. On `develop`
+the admin can therefore merge with a failing check too. The checks still run and
+still show red; merging past them is a choice the admin makes in the open, not
+one the rules make impossible.
+
+Nothing else in the repository pushes to a protected branch. The `HANDOFF.md`
+snapshot used to be committed to `main` by a workflow; it is now checked in CI
+instead, so no bot needs a bypass.
 
 ## Applying the rules
 

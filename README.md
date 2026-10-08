@@ -1,8 +1,13 @@
 # Chirp
 
-On-demand remote support: a technician generates a 6-digit PIN, the person
-being helped enters it, grants explicit consent, and the session begins. No
-installation, no standing agent, no account.
+On-demand remote support. Download Chirp and run it — nothing to install, no
+account. It shows your own code and a share link. Read the code (or send the
+link) to someone you trust; they type it into their Chirp, you accept in a
+prompt on your own screen, and they can help you. Every Chirp is the same: the
+one who types the code controls, the one who shared it decides.
+
+How it works, and what that commits Chirp to, is in
+[docs/product-model.md](docs/product-model.md).
 
 [![License](https://img.shields.io/badge/License-AGPL--3.0-blue.svg?style=flat-square)](LICENSE)
 [![CI](https://github.com/barahn/chirp/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/barahn/chirp/actions/workflows/ci.yml)
@@ -14,31 +19,34 @@ Read this before trying to use it.
 
 What is here today:
 
-- **The session layer** — PIN generation and throttled redemption, the session
-  lifecycle state machine, and the consent flow.
-- **A signalling server** — a relay for WebRTC signalling between the two ends
-  of a session, with an HTTP surface for creating sessions, following their
-  state and answering consent. Written for Chirp — no multi-tenancy, no RBAC —
-  rather than taken from the proprietary Barahn control plane.
+- **The session layer** — each running Chirp registers as a peer and gets its
+  own code and share link; whoever redeems the code controls that peer's
+  machine once its user consents. Codes, links and the per-origin throttle are
+  remotekit's `rendezvous` package; the state machine, consent rules and values
+  are Chirp's.
+- **A signalling relay** — relays WebRTC signalling between the two ends of a
+  session and announces each end to the other. Written for Chirp — no
+  multi-tenancy, no RBAC — rather than taken from the proprietary Barahn
+  control plane.
 
-Both are tested and AGPL-3.0. Nothing yet drives a session from end to end: the
-server does not move a session through connection and the consent request,
-which is the Nest's and the binary's job.
+Both are tested, AGPL-3.0, and follow the [product model](docs/product-model.md):
+the code belongs to the machine to be controlled, and consent is asked of that
+machine's user over its own socket, as a remotekit `bark` consent request.
 
 What is **not** here yet:
 
-- **The Nest** — the `/join` page where an end user enters their PIN.
+- **The `cmd/chirp` binary** — the one program both sides run, which shows its
+  own code and link, asks for consent, and uses remotekit to share the screen.
 - **A TURN relay.** Until Chirp ships one, self-hosting means bringing your own
-  STUN/TURN (coturn works).
-- **A `cmd/chirp` binary.** There is no entry point yet.
+  STUN/TURN (coturn works): see [docs/stun-turn.md](docs/stun-turn.md).
 
 The remote-session mechanism — screen capture, VP8 encoding, input injection,
 clipboard, file transfer, WebRTC, the reverse tunnel — is not missing; it lives
 in [remotekit](https://github.com/barahn/remotekit) under Apache-2.0, and Chirp
 will consume it as a dependency.
 
-Tracking: [the separation plan](https://github.com/barahn/barahn) in the Barahn
-repository.
+Tracking: planned work is in this repository's issues and the
+[Chirp roadmap](https://github.com/orgs/barahn/projects/2) project.
 
 ## Where Chirp sits
 

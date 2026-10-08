@@ -8,7 +8,11 @@
 package session
 
 import (
+	"context"
+	"errors"
+	"fmt"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -22,9 +26,9 @@ func TestReapExpired_DoesNotDeadlock(t *testing.T) {
 	sm := NewSessionManager(30 * time.Millisecond)
 	defer sm.Close()
 
-	sess, err := sm.CreateSession("tech-reap", "Reaper", 30*time.Millisecond)
+	sess, err := openSession(sm)
 	if err != nil {
-		t.Fatalf("CreateSession failed: %v", err)
+		t.Fatalf("openSession failed: %v", err)
 	}
 	time.Sleep(60 * time.Millisecond)
 
@@ -61,8 +65,8 @@ func TestListActiveSessions_DoesNotDeadlockUnderWriters(t *testing.T) {
 	defer sm.Close()
 
 	for i := 0; i < 20; i++ {
-		if _, err := sm.CreateSession("tech", "Tech", time.Minute); err != nil {
-			t.Fatalf("CreateSession failed: %v", err)
+		if _, err := openSession(sm); err != nil {
+			t.Fatalf("openSession failed: %v", err)
 		}
 	}
 
@@ -84,8 +88,8 @@ func TestListActiveSessions_DoesNotDeadlockUnderWriters(t *testing.T) {
 				for j := 0; j < 50; j++ {
 					// A writer queued behind the readers is what makes a
 					// recursive RLock deadlock rather than merely work.
-					if _, err := sm.CreateSession("tech", "Tech", time.Minute); err != nil {
-						t.Errorf("CreateSession failed: %v", err)
+					if _, err := openSession(sm); err != nil {
+						t.Errorf("openSession failed: %v", err)
 						return
 					}
 				}
@@ -106,12 +110,12 @@ func TestReapExpired_NotifiesSubscribers(t *testing.T) {
 	sm := NewSessionManager(30 * time.Millisecond)
 	defer sm.Close()
 
-	sess, err := sm.CreateSession("tech-sub", "Subscriber", 30*time.Millisecond)
+	sess, err := openSession(sm)
 	if err != nil {
-		t.Fatalf("CreateSession failed: %v", err)
+		t.Fatalf("openSession failed: %v", err)
 	}
 
-	ch, unsub := sm.Subscribe(sess.Code)
+	ch, unsub := sm.Subscribe(sess.ID)
 	defer unsub()
 	<-ch // the initial snapshot emitted on subscribe
 
@@ -125,5 +129,100 @@ func TestReapExpired_NotifiesSubscribers(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("no expiry event reached the subscriber")
+	}
+}
+
+// openSession registers an owner and redeems its code, which is how every
+// session starts.
+var registrations atomic.Int64
+
+func openSession(sm *SessionManager) (*Session, error) {
+	p, err := sm.RegisterPeer("Owner", fmt.Sprint("owner ", registrations.Add(1)))
+	if err != nil {
+		return nil, err
+	}
+	// Each session from its own origin, so the per-origin session cap is not
+	// what these tests measure.
+	return sm.Redeem(string(p.Code), "Controller", &ClientInfo{RemoteIP: string(p.ID)})
+}
+
+// The reaper is the only thing that expires a session nobody touches, such as
+// an owner who never answers the prompt. Its waiters must be released too.
+func TestReapExpired_ReleasesConsentWaiters(t *testing.T) {
+	sm := NewSessionManager(30 * time.Millisecond)
+	defer sm.Close()
+
+	sess, err := openSession(sm)
+	if err != nil {
+		t.Fatalf("openSession failed: %v", err)
+	}
+	type result struct {
+		granted bool
+		err     error
+	}
+	res := make(chan result, 1)
+	go func() {
+		granted, err := sm.WaitForConsent(context.Background(), sess.ID)
+		res <- result{granted, err}
+	}()
+	time.Sleep(60 * time.Millisecond)
+	sm.reapExpired()
+
+	select {
+	case r := <-res:
+		if r.granted || !errors.Is(r.err, ErrSessionExpired) {
+			t.Fatalf("WaitForConsent = %v, %v; want false, %v", r.granted, r.err, ErrSessionExpired)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("WaitForConsent still blocked after the reaper expired its session")
+	}
+}
+
+// A Chirp that exits without releasing itself must not hold its place under
+// the peer cap forever: the place comes back when its code expires. And a
+// lapsed code cannot be revived past the cap, or an origin could register up
+// to the cap, let the codes lapse, register more, and revive them all.
+func TestPeerCapCountsLiveCodes(t *testing.T) {
+	sm := NewSessionManager(time.Minute)
+	defer sm.Close()
+	sm.codeTTL = 30 * time.Millisecond
+	if err := sm.SetMaxPeersPerOrigin(2); err != nil {
+		t.Fatal(err)
+	}
+
+	const from = "198.51.100.20"
+	lapsed, err := sm.RegisterPeer("a", from)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := sm.RegisterPeer("b", from); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := sm.RegisterPeer("c", from); !errors.Is(err, ErrTooManyPeers) {
+		t.Fatalf("third registration: got %v, want ErrTooManyPeers", err)
+	}
+
+	time.Sleep(50 * time.Millisecond) // a's and b's codes lapse
+
+	sm.codeTTL = time.Minute
+	c, err := sm.RegisterPeer("c", from)
+	if err != nil {
+		t.Fatalf("lapsed codes still held their places: %v", err)
+	}
+	if _, err := sm.RegisterPeer("d", from); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := sm.Peer(lapsed.ID); !errors.Is(err, ErrTooManyPeers) {
+		t.Fatalf("reviving a lapsed code past the cap: got %v, want ErrTooManyPeers", err)
+	}
+	if err := sm.ReleasePeer(c.ID); err != nil {
+		t.Fatal(err)
+	}
+	p, err := sm.Peer(lapsed.ID)
+	if err != nil {
+		t.Fatalf("reviving with room: %v", err)
+	}
+	if p.Code == lapsed.Code {
+		t.Fatal("the lapsed code was shown again instead of a fresh one")
 	}
 }
