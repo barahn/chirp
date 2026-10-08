@@ -20,7 +20,7 @@ applies. Chirp itself is AGPL-3.0-only; see LICENSING.md.
 
 ### github.com/barahn/remotekit
 
-- Version: `v0.1.1-0.20260930215036-b062c4d44743`
+- Version: `v0.3.0`
 - License: Apache-2.0
 - Homepage: https://github.com/barahn/remotekit
 

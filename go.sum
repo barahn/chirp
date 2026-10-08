@@ -1,5 +1,5 @@
-github.com/barahn/remotekit v0.1.1-0.20260930215036-b062c4d44743 h1:qbjHPavRIf9BblIGATFIBaTuCoVnYNRlYuHv8NGx7W0=
-github.com/barahn/remotekit v0.1.1-0.20260930215036-b062c4d44743/go.mod h1:IFL9gismE88G8V+3CYC39YnNfJmCZE5KT7m2p6n1Tnk=
+github.com/barahn/remotekit v0.3.0 h1:dEKn+5iz6k8T7wsHeyLoYmNfq9nyBg1MusB0t3YPxTs=
+github.com/barahn/remotekit v0.3.0/go.mod h1:OWkRvklcaxEUARmA4Hg8/Dbj9hxGqf462r9+e0bn934=
 github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=
 github.com/google/uuid v1.6.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
 github.com/gorilla/websocket v1.5.3 h1:saDtZ6Pbx/0u+bgYQ3q96pZgCzfhKXGPqt7kZ72aNNg=
