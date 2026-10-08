@@ -82,7 +82,12 @@ These are consequences of the model, stated so nobody has to rediscover them:
 Decided by the maintainer:
 
 1. **Link lifetime and revocation.** A link is valid only while the sharer's
-   Chirp is running, can be revoked from it, and is replaced on restart.
+   Chirp is running, can be revoked from it, and is replaced on restart. A
+   Chirp that disappears without saying so (a crash, a lost connection) is
+   taken to have stopped once it has been away from the relay for **2
+   minutes**: its code and link stop working and any session with it ends.
+   Coming back within that time keeps both, so a network blip does not break a
+   link already sent. Operators can change it (`SetPeerGrace`).
 2. **The code shown at start is single-use.** Once it is used it is replaced,
    for the same reason a link mints a fresh code per use: a code that has done
    its job opens nothing.

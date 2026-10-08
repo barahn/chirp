@@ -63,6 +63,13 @@ const (
 	// releasing itself gives its place back when its code expires. A
 	// maintainer decision: 30.
 	DefaultMaxPeersPerOrigin = 30
+
+	// DefaultPeerGrace is how long a peer may go without its owner socket
+	// before it is released: its codes, its link and any session with it.
+	// It covers a network blip or a quick restart of the router; past it, the
+	// Chirp is taken to have exited, which is when decision 1 says its link
+	// stops working. A maintainer decision: 2 minutes.
+	DefaultPeerGrace = 2 * time.Minute
 )
 
 var (
@@ -127,6 +134,12 @@ type peerEntry struct {
 	origin      string // where it registered from, for the per-origin cap
 	codeExpires time.Time
 	active      string // session in progress, if any
+
+	// attached is whether the owner socket is open. detachedSince is when it
+	// last was not: registration, or the socket closing. A peer detached for
+	// longer than the grace period is released by the reaper.
+	attached      bool
+	detachedSince time.Time
 }
 
 // Session is one controller's connection to one owner.
@@ -256,6 +269,7 @@ type SessionManager struct {
 	codeTTL     time.Duration
 	maxPerOrig  int
 	maxPeers    int
+	peerGrace   time.Duration
 	stopReaper  chan struct{}
 	mu          sync.RWMutex
 	listenersMu sync.RWMutex
@@ -284,6 +298,7 @@ func NewSessionManager(sessionTTL time.Duration) *SessionManager {
 		codeTTL:    DefaultCodeTTL,
 		maxPerOrig: DefaultMaxSessionsPerOrigin,
 		maxPeers:   DefaultMaxPeersPerOrigin,
+		peerGrace:  DefaultPeerGrace,
 		stopReaper: make(chan struct{}),
 	}
 	go sm.startReaper()
@@ -384,7 +399,7 @@ func (sm *SessionManager) RegisterPeer(name, origin string) (*Peer, error) {
 		return nil, err
 	}
 	p := Peer{ID: id, Name: name, Code: code, Link: link, RegisteredAt: now}
-	sm.peers[id] = &peerEntry{peer: p, origin: origin, codeExpires: now.Add(sm.codeTTL)}
+	sm.peers[id] = &peerEntry{peer: p, origin: origin, codeExpires: now.Add(sm.codeTTL), detachedSince: now}
 
 	cp := p
 	return &cp, nil
@@ -426,6 +441,44 @@ func (sm *SessionManager) renewCodeLocked(pe *peerEntry) error {
 	pe.peer.Code = code
 	pe.codeExpires = time.Now().UTC().Add(sm.codeTTL)
 	return nil
+}
+
+// SetPeerGrace changes how long a peer may go without its owner socket before
+// it is released.
+func (sm *SessionManager) SetPeerGrace(d time.Duration) error {
+	if d <= 0 {
+		return errors.New("chirp: the peer grace period must be positive")
+	}
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	sm.peerGrace = d
+	return nil
+}
+
+// OwnerAttached records that a peer's owner socket is open. A peer with its
+// socket open is never released for being away. It returns ErrPeerNotFound
+// for a peer that was released meanwhile, whose socket should then be closed.
+func (sm *SessionManager) OwnerAttached(id rendezvous.PeerID) error {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	pe, ok := sm.peers[id]
+	if !ok {
+		return ErrPeerNotFound
+	}
+	pe.attached = true
+	pe.detachedSince = time.Time{}
+	return nil
+}
+
+// OwnerDetached records that a peer's owner socket has closed. The peer is
+// released if it does not attach again within the grace period.
+func (sm *SessionManager) OwnerDetached(id rendezvous.PeerID) {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	if pe, ok := sm.peers[id]; ok {
+		pe.attached = false
+		pe.detachedSince = time.Now().UTC()
+	}
 }
 
 // ReleasePeer forgets a peer when its Chirp exits: its codes and link stop
@@ -794,6 +847,11 @@ func (sm *SessionManager) startReaper() {
 	}
 }
 
+// Reap runs one pass of the background reaper now, instead of at its next
+// tick (every 10 seconds): undecided sessions past their deadline expire, and
+// peers away from their owner socket past the grace period are released.
+func (sm *SessionManager) Reap() { sm.reapExpired() }
+
 // reapExpired expires undecided sessions past their deadline and lets the
 // rendezvous registry reclaim expired codes and throttle windows.
 func (sm *SessionManager) reapExpired() {
@@ -802,6 +860,14 @@ func (sm *SessionManager) reapExpired() {
 	// Snapshots are collected under the lock and delivered after it is
 	// released: a listener must never be fed from inside sm.mu.
 	var expired []*Session
+	// Peers away past their grace are removed under the same lock that
+	// checks them, so one attaching meanwhile is either kept or told it is
+	// gone, never released while attached.
+	type gone struct {
+		id     rendezvous.PeerID
+		active string
+	}
+	var away []gone
 
 	sm.mu.Lock()
 	for _, sess := range sm.sessions {
@@ -814,8 +880,20 @@ func (sm *SessionManager) reapExpired() {
 		}
 		sess.mu.Unlock()
 	}
+	for id, pe := range sm.peers {
+		if !pe.attached && now.Sub(pe.detachedSince) >= sm.peerGrace {
+			delete(sm.peers, id)
+			away = append(away, gone{id, pe.active})
+		}
+	}
 	sm.mu.Unlock()
 
+	for _, g := range away {
+		sm.reg.Release(g.id)
+		if g.active != "" {
+			_, _ = sm.EndSession(g.active)
+		}
+	}
 	sm.reg.Sweep()
 
 	for _, snap := range expired {

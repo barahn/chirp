@@ -294,7 +294,9 @@ Chirp now requires `github.com/barahn/remotekit` at a release tag (`v0.3.0`;
    keeps it for as long as it runs. `GET /api/peers/{peer}` returns the code to
    show now (the start code is single-use and replaced once used or expired);
    `DELETE /api/peers/{peer}` on exit releases its codes and link and ends its
-   session.
+   session. A Chirp that exits without `DELETE` is released the same way by
+   the reaper once its owner socket has been closed (or never opened) for
+   `DefaultPeerGrace`, 2 minutes (barahn/chirp#37).
 2. Another Chirp types the code: `POST /api/redeem {code, name}` → session, or
    uses the link: `POST /api/links/{token}/sessions {name}` mints a single-use
    code and redeems it in one step. Both are metered per origin from one
@@ -318,6 +320,15 @@ over HTTP and WebSocket only.
 **Known limits:**
 
 - **One controller per owner at a time.** Deliberate for now.
+- **A peer away from its owner socket for 2 minutes is released**
+  (maintainer decision, `DefaultPeerGrace`, tunable with `SetPeerGrace`;
+  barahn/chirp#37). `serveOwner` reports the socket opening and closing
+  (`OwnerAttached`, `OwnerDetached`), and the reaper, every 10 s, releases a
+  peer detached past the grace: codes, link and session, as `DELETE` does. It
+  checks and removes under one `sm.mu`, so a peer attaching meanwhile is never
+  released while attached; one released meanwhile gets its socket closed. A
+  link therefore stops working at most grace + 10 s after its Chirp vanishes
+  (decision 1). `Reap` runs a pass on demand.
 - **At most 30 open sessions per controller origin** (maintainer decision,
   `DefaultMaxSessionsPerOrigin`, tunable with `SetMaxSessionsPerOrigin`). A
   session counts until it ends, is denied, or its undecided deadline passes.
@@ -336,10 +347,6 @@ over HTTP and WebSocket only.
   cap, let the codes lapse, register more and revive them all. Such a peer
   still exists, keeps its owner socket and its link. The origin is the same
   `Server.ClientIP` as the throttle, with the same NAT caveat.
-- **Peers are never reaped.** A peer that exits without `DELETE` stays in
-  memory, with its link, until the relay restarts. Its code lapses and stops
-  counting, so this is not the code-space exhaustion above, but it does grow
-  the peer map.
 - Controller identity is self-asserted by design (`docs/product-model.md`).
 
 ## 5. The roadmap — what is missing, in dependency order

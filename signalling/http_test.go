@@ -16,6 +16,7 @@ import (
 
 	"github.com/barahn/chirp/session"
 	"github.com/barahn/remotekit/bark"
+	"github.com/barahn/remotekit/rendezvous"
 	"github.com/gorilla/websocket"
 )
 
@@ -435,6 +436,40 @@ func TestOwnerSocketNeedsItsCredential(t *testing.T) {
 	ctrl := dialController(t, ts, sess.SessionID)
 	awaitPeer(t, ctrl, RoleOwner)
 	awaitPeer(t, first, RoleController)
+}
+
+// A Chirp whose owner socket goes away and stays away is released by the
+// reaper, as if it had sent DELETE; one that keeps its socket open is not.
+func TestOwnerAwayPastTheGraceIsReleased(t *testing.T) {
+	srv, ts := newServer(t)
+	const grace = 40 * time.Millisecond
+	if err := srv.sessions.SetPeerGrace(grace); err != nil {
+		t.Fatal(err)
+	}
+	gone := register(t, ts, "Ana")
+	stays := register(t, ts, "Bia")
+	_ = dialOwner(t, ts, stays.PeerID)
+	ws := dialOwner(t, ts, gone.PeerID)
+	_ = ws.Close()
+	waitFor(t, "the relay to notice the socket closed", func() bool {
+		srv.ownersMu.Lock()
+		defer srv.ownersMu.Unlock()
+		_, open := srv.owners[rendezvous.PeerID(gone.PeerID)]
+		return !open
+	})
+
+	time.Sleep(grace + 10*time.Millisecond)
+	srv.sessions.Reap()
+
+	if st := call(t, ts, "GET", "/api/peers/"+gone.PeerID, "", nil); st != http.StatusNotFound {
+		t.Fatalf("peer away past its grace = %d, want 404", st)
+	}
+	if st := call(t, ts, "POST", "/api/links/"+gone.Link+"/sessions", `{}`, nil); st != http.StatusNotFound {
+		t.Fatalf("its link = %d, want 404", st)
+	}
+	if st := call(t, ts, "GET", "/api/peers/"+stays.PeerID, "", nil); st != http.StatusOK {
+		t.Fatalf("peer with its socket open = %d, want 200", st)
+	}
 }
 
 func TestReleaseRevokesTheCodeAndClosesTheSocket(t *testing.T) {
