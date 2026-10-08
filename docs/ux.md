@@ -8,8 +8,9 @@ below. [product-model.md](product-model.md) is the authority on what Chirp
 does; where this page disagrees with it, this page is wrong.
 
 **Status: proposal.** The open decisions are listed at the end. Nothing here is
-drawn yet: `cmd/chirp` does not exist (barahn/chirp#10), and its UI will be
-Fyne (HANDOFF §5.6).
+built yet: `cmd/chirp` does not exist (barahn/chirp#10), and its UI will be
+Fyne (HANDOFF §5.6). Mockups of the possible looks are linked from § Visual
+direction.
 
 ## The name is the metaphor
 
@@ -255,9 +256,56 @@ setting, and never onto a control that gives or takes control.
 Avoid *Nest* (a Google brand, and the name of the abandoned web page) and
 *Tweet*.
 
+## Visual direction
+
+Nothing visual is chosen yet. A design canvas shows the possibilities: three
+directions side by side, the bird in every state, the app and tray icons, the
+main screens in each direction and in dark mode, and the colour tokens mapped
+to Fyne — [Chirp visual directions](https://claude.ai/artifact/JroqdRHaFU7wochyTrfMNB).
+The screens there switch direction, dark mode and state from their *Tweaks*,
+and the consent prompt, the helper's flow and the session bar can be clicked
+through.
+
+- **A · Warm.** An illustrated, filled bird, rounded shapes, yolk yellow for
+  the bird and deep teal for actions; Fredoka, Nunito Sans and JetBrains
+  Mono. The closest to TunnelBear.
+- **B · Calm.** A line-drawn bird, quieter surfaces, teal and blue; IBM Plex
+  Sans and IBM Plex Mono.
+- **C · Native.** A silhouette bird used as a logo and little else, close to
+  what Fyne draws by default; Noto Sans and Noto Sans Mono. The least work.
+
+Whichever is chosen, some things stay fixed:
+
+- **The consent prompt and the session bar look the same in every
+  direction:** no bird, no accent colour, the warning in the warning colour,
+  *Decline* focused. They change only between light and dark.
+- **The tray icon changes shape, not only colour:** an outline when idle, a
+  dot when someone is asking, a filled shape during a session. macOS gets
+  one-colour template images.
+- **Every colour has a light and a dark value** and maps to a Fyne theme
+  colour name. The few Fyne has no name for — muted text, the bird's accent,
+  the highlight tint, the warning background — are Chirp's own (`chirp.*`)
+  and served by the same theme.
+
+What that means in Fyne:
+
+- **Fonts follow style, not role.** Fyne picks a font by text style (regular,
+  bold, italic, monospace), so a separate display face (Warm's Fredoka) needs
+  Bold mapped to it, or the wordmark drawn as an image. Each bundled font
+  file adds to the binary.
+- **The bird is SVG**, one file per pose, bundled with the binary and drawn
+  with `canvas.NewImageFromResource`; Fyne rasterises SVG itself. Keep the
+  paths plain: no filters, masks or text. Motion is swapping the pose and
+  moving or fading it with Fyne's animation API; the canvas lists the
+  durations.
+- **The session bar needs a per-OS shim** to stay above every window
+  (§ During a session).
+
+The canvas is private until it is shared from its page.
+
 ## Open decisions
 
-Each has an issue, on the roadmap project.
+The first four have issues on the roadmap project.
 
 1. **Does Chirp write anything to disk** — a name, a self-hosted server
    address, a muted sound? Decision 4 treats a URL handler as installation by
@@ -271,6 +319,7 @@ Each has an issue, on the roadmap project.
    is shared, if Screen Recording does require a relaunch (barahn/chirp#51).
 4. **Per-permission consent.** Needs a change to remotekit's `bark`
    consent response. Out of the first runnable Chirp (barahn/chirp#52).
+5. **Which visual direction:** Warm, Calm or Native (§ Visual direction).
 
 ---
 
