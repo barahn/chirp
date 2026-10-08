@@ -134,8 +134,10 @@ type Session struct {
 	ClientInfo     *ClientInfo      `json:"client_info,omitempty"`
 	Consent        *ConsentDecision `json:"consent,omitempty"`
 
-	mu        sync.RWMutex
-	consentCh chan bool
+	mu sync.RWMutex
+	// decided is closed, under mu, when Consent is set. Closing wakes every
+	// WaitForConsent at once, where a send would wake only one of them.
+	decided chan struct{}
 }
 
 // Clone returns a thread-safe snapshot of the session state.
@@ -410,7 +412,7 @@ func (sm *SessionManager) Redeem(code, controllerName string, info *ClientInfo) 
 		State:          StatePending,
 		CreatedAt:      now,
 		ExpiresAt:      now.Add(sm.sessionTTL),
-		consentCh:      make(chan bool, 1),
+		decided:        make(chan struct{}),
 	}
 	if info != nil {
 		ci := *info
@@ -545,15 +547,13 @@ func (sm *SessionManager) SubmitConsent(id string, granted bool, reason string) 
 			s.State = StateConsentDenied
 			s.EndedAt = &now
 		}
-		select {
-		case s.consentCh <- granted:
-		default:
-		}
+		close(s.decided)
 		return nil
 	})
 }
 
-// WaitForConsent blocks until the owner decides or ctx ends.
+// WaitForConsent blocks until the owner decides or ctx ends. Any number of
+// callers may wait on the same session; all of them see the decision.
 func (sm *SessionManager) WaitForConsent(ctx context.Context, id string) (bool, error) {
 	sess, err := sm.get(id)
 	if err != nil {
@@ -565,14 +565,16 @@ func (sm *SessionManager) WaitForConsent(ctx context.Context, id string) (bool, 
 		sess.mu.RUnlock()
 		return granted, nil
 	}
-	ch := sess.consentCh
+	decided := sess.decided
 	sess.mu.RUnlock()
 
 	select {
 	case <-ctx.Done():
 		return false, ctx.Err()
-	case granted := <-ch:
-		return granted, nil
+	case <-decided:
+		sess.mu.RLock()
+		defer sess.mu.RUnlock()
+		return sess.Consent.Granted, nil
 	}
 }
 
