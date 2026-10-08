@@ -21,6 +21,10 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: write # attach the SBOM to the release
+      # anchore/sbom-action lists this workflow's runs before it uploads a
+      # release asset. Without it, a published release fails with "Resource
+      # not accessible by integration" (it did for v0.2.0). Read-only.
+      actions: read
     steps:
       # Audit mode: harden-runner records what each job talks to without
       # blocking it. Read the egress report on a few green runs, then turn this
