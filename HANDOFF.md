@@ -10,12 +10,18 @@ repo checked out and has read nothing else.
 
 You are continuing development of **Chirp**, an open-source (AGPL-3.0-only)
 on-demand remote support tool owned by **Fabrintek Engenharia Digital Ltda**.
-Work on the `develop` branch. Commit with `git commit -s` (a DCO
-`Signed-off-by` trailer is mandatory and enforced in CI) and push with
-`git push -u origin develop`. Do not open pull requests unless asked.
+Start each change on a branch from `develop` (`feature/*`, `fix/*`, `deps/*`,
+`docs/*`) and land it on `develop` by pull request, as `docs/branching.md`
+describes. Commit with `git commit -s` (a DCO `Signed-off-by` trailer is
+mandatory and enforced in CI).
 
 Read `README.md`, `CONTRIBUTING.md` and `LICENSING.md` before your first
 commit. They are not boilerplate — they encode hard constraints (below).
+
+**Planned work is tracked on GitHub**, in the issues of this repository and the
+[Chirp roadmap](https://github.com/orgs/barahn/projects/2) project, whose
+*Track* field orders it. §8 summarises it; when the two disagree, the issues
+are the newer record.
 
 ## 2. What Chirp is
 
@@ -195,32 +201,31 @@ Consequences to know about:
 
 ### 4.3 Still open
 
-- `Session` has a `sync.RWMutex` field carrying a `json:"-"` tag, which does
-  nothing on an unexported field. Harmless; confirm and simplify.
-- `CreateSession` retries PIN generation 10 times against collisions but does
-  not distinguish "collision" from "entropy failure"; the error message is
-  generic.
-- **CodeQL and dependency review are off** until the repository variable
-  `CODE_SCANNING` is set. The repository is private, and both need GitHub
-  Advanced Security there — confirmed on barahn/chirp#1, where both failed for
-  that reason. Each run warns that the gate is off. Set the variable when the
-  repository goes public or Code Security is enabled; `docs/devsecops.md`
-  explains, including why marking them required before then enforces nothing.
-- **Branch protection is written, decided, and not yet applied.** The approval
-  policy is settled — the admin may bypass on `develop` via pull request only,
-  and `main` has no bypass (see `docs/branching.md`) — so nothing in the
-  repository blocks importing the rulesets any more. Importing them needs an
-  admin token, which this work does not have.
-  The rules are versioned in `.github/rulesets/`, with the reasoning in
-  `docs/branching.md`. Their first version could not have worked — `main`
-  required linear history while allowing only merge commits, required a check
-  under the wrong name, and would have deadlocked from the second release on —
-  and those defects are fixed. The other blocker, a workflow pushing the
-  handoff snapshot straight to `main`, is gone: the snapshot is now checked in
-  CI instead of committed by a bot.
+- **Branch protection and code scanning cannot be turned on while the
+  repository is private on GitHub's free plan** (barahn/chirp#17). An earlier
+  version of this list said importing the rulesets only needed an admin token.
+  It does not: `GET /repos/barahn/chirp/rulesets` answers the maintainer's own
+  account with `403 Upgrade to GitHub Pro or make this repository public`.
+  CodeQL and dependency review stay off until the repository variable
+  `CODE_SCANNING` is set, and they need GitHub Advanced Security on a private
+  repository, for the same reason (confirmed on barahn/chirp#1). The real
+  decision is to make the repository public or move to a paid plan.
+  Until then nothing is enforced: `develop` takes direct pushes and merge
+  commits, although `docs/branching.md` prescribes squash or rebase there.
+  The rules themselves are settled and versioned in `.github/rulesets/`, with
+  the reasoning in `docs/branching.md`. Their first version could not have
+  worked — `main` required linear history while allowing only merge commits,
+  required a check under the wrong name, and would have deadlocked from the
+  second release on — and those defects are fixed. `docs/devsecops.md`
+  explains why marking the code-scanning pair required before then enforces
+  nothing.
 - `WaitForConsent` reads from a buffered channel of capacity 1, so only one
-  waiter is woken per session. Fine for one technician per session; revisit if
-  that stops being true.
+  waiter is woken per session. Fine for one controller per owner; revisit if
+  that stops being true (barahn/chirp#18).
+
+Two items that used to be listed here no longer apply. The `Session` mutex
+carries no `json:"-"` tag any more. `CreateSession`'s retry loop went to
+remotekit's `rendezvous` with the code allocation (§4.5).
 
 ### 4.4 What integrating the signalling server exposed — FIXED
 
@@ -258,7 +263,10 @@ shows the consent prompt itself, so `POST /api/sessions` (helper creates),
 `POST /api/sessions/{code}/consent` (web page answers) and the consent details
 in `GET /api/sessions/{code}` are all on the wrong side. The security properties
 established here — every code-keyed entry point metered, consent refused until
-requested — carry over unchanged; the endpoints themselves do not.
+requested — carry over unchanged; the endpoints themselves do not. **They are
+gone:** barahn/chirp#5 removed them (barahn/chirp#13), and the surface that
+replaced them is in §4.5. `GET /api/sessions/{id}` survives, keyed by session
+ID instead of by code.
 
 Also found: `TestSignallingCrossesBetweenPeers` failed 2 runs in 15 under CPU
 load. A client's `Dial` returns when the server writes the upgrade response,
@@ -372,8 +380,26 @@ pure-Go VP8 encoder whose reconstruction is byte-exact against libvpx;
 It is built around enrolment: pairing codes, persistent agent credentials, an
 agent registration store, agent IDs, online status. That is precisely the
 standing-agent model Chirp rejects in its first paragraph. Do not try to reuse
-it for session signalling; the unmerged `signalling` package writing its own
-two-peer hub is the correct call, not duplication.
+it for session signalling; the `signalling` package writing its own two-peer
+hub is the correct call, not duplication.
+
+**But `tunnel` is also where consent is enforced, and that is unresolved
+(barahn/chirp#20).** Since remotekit Phase 0–2, `tunnel.AgentStreamRunner`
+holds `Grant`, `RequireScreenViewConsent` and `RequireSignedViewers`. It also
+holds the Phase 2 transport seam: `tunnel.SignalConn` and
+`AgentStreamRunner.Serve(ctx, conn)` run a whole session over any transport
+(barahn/remotekit#68, #77). Keeping `tunnel` out of Chirp, as this section
+says, therefore means re-implementing consent enforcement. Importing it means
+taking yamux (MPL-2.0, below) and the enrolment code. The recommended way out
+is for remotekit to move the session runner out of `tunnel`. Decide before
+writing `cmd/chirp`.
+
+**remotekit's Phase 2 did not build the `Signaler` its plan proposed.** It
+shipped the narrower `SignalConn` above, and **`signal/nostr`**: a separate Go
+module carrying a session's signalling over public Nostr relays, gift-wrapped
+and encrypted end to end with per-session keys (barahn/remotekit#77). Any
+Chirp document that places future work "alongside the Phase 2 `Signaler`"
+means `SignalConn` and `signal/nostr`.
 
 **What the signalling branch genuinely duplicates: almost nothing.** Its `Hub`
 never parses what it forwards — `Forward` relays opaque bytes by design — so it
@@ -414,6 +440,11 @@ their own. Barahn works the same way, as does every mainstream remote-support
 tool. So the relay is trusted, openly, and what follows is **optional
 hardening** for relays run by a third party — worth keeping on record, not on
 the critical path.
+
+> **Open: barahn/chirp#7 proposes reversing this** (a public server blind to
+> the traffic, every running Chirp a node, a 6 + 4 digit code). If it is
+> accepted, the PAKE below moves onto the critical path. The decision is
+> tracked in barahn/chirp#19, and the PAKE work in barahn/chirp#21.
 
 **Correction: signing is necessary, not sufficient.** An earlier version of
 this section said remotekit "already has the parts". It does not. A signature
@@ -548,18 +579,36 @@ closed (§4.4), the CI branch integrated into `develop` (`ci.yml` now runs on `d
 dependency review, SBOM and Dependabot are in, with the code-scanning pair gated
 as §4.3 describes).
 
-Done since: remotekit's `rendezvous` adopted and the session direction
-inverted (§4.5).
+Done on `develop` since, not yet released to `main`:
 
-Still to decide or do, in order:
+- remotekit's `rendezvous` adopted, and the session direction inverted
+  (barahn/chirp#5, §4.5).
+- The cap of 30 sessions per controller origin (barahn/chirp#6).
+- remotekit pinned at the `v0.3.0` tag instead of an orphaned pseudo-version.
+  `clipboard_sync` was renamed to `clipboard`, the name remotekit grants
+  (barahn/chirp#9).
+- The CI actions bumped (barahn/chirp#8).
 
-1. **Import the rulesets** (§4.3) — `docs/branching.md` has the commands. The
-   policy is decided; only an admin can apply it.
-2. **Meter registration** (`POST /api/peers`) per origin before any public
-   relay is run (§4.5, known limits).
-3. **`cmd/chirp`** — the one binary: registers, shows its code and link, holds
-   the owner socket, shows the consent prompt with the controller's name as a
-   claim, redeems other people's codes, and uses remotekit to share the screen
-   (§5.5).
-4. **How a link reaches a freshly downloaded binary** — still open, until the
-   download site exists (`docs/product-model.md`, decision 4).
+Still to decide or do, in order. Each step has an issue, and the
+[Chirp roadmap](https://github.com/orgs/barahn/projects/2) project tracks them:
+
+1. **Decisions that block the binary.** None of these is an implementation
+   task. Each needs the maintainer.
+   - barahn/chirp#19: accept or reject barahn/chirp#7 (blind public server,
+     every Chirp a node). It decides whether #21 is on the critical path.
+   - barahn/chirp#20: consent enforcement lives in remotekit `tunnel` (§5.5).
+   - The tray/UI library, `getlantern/systray` or Fyne (barahn/chirp#11),
+     checked against the licence gate.
+   - barahn/chirp#16: how a link reaches a freshly downloaded binary
+     (`docs/product-model.md`, decision 4).
+2. **`cmd/chirp`** (barahn/chirp#10 → #11 → #12, with barahn/remotekit#68).
+   It is the one binary: it registers, shows its code and link, holds the owner
+   socket, shows the consent prompt with the controller's name as a claim,
+   redeems other people's codes, and uses remotekit to share the screen (§5.5).
+3. **Before any public relay:** meter registration per origin
+   (barahn/chirp#14, §4.5 known limits), the PAKE if #19 makes it required
+   (barahn/chirp#21), and bring-your-own STUN/TURN documentation
+   (barahn/chirp#15).
+4. **Branch protection and code scanning** (barahn/chirp#17, §4.3). Blocked on
+   making the repository public or moving to a paid plan, not on an admin
+   token.
