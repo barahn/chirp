@@ -591,6 +591,41 @@ enrolment model, to keep `tunnel` out of Chirp.
 `screen`, `input`, `clipboard`, `transfer` and `webrtc.PeerSession`. `session/`
 needs only `rendezvous`, and should acquire nothing more.
 
+### 5.6 The UI library: Fyne — DECIDED (barahn/chirp#24)
+
+The maintainer chose **Fyne** (`fyne.io/fyne/v2`) for `cmd/chirp`'s UI. Chirp
+needs windows, not only a tray icon: one window shows the machine's own code
+and link, one has a field to type a code or paste a link, and the consent
+prompt has to be drawn by Chirp, the same way on every platform, unmistakable
+enough that an unexpected one is declined. Fyne draws all of that itself, and
+brings its own tray (`fyne.io/systray`).
+
+**What was checked**, in a throwaway module built against each candidate,
+before deciding:
+
+| | Draws windows | Modules imported | Licences | Builds with `CGO_ENABLED=0` |
+| --- | --- | --- | --- | --- |
+| Fyne v2.8.1 | yes | 26 | all permissive (BSD, MIT, Apache-2.0, ISC) | none of Linux, Windows, macOS |
+| `fyne.io/systray` | no, tray only | 2 | permissive | Linux and Windows; not macOS |
+| `getlantern/systray` | no, tray only | 9 | permissive | Windows only (GTK + appindicator on Linux) |
+
+remotekit's `tray` was ruled out. It is built for the standing agent: its
+constructor takes an agent ID and a server address, its menu shows them, and
+on Windows it imports remotekit's `service` package (OS service installation).
+It draws no windows either, so the consent prompt would still be missing.
+
+**What the decision costs, and where it lands:** Fyne needs cgo on every
+platform, and on Linux the X11 and OpenGL development headers. CI's
+*Cross-compile Check* builds `./...` for Windows and macOS with
+`CGO_ENABLED=0` from a Linux runner, and that cannot build a Fyne program. The
+pull request that adds `cmd/chirp` (barahn/chirp#10) has to move its build to
+native runners per OS (a matrix of `ubuntu`, `windows` and `macos`), or keep
+the cross-compile check for the library packages and build `cmd/chirp`
+natively. `THIRD_PARTY_NOTICES.md` grows by Fyne's tree in that same pull
+request, and the licence gate re-checks it there. The library packages
+(`session`, `signalling`) must not import Fyne. Keep the UI in `cmd/chirp`,
+or a package under it, so the relay still builds without cgo.
+
 ## 6. Hard constraints — do not trade these away
 
 **Product commitments** (from `README.md`, stated as constraints on what Chirp
@@ -664,11 +699,11 @@ Still to decide or do, in order. Each step has an issue, and the
 1. **Decisions that block the binary.** None of these is an implementation
    task. Each needs the maintainer.
    - barahn/chirp#20: consent enforcement lives in remotekit `tunnel` (§5.5).
-   - barahn/chirp#24: the tray/UI library, `getlantern/systray` or Fyne,
-     checked against the licence gate.
 2. **`cmd/chirp`** (barahn/chirp#10 → #11 → #12, with barahn/remotekit#68).
-   It is the one binary: it registers, shows its code and link, holds the owner
-   socket, shows the consent prompt with the controller's name as a claim,
+   Its UI is Fyne (barahn/chirp#24, §5.6), so its pull request also moves the
+   CI build to native runners. It is the one binary: it registers, shows its
+   code and link, holds the owner socket, shows the consent prompt with the
+   controller's name as a claim,
    redeems other people's codes and pasted links (`docs/product-model.md`,
    decision 4), and uses remotekit to share the screen (§5.5).
 3. **Before any public relay:** bring-your-own STUN/TURN documentation
