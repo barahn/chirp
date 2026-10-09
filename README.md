@@ -27,18 +27,35 @@ What is here today:
 - **A signalling relay** — relays WebRTC signalling between the two ends of a
   session and announces each end to the other. Written for Chirp — no
   multi-tenancy, no RBAC — rather than taken from the proprietary Barahn
-  control plane.
+  control plane. `cmd/chirp-relay` runs it, for a relay you host yourself.
+- **The `cmd/chirp` binary, up to the consent request** — the one program
+  both sides run. Its window shows this machine's code and link, and lets its
+  user type someone else's code or paste their link; the other machine is then
+  asked for consent. The window is Fyne in its default theme
+  ([docs/ux.md](docs/ux.md) has the plan for the rest).
 
-Both are tested, AGPL-3.0, and follow the [product model](docs/product-model.md):
+All of it is tested, AGPL-3.0, and follow the [product model](docs/product-model.md):
 the code belongs to the machine to be controlled, and consent is asked of that
 machine's user over its own socket, as a remotekit `bark` consent request.
 
 What is **not** here yet:
 
-- **The `cmd/chirp` binary** — the one program both sides run, which shows its
-  own code and link, asks for consent, and uses remotekit to share the screen.
+- **The consent prompt and the screen.** `cmd/chirp` stops at the consent
+  request: drawing the prompt and answering it (barahn/chirp#11), and sharing
+  the screen through remotekit (barahn/chirp#12), come next. Until then nobody
+  can be let in.
 - **A TURN relay.** Until Chirp ships one, self-hosting means bringing your own
   STUN/TURN (coturn works): see [docs/stun-turn.md](docs/stun-turn.md).
+
+To try what exists: `cmd/chirp` needs cgo, and on Linux the OpenGL, X11 and
+Wayland headers (`libgl1-mesa-dev xorg-dev libwayland-dev libxkbcommon-dev` on
+Debian and Ubuntu). Start a relay, then two Chirps, and type one's code into
+the other:
+
+```sh
+go run ./cmd/chirp-relay
+CHIRP_RELAY=http://localhost:8080 go run ./cmd/chirp
+```
 
 The remote-session mechanism — screen capture, VP8 encoding, input injection,
 clipboard, file transfer, WebRTC, the reverse tunnel — is not missing; it lives

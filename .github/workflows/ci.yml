@@ -52,6 +52,16 @@ jobs:
           # below then fails on standard-library fixes that are already out.
           check-latest: true
 
+      # cmd/chirp draws its window with Fyne, which needs cgo and the system's
+      # OpenGL, X11 and Wayland headers to build (HANDOFF §5.6). Every later
+      # step that loads cmd/chirp -- build, vet, lint, tests, gosec,
+      # govulncheck -- compiles it, so the headers go in first.
+      - name: Install Fyne's build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libgl1-mesa-dev xorg-dev libwayland-dev libxkbcommon-dev
+
       # CONTRIBUTING.md requires a DCO Signed-off-by trailer on every commit.
       # Merge commits are exempt: they carry no contribution of their own.
       #
@@ -107,12 +117,17 @@ jobs:
           go build ./...
           go vet ./...
 
+      # Everything but cmd/chirp builds without cgo for every platform, and
+      # must keep doing so: the relay and the protocol never need a C
+      # toolchain. cmd/chirp needs cgo everywhere, so it is built natively by
+      # the `binary` job below instead.
       - name: Cross-compile Check (Windows / macOS)
         env:
           CGO_ENABLED: 0
         run: |
-          GOOS=windows GOARCH=amd64 go build ./...
-          GOOS=darwin GOARCH=amd64 go build ./...
+          PKGS=$(go list ./... | grep -Ev '/cmd/chirp(/|$)')
+          GOOS=windows GOARCH=amd64 go build $PKGS
+          GOOS=darwin GOARCH=amd64 go build $PKGS
 
       - name: Lint
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
@@ -143,3 +158,30 @@ jobs:
 
       - name: Vulnerability Check (govulncheck)
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.7.0 ./...
+
+  # cmd/chirp on the systems it ships for, each on its own kind of runner:
+  # Fyne needs cgo, and cgo does not cross-compile from Linux. Linux itself
+  # is covered by the job above. harden-runner observes Linux runners only,
+  # so it is not here.
+  binary:
+    name: Build cmd/chirp (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ windows-latest, macos-latest ]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.26'
+          check-latest: true
+
+      - name: Build
+        env:
+          CGO_ENABLED: 1
+        run: go build -o chirp-bin ./cmd/chirp

@@ -7,10 +7,11 @@ makes a security product feel simple, with one deliberate exception, explained
 below. [product-model.md](product-model.md) is the authority on what Chirp
 does; where this page disagrees with it, this page is wrong.
 
-**Status: proposal.** The open decisions are listed at the end. Nothing here is
-built yet: `cmd/chirp` does not exist (barahn/chirp#10), and its UI will be
-Fyne (HANDOFF §5.6). Mockups of the possible looks are linked from § Visual
-direction.
+**Status: proposal, partly built.** The open decisions are listed at the end.
+`cmd/chirp` has the main window and the helper's flow (barahn/chirp#10), in
+Fyne's default theme; the consent prompt, the session bar, the tray and the
+sound are not built yet. Mockups of the possible looks are linked from
+§ Visual direction.
 
 ## The name is the metaphor
 
@@ -117,10 +118,13 @@ From top to bottom:
    the code and the link (decision 1); today that is a `DELETE` and a fresh
    `POST /api/peers`. The hint under the code: "Read it only to someone you
    called."
-3. **Help someone.** One field that takes a code or a pasted link, and a
-   *Connect* button. Chirp reads the clipboard only when the user pastes
-   (decision 4). The hint: "Typing their code lets you control their
-   computer, after they allow it."
+3. **Help someone.** A field for the helper's name, one that takes a code or
+   a pasted link, and a *Connect* button. The name is what the other
+   person's prompt shows, as a claim, so Chirp asks for it rather than send
+   a blank; with nothing written to disk (open decision 1) it is typed each
+   time. Chirp reads the clipboard only when the user pastes (decision 4).
+   The hint: "Typing their code lets you control their computer, after they
+   allow it."
 
 These hints replace TunnelBear's Quick Guide. They are always there, short
 enough not to need dismissing.
