@@ -39,6 +39,12 @@ type Window struct {
 	OnConnect func(target, name string)
 	// OnCancel is called when the person stops waiting, or ends a session.
 	OnCancel func()
+	// OnConsent is called with this machine's user's answer to a consent
+	// request: the button they pressed in the prompt, or false when the
+	// prompt was closed or ran out of time. It is never called otherwise.
+	OnConsent func(sessionID string, granted bool)
+	// OnEndSession is called when the user ends a session they allowed.
+	OnEndSession func()
 
 	// The header: the bird, whose pose says how this machine stands, and
 	// the wordmark.
@@ -48,16 +54,18 @@ type Window struct {
 	animating bool
 
 	// This machine's code.
-	status   *widget.Label
-	code     *canvas.Text
-	codeDim  bool
-	copyCode *widget.Button
-	note     *widget.Label
-	hint     *widget.Label
-	copyLink *widget.Button
-	newCode  *widget.Button
-	request  *widget.Label
-	peer     client.Peer
+	status     *widget.Label
+	code       *canvas.Text
+	codeDim    bool
+	copyCode   *widget.Button
+	note       *widget.Label
+	hint       *widget.Label
+	copyLink   *widget.Button
+	newCode    *widget.Button
+	request    *widget.Label
+	endSession *widget.Button
+	prompt     *prompt
+	peer       client.Peer
 
 	// Helping someone: the form, waiting, and how it ended.
 	form        *fyne.Container
@@ -85,7 +93,7 @@ func New(a fyne.App) *Window {
 	header := w.header()
 	card := w.ownerCard()
 	help := w.helpArea()
-	w.win.SetContent(container.NewPadded(container.NewVBox(header, card, w.request, widget.NewSeparator(), help)))
+	w.win.SetContent(container.NewPadded(container.NewVBox(header, card, w.request, container.NewHBox(w.endSession), widget.NewSeparator(), help)))
 	w.win.Resize(fyne.NewSize(460, 660))
 	w.ApplyOwner(client.OwnerEvent{Phase: client.OwnerStarting})
 	// Text drawn by hand keeps the colour it was given, so it is given the
@@ -155,8 +163,10 @@ func (w *Window) ownerCard() fyne.CanvasObject {
 		}
 	})
 	w.request = wrapped("")
-	w.request.Importance = widget.WarningImportance
 	w.request.Hide()
+	w.endSession = widget.NewButton("End session", w.endTheSession)
+	w.endSession.Importance = widget.DangerImportance
+	w.endSession.Hide()
 	return widget.NewCard("Your code", "", container.NewVBox(
 		container.NewBorder(nil, nil, nil, w.copyCode, w.code),
 		w.note,
@@ -246,8 +256,7 @@ func (w *Window) ApplyOwner(ev client.OwnerEvent) {
 	setEnabled(usable, w.copyCode, w.copyLink, w.newCode)
 
 	if ev.Consent != nil {
-		w.request.SetText(requestNote(ev.Consent))
-		w.request.Show()
+		w.showPrompt(ev.Consent)
 		return
 	}
 	w.setPose(ownerPose(ev))
@@ -258,6 +267,43 @@ func (w *Window) ApplyOwner(ev client.OwnerEvent) {
 		w.note.Show()
 	} else {
 		w.note.Hide()
+	}
+}
+
+// consentDecided records the user's answer in the main window and passes it
+// on. Only the prompt calls it.
+func (w *Window) consentDecided(req *client.ConsentRequest, granted bool) {
+	defer w.relayout()
+	w.request.Importance = widget.MediumImportance
+	w.request.SetText(decidedNote(req.Name, granted))
+	w.request.Show()
+	if granted {
+		w.endSession.Show()
+	} else {
+		w.endSession.Hide()
+	}
+	if w.OnConsent != nil {
+		w.OnConsent(req.SessionID, granted)
+	}
+}
+
+// AnswerFailed says that an answer did not reach the relay. The relay then
+// declines by itself at the deadline, so nobody gets in either way.
+func (w *Window) AnswerFailed(granted bool) {
+	defer w.relayout()
+	w.request.Importance = widget.WarningImportance
+	w.request.SetText(answerProblem(granted))
+	w.request.Show()
+	w.endSession.Hide()
+}
+
+func (w *Window) endTheSession() {
+	defer w.relayout()
+	w.endSession.Hide()
+	w.request.Importance = widget.MediumImportance
+	w.request.SetText("Session ended. Your code and link are being replaced.")
+	if w.OnEndSession != nil {
+		w.OnEndSession()
 	}
 }
 
@@ -407,6 +453,9 @@ func (w *Window) recolor() {
 		w.code.Color = dim()
 	}
 	w.code.Refresh()
+	if w.prompt != nil {
+		w.prompt.recolor()
+	}
 }
 
 // relayout lays the whole window out again. A label that changes its text,

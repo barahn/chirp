@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/barahn/remotekit/bark"
 	"github.com/gorilla/websocket"
 )
 
@@ -166,6 +167,21 @@ func (c *Client) Redeem(ctx context.Context, code, name string) (Session, error)
 func (c *Client) RedeemLink(ctx context.Context, token, name string) (Session, error) {
 	var s Session
 	err := c.do(ctx, http.MethodPost, c.endpoint("api", "links", token, "sessions"), map[string]string{"name": name}, &s)
+	return s, err
+}
+
+// Consent answers a consent request, as the owner peerID. The relay applies
+// it only to that peer's current session, only if sessionID is that session,
+// and only while the session is asking; a declined session is over for good.
+func (c *Client) Consent(ctx context.Context, peerID, sessionID string, granted bool, reason string) (Session, error) {
+	var s Session
+	body := bark.ConsentResponsePayload{
+		SessionID: sessionID,
+		Granted:   granted,
+		Reason:    reason,
+		Timestamp: time.Now().UTC(),
+	}
+	err := c.do(ctx, http.MethodPost, c.endpoint("api", "peers", peerID, "consent"), body, &s)
 	return s, err
 }
 

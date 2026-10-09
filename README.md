@@ -28,11 +28,12 @@ What is here today:
   session and announces each end to the other. Written for Chirp — no
   multi-tenancy, no RBAC — rather than taken from the proprietary Barahn
   control plane. `cmd/chirp-relay` runs it, for a relay you host yourself.
-- **The `cmd/chirp` binary, up to the consent request** — the one program
+- **The `cmd/chirp` binary, up to the consent decision** — the one program
   both sides run. Its window shows this machine's code and link, and lets its
-  user type someone else's code or paste their link; the other machine is then
-  asked for consent. The window is Fyne in Chirp's Warm look
-  ([docs/ux.md](docs/ux.md) has the plan for the rest).
+  user type someone else's code or paste their link; the other machine then
+  asks its user in Chirp's own prompt, and the answer reaches the relay. The
+  window is Fyne in Chirp's Warm look ([docs/ux.md](docs/ux.md) has the plan
+  for the rest).
 
 All of it is tested, AGPL-3.0, and follow the [product model](docs/product-model.md):
 the code belongs to the machine to be controlled, and consent is asked of that
@@ -40,10 +41,9 @@ machine's user over its own socket, as a remotekit `bark` consent request.
 
 What is **not** here yet:
 
-- **The consent prompt and the screen.** `cmd/chirp` stops at the consent
-  request: drawing the prompt and answering it (barahn/chirp#11), and sharing
-  the screen through remotekit (barahn/chirp#12), come next. Until then nobody
-  can be let in.
+- **The screen.** A user can allow a session, but nothing is shared yet:
+  sharing the screen through remotekit, and making the session obey the
+  consent there, is barahn/chirp#12, waiting on barahn/remotekit#83.
 - **A TURN relay.** Until Chirp ships one, self-hosting means bringing your own
   STUN/TURN (coturn works): see [docs/stun-turn.md](docs/stun-turn.md).
 

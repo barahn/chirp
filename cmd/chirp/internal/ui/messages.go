@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
+	"unicode"
 
 	"github.com/barahn/chirp/client"
 )
@@ -64,10 +66,114 @@ func ownerNote(ev client.OwnerEvent) string {
 	return ""
 }
 
-// requestNote tells the owner a controller is asking. The prompt that answers
-// is barahn/chirp#11; until it exists, nobody can be let in.
-func requestNote(req *client.ConsentRequest) string {
-	return fmt.Sprintf("Someone typed your code and says they're “%s”. Answering isn't built yet (barahn/chirp#11), so nothing will start.", req.Name)
+// The consent prompt's words (docs/ux.md, Consent). Plain on purpose: no
+// brand words, nothing that sounds like the product vouching for anyone.
+const (
+	promptTitle   = "Someone wants to control this computer"
+	promptUnnamed = "They didn't give a name."
+	promptNoCheck = "Chirp can't check names."
+	promptAsking  = "They're asking to:"
+	promptWarning = "Allow only if you asked this person for help just now. Banks, government agencies and Microsoft never ask for this."
+	promptDecline = "Decline"
+	promptAllow   = "Allow"
+)
+
+// claimMax is the longest name the prompt shows, in characters.
+const claimMax = 40
+
+// claim makes a typed name safe to show as a claim. The controller chose it,
+// so it must not be able to pass for the prompt's own words: control and
+// formatting characters go (a line break could start a fake line, and a
+// right-to-left override could reverse what follows), double quotes become
+// single ones (so the name cannot close its own quotation marks), runs of
+// space collapse, and it stops at claimMax characters.
+func claim(name string) string {
+	var b strings.Builder
+	n, space := 0, false
+	for _, r := range name {
+		switch {
+		case unicode.IsSpace(r):
+			space = true
+			continue
+		case unicode.IsControl(r), unicode.Is(unicode.Cf, r):
+			continue
+		case strings.ContainsRune("\"“”„‟«»", r):
+			r = '\''
+		}
+		if n == claimMax {
+			b.WriteRune('…')
+			break
+		}
+		if space && n > 0 {
+			b.WriteRune(' ')
+			n++
+		}
+		space = false
+		b.WriteRune(r)
+		n++
+	}
+	return b.String()
+}
+
+// promptName is the line that names who is asking.
+func promptName(name string) string {
+	c := claim(name)
+	if c == "" {
+		return promptUnnamed
+	}
+	return "They say they're “" + c + "”."
+}
+
+// permissionText names what a permission lets the other person do. A name
+// Chirp does not know is shown as it came, so nothing is granted unseen.
+func permissionText(p string) string {
+	switch p {
+	case "screen_view":
+		return "See your screen"
+	case "remote_control":
+		return "Use your mouse and keyboard"
+	case "clipboard":
+		return "Share your clipboard"
+	case "file_transfer":
+		return "Send and receive files"
+	}
+	return "Something Chirp doesn't know: " + claim(p)
+}
+
+// promptCountdown says when the prompt declines by itself.
+func promptCountdown(seconds int) string {
+	if seconds < 0 {
+		seconds = 0
+	}
+	return fmt.Sprintf("Declines by itself in %d:%02d", seconds/60, seconds%60)
+}
+
+// allowLabel is the Allow button's label while it is still locked.
+func allowLabel(locked int) string {
+	if locked > 0 {
+		return fmt.Sprintf("%s (%d)", promptAllow, locked)
+	}
+	return promptAllow
+}
+
+// decidedNote tells the owner, in the main window, what they decided.
+func decidedNote(name string, granted bool) string {
+	who := "them"
+	if c := claim(name); c != "" {
+		who = "“" + c + "”"
+	}
+	if granted {
+		return "You let " + who + " in. Their view of your screen comes in a later version of Chirp (barahn/chirp#12). End the session when you're done."
+	}
+	return "You declined " + who + ". Nobody got in."
+}
+
+// answerProblem is shown when an answer did not reach the relay.
+func answerProblem(granted bool) string {
+	if granted {
+		return "Your Allow didn't reach the Chirp server, so nobody got in. The request will decline by itself."
+	}
+	return "Your Decline didn't reach the Chirp server. The request will decline by itself anyway."
 }
 
 // helpProblem says why an attempt to help someone failed, and what to do.

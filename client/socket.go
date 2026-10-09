@@ -47,6 +47,10 @@ type ConsentRequest struct {
 	Name         string
 	Permissions  []string
 	NameVerified bool
+	// ExpiresIn is how many seconds the request has left before the relay
+	// declines it for the owner. The request itself does not carry it, so
+	// Owner asks the relay; zero means it could not.
+	ExpiresIn int
 }
 
 // Socket is one end's WebSocket to the relay. Next is for one reader at a

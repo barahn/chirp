@@ -8,10 +8,10 @@ below. [product-model.md](product-model.md) is the authority on what Chirp
 does; where this page disagrees with it, this page is wrong.
 
 **Status: proposal, partly built.** The open decisions are listed at the end.
-`cmd/chirp` has the main window and the helper's flow (barahn/chirp#10), in
-the Warm look (§ Visual direction); the consent prompt, the session bar, the
-tray and the sound are not built yet. Mockups of the possible looks are linked from
-§ Visual direction.
+`cmd/chirp` has the main window, the helper's flow (barahn/chirp#10) and the
+consent prompt (barahn/chirp#11), in the Warm look (§ Visual direction); the
+session bar, the tray and the sound are not built yet. Mockups of the
+possible looks are linked from § Visual direction.
 
 ## The name is the metaphor
 
@@ -133,23 +133,42 @@ enough not to need dismissing.
 
 The prompt Chirp draws on the owner's machine when someone redeems its code.
 It is the most important screen in the product (barahn/chirp#11), and it is
-written to make an unexpected request easy to decline.
+written to make an unexpected request easy to decline. It is built in
+`cmd/chirp/internal/ui/consent.go`, with a test for each point below.
 
 - **Decline has the focus.** *Allow* becomes clickable only after three
   seconds, so neither a reflexive Enter nor a click aimed at something else
   lets anyone in.
 - **The name is a claim.** It is shown in quotes, followed by "Chirp can't
-  check names", because `name_verified` is always false.
+  check names", because `name_verified` is always false. The controller
+  chose it, so it is cleaned before it is shown: no line breaks or other
+  control characters, no right-to-left overrides or other formatting
+  characters, no double quotes that could close its own quotation, and at
+  most 40 characters. A name like `Ana\nVerified by your bank` cannot pass
+  for a line of the prompt.
 - **The permissions are listed** in words, from `session.DefaultPermissions`.
+  A permission Chirp does not know is shown as it came, so nothing is asked
+  for unseen.
   Granting only some of them is not possible today: remotekit's
   `bark.ConsentResponsePayload` carries a single `Granted`. Per-permission
   consent is open decision 4 (barahn/chirp#52).
 - **A fixed warning** against the usual scam script.
 - **A countdown** to the session's deadline, after which the prompt declines
-  by itself. The consent request carries only a timestamp; the deadline is
-  `expires_at` from `GET /api/sessions/{id}`, or a field to add to
-  `chirp.consent_request`.
-- **It stays on top** of other windows, and carries no bird and no brand word.
+  by itself. The consent request carries only a timestamp, so the owner asks
+  `GET /api/sessions/{id}` for the time left as the request arrives.
+- **Closing the prompt declines.** Nothing answers on its own: an answer is
+  the user pressing a button, or the prompt closing or running out of time,
+  which both decline.
+- **It asks for attention and carries no bird and no brand word.** It opens
+  as its own window and asks for focus. Keeping it above every other window
+  needs the same per-OS shim as the session bar (§ During a session).
+- **After the answer** the main window says what was decided. A session that
+  was let in can be ended there; since the relay ends a session only when its
+  owner gives the registration up, ending one also replaces the code and link.
+- **The prompt answers the relay; it does not stream anything.** Making the
+  screen and input obey the answer is the session runner's job, with the
+  screen itself (barahn/chirp#12, barahn/remotekit#83). Until then a session
+  that is let in shows nothing.
 
 | | English | Português (Brasil) |
 | --- | --- | --- |

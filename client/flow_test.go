@@ -154,20 +154,55 @@ func TestHelpFollowsTheOwnersDecision(t *testing.T) {
 	} {
 		r := newRelay(t)
 		c := newClient(t, r)
-		_, events, _, _ := runOwner(t, c)
+		o, events, _, _ := runOwner(t, c)
 		shown := await(t, events, "a code", ready).Peer
 
 		helped := make(chan HelperEvent, 64)
 		ctx, cancel := context.WithCancel(context.Background())
 		go c.Help(ctx, shown.Link, "Ana", func(ev HelperEvent) { helped <- ev })
 
-		asking := await(t, helped, "asking", func(ev HelperEvent) bool { return ev.Phase == HelperAsking })
-		if asking.Session.ExpiresIn <= 0 {
-			t.Errorf("asking without a deadline: %+v", asking.Session)
+		asked := await(t, events, "the request", func(ev OwnerEvent) bool { return ev.Consent != nil }).Consent
+		if asked.ExpiresIn <= 0 {
+			t.Errorf("the request arrived without its deadline: %+v", asked)
 		}
-		consent(t, r, shown.ID, asking.Session.ID, tc.granted)
+		await(t, helped, "asking", func(ev HelperEvent) bool { return ev.Phase == HelperAsking })
+		s, err := o.Answer(context.Background(), asked.SessionID, tc.granted)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if want := map[bool]string{true: StateConsentGranted, false: StateConsentDenied}[tc.granted]; s.State != want {
+			t.Errorf("after answering %v the session is %q, want %q", tc.granted, s.State, want)
+		}
 		await(t, helped, "the decision", func(ev HelperEvent) bool { return ev.Phase == tc.want })
+		// A decision is final: the relay refuses a second one.
+		if _, err := o.Answer(context.Background(), asked.SessionID, !tc.granted); err == nil {
+			t.Error("a second answer was accepted")
+		}
 		cancel()
+	}
+}
+
+func TestAnswerNeedsARegistration(t *testing.T) {
+	r := newRelay(t)
+	c := newClient(t, r)
+	o := NewOwner(c, "", func(OwnerEvent) {})
+	if _, err := o.Answer(context.Background(), "s", true); !errors.Is(err, ErrNotRegistered) {
+		t.Errorf("Answer before Run = %v, want ErrNotRegistered", err)
+	}
+}
+
+func TestAnAnswerToAnotherSessionIsRefused(t *testing.T) {
+	r := newRelay(t)
+	c := newClient(t, r)
+	o, events, _, _ := runOwner(t, c)
+	shown := await(t, events, "a code", ready).Peer
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go c.Help(ctx, shown.Code, "Ana", func(HelperEvent) {})
+	await(t, events, "the request", func(ev OwnerEvent) bool { return ev.Consent != nil })
+	if _, err := o.Answer(context.Background(), "not-this-session", true); !errors.Is(err, ErrBusy) {
+		t.Errorf("answering another session = %v, want ErrBusy (409)", err)
 	}
 }
 

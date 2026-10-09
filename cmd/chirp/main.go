@@ -5,8 +5,9 @@
 // (docs/product-model.md). It shows this machine's code and link, and lets its
 // user help someone else by typing theirs.
 //
-// For now it goes as far as the consent request. Answering it is
-// barahn/chirp#11, and the screen is barahn/chirp#12.
+// It asks for consent in its own prompt and sends the answer (barahn/chirp#11).
+// The screen itself is barahn/chirp#12: until then, a session that is let in
+// shows nothing.
 //
 // Usage:
 //
@@ -58,6 +59,18 @@ func main() {
 		_ = owner.Run(ctx)
 	}()
 	w.OnNewCode = owner.NewCode
+	// Consent is given here and nowhere else: the user's own answer, from
+	// Chirp's own prompt, sent as this machine (barahn/chirp#11).
+	w.OnConsent = func(sessionID string, granted bool) {
+		go func() {
+			if _, err := owner.Answer(ctx, sessionID, granted); err != nil {
+				fyne.Do(func() { w.AnswerFailed(granted) })
+			}
+		}()
+	}
+	// The relay ends a session only when its owner gives the registration
+	// up, so ending one replaces the code and link too.
+	w.OnEndSession = owner.NewCode
 
 	// One attempt to help someone at a time. The callbacks run on Fyne's
 	// goroutine, so cancelHelp needs no lock.

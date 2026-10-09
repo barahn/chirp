@@ -83,12 +83,15 @@ func TestOwnerStatesShowWhatTheCodeIsWorth(t *testing.T) {
 	}
 }
 
-func TestAConsentRequestShowsTheNameAsAClaim(t *testing.T) {
+func TestAConsentRequestOpensThePrompt(t *testing.T) {
 	w := newWindow(t)
 	w.ApplyOwner(client.OwnerEvent{Phase: client.OwnerReady, Peer: shown})
-	w.ApplyOwner(client.OwnerEvent{Phase: client.OwnerReady, Peer: shown, Consent: &client.ConsentRequest{Name: "João da TI"}})
-	if !w.request.Visible() || !strings.Contains(w.request.Text, "says they're “João da TI”") {
-		t.Errorf("request note = %q, visible %v", w.request.Text, w.request.Visible())
+	w.ApplyOwner(client.OwnerEvent{Phase: client.OwnerReady, Peer: shown, Consent: &client.ConsentRequest{Name: "João da TI", SessionID: "s1", ExpiresIn: 100}})
+	if w.prompt == nil || w.prompt.req.SessionID != "s1" {
+		t.Fatal("no prompt for the request")
+	}
+	if w.request.Visible() {
+		t.Error("the main window says something before the user has answered")
 	}
 }
 
