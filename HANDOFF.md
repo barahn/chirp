@@ -155,7 +155,6 @@ github.com/barahn/chirp/cmd/chirp
 github.com/barahn/chirp/cmd/chirp/internal/ui
 github.com/barahn/chirp/cmd/chirp/internal/warm
 github.com/barahn/chirp/cmd/chirp-relay
-github.com/barahn/chirp/nest
 github.com/barahn/chirp/session
 github.com/barahn/chirp/signalling
 ```
@@ -168,7 +167,6 @@ ok  	github.com/barahn/chirp/client
 ok  	github.com/barahn/chirp/cmd/chirp/internal/ui
 ok  	github.com/barahn/chirp/cmd/chirp/internal/warm
 ?   	github.com/barahn/chirp/cmd/chirp-relay	[no test files]
-ok  	github.com/barahn/chirp/nest
 ok  	github.com/barahn/chirp/session
 ok  	github.com/barahn/chirp/signalling
 ```
