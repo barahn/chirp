@@ -47,6 +47,10 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: '1.26'
+          # Without this, '1.26' is whichever 1.26 patch the runner image has
+          # cached, which can lag a security release by days. govulncheck
+          # below then fails on standard-library fixes that are already out.
+          check-latest: true
 
       # CONTRIBUTING.md requires a DCO Signed-off-by trailer on every commit.
       # Merge commits are exempt: they carry no contribution of their own.
