@@ -105,13 +105,18 @@ find_license_file() {
 # window (Fyne) has no files at all without cgo, so listing it without cgo
 # misses its dependencies and fails. go list compiles nothing, so this needs
 # no C toolchain for the other platforms.
+#
+# The sort is byte order (LC_ALL=C) so the file comes out the same on every
+# machine: a locale that folds case puts github.com/BurntSushi/toml after
+# github.com/anthonynsimon/bild, CI's puts it before, and the check above
+# would then fail on whichever machine did not generate the file.
 modules_file="$(mktemp)"
 trap 'rm -f "$modules_file"' EXIT
 for goos in "${PLATFORMS[@]}"; do
 	GOOS="$goos" CGO_ENABLED=1 go list -deps -f \
 		'{{if and .Module (not .Standard)}}{{.Module.Path}}|{{.Module.Version}}|{{.Module.Dir}}{{end}}' \
 		./... 2>/dev/null
-done | grep -v '^github.com/barahn/chirp|' | sort -u | grep -v '^$' >"$modules_file"
+done | grep -v '^github.com/barahn/chirp|' | LC_ALL=C sort -u | grep -v '^$' >"$modules_file"
 
 [ -s "$modules_file" ] || die "no modules resolved; is the module cache populated?"
 
