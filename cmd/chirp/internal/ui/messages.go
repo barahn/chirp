@@ -73,7 +73,7 @@ const (
 	promptUnnamed = "They didn't give a name."
 	promptNoCheck = "Chirp can't check names."
 	promptAsking  = "They're asking to:"
-	promptWarning = "Allow only if you asked this person for help just now. Banks, government agencies and Microsoft never ask for this."
+	promptWarning = "Allow only if you asked this person for help just now. Banks, government agencies and big tech companies never ask for this."
 	promptDecline = "Decline"
 	promptAllow   = "Allow"
 )
