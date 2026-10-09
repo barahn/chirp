@@ -339,7 +339,7 @@ SOFTWARE.
 
 ### github.com/barahn/remotekit
 
-- Version: `v0.3.0`
+- Version: `v0.4.0`
 - License: Apache-2.0
 - Homepage: https://github.com/barahn/remotekit
 
@@ -1474,7 +1474,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### golang.org/x/net
 
-- Version: `v0.56.0`
+- Version: `v0.60.0`
 - License: BSD-3-Clause
 - Homepage: https://golang.org/x/net
 
