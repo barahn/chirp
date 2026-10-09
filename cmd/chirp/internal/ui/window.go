@@ -4,13 +4,16 @@
 // Package ui is Chirp's one window (docs/ux.md, The main window): this
 // machine's code and link above, the place to help someone below.
 //
-// It draws in Fyne's default theme until a visual direction is chosen
-// (barahn/chirp#53). It holds no protocol: cmd/chirp feeds it the events of
-// package client and hands its buttons back.
+// It draws in whatever theme the app has; cmd/chirp gives it the Warm one
+// (package warm, barahn/chirp#53), and the bird and the wordmark come from
+// there too. It holds no protocol: cmd/chirp feeds it the events of package
+// client and hands its buttons back.
 package ui
 
 import (
+	"context"
 	"image/color"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -20,6 +23,7 @@ import (
 	"fyne.io/fyne/v2/widget"
 
 	"github.com/barahn/chirp/client"
+	"github.com/barahn/chirp/cmd/chirp/internal/warm"
 )
 
 // Window is the main window. Its methods are called on Fyne's goroutine:
@@ -36,9 +40,17 @@ type Window struct {
 	// OnCancel is called when the person stops waiting, or ends a session.
 	OnCancel func()
 
+	// The header: the bird, whose pose says how this machine stands, and
+	// the wordmark.
+	bird      *canvas.Image
+	pose      warm.Pose
+	mark      *canvas.Text
+	animating bool
+
 	// This machine's code.
 	status   *widget.Label
 	code     *canvas.Text
+	codeDim  bool
 	copyCode *widget.Button
 	note     *widget.Label
 	hint     *widget.Label
@@ -48,21 +60,23 @@ type Window struct {
 	peer     client.Peer
 
 	// Helping someone: the form, waiting, and how it ended.
-	form      *fyne.Container
-	name      *widget.Entry
-	target    *widget.Entry
-	connect   *widget.Button
-	problem   *widget.Label
-	waiting   *fyne.Container
-	remaining *widget.Label
-	progress  *widget.ProgressBar
-	cancel    *widget.Button
-	firstWait int
-	done      *fyne.Container
-	doneTitle *widget.Label
-	doneText  *widget.Label
-	again     *widget.Button
-	allowed   bool
+	form        *fyne.Container
+	name        *widget.Entry
+	target      *widget.Entry
+	connect     *widget.Button
+	problem     *widget.Label
+	waiting     *fyne.Container
+	waitHeading *canvas.Text
+	remaining   *widget.Label
+	progress    *widget.ProgressBar
+	cancel      *widget.Button
+	firstWait   int
+	done        *fyne.Container
+	doneBird    *canvas.Image
+	doneTitle   *canvas.Text
+	doneText    *widget.Label
+	again       *widget.Button
+	allowed     bool
 }
 
 // New builds the window, not yet shown.
@@ -72,20 +86,59 @@ func New(a fyne.App) *Window {
 	card := w.ownerCard()
 	help := w.helpArea()
 	w.win.SetContent(container.NewPadded(container.NewVBox(header, card, w.request, widget.NewSeparator(), help)))
-	w.win.Resize(fyne.NewSize(460, 620))
+	w.win.Resize(fyne.NewSize(460, 660))
 	w.ApplyOwner(client.OwnerEvent{Phase: client.OwnerStarting})
+	// Text drawn by hand keeps the colour it was given, so it is given the
+	// theme's again when the system switches between light and dark.
+	a.Settings().AddListener(func(fyne.Settings) { fyne.Do(w.recolor) })
 	return w
 }
 
 // Window returns the Fyne window, to show and run.
 func (w *Window) Window() fyne.Window { return w.win }
 
+// Animate lets the bird move until ctx ends: it blinks now and then while
+// perched, and a hop for a replaced code settles back on the perch. Without
+// it the bird holds each pose, which is what the tests see.
+func (w *Window) Animate(ctx context.Context) {
+	w.animating = true
+	go func() {
+		t := time.NewTicker(5 * time.Second)
+		defer t.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+				fyne.Do(w.blink)
+			}
+		}
+	}()
+}
+
+func (w *Window) blink() {
+	if w.pose != warm.Perched {
+		return
+	}
+	w.bird.Resource = warm.Bird(warm.Blink)
+	w.bird.Refresh()
+	time.AfterFunc(150*time.Millisecond, func() {
+		fyne.Do(func() {
+			if w.pose == warm.Perched {
+				w.bird.Resource = warm.Bird(warm.Perched)
+				w.bird.Refresh()
+			}
+		})
+	})
+}
+
 func (w *Window) header() fyne.CanvasObject {
-	mark := canvas.NewText("Chirp", theme.Color(theme.ColorNameForeground))
-	mark.TextSize = 26
-	mark.TextStyle = fyne.TextStyle{Bold: true}
+	w.bird = birdImage(warm.Landing, 56)
+	w.mark = canvas.NewText("Chirp", theme.Color(theme.ColorNameForeground))
+	w.mark.TextSize = 30
+	w.mark.FontSource = warm.Display
 	w.status = widget.NewLabel("")
-	return container.NewHBox(mark, layout.NewSpacer(), w.status)
+	return container.NewHBox(w.bird, container.NewCenter(w.mark), layout.NewSpacer(), container.NewCenter(w.status))
 }
 
 func (w *Window) ownerCard() fyne.CanvasObject {
@@ -133,12 +186,14 @@ func (w *Window) helpArea() fyne.CanvasObject {
 		hint,
 	)
 
+	w.waitHeading = heading(waitTitle)
 	w.remaining = widget.NewLabel("")
 	w.progress = widget.NewProgressBar()
 	w.progress.TextFormatter = func() string { return "" }
 	w.cancel = widget.NewButton("Cancel", w.stopHelping)
 	w.waiting = container.NewVBox(
-		widget.NewLabelWithStyle(waitTitle, fyne.TextAlignCenter, fyne.TextStyle{Bold: true}),
+		container.NewCenter(birdImage(warm.Chirping, 96)),
+		container.NewCenter(w.waitHeading),
 		wrapped(waitText),
 		w.progress,
 		w.remaining,
@@ -146,10 +201,16 @@ func (w *Window) helpArea() fyne.CanvasObject {
 	)
 	w.waiting.Hide()
 
-	w.doneTitle = widget.NewLabelWithStyle("", fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
+	w.doneBird = birdImage(warm.Perched, 96)
+	w.doneTitle = heading("")
 	w.doneText = wrapped("")
 	w.again = widget.NewButton("", w.stopHelping)
-	w.done = container.NewVBox(w.doneTitle, w.doneText, container.NewCenter(w.again))
+	w.done = container.NewVBox(
+		container.NewCenter(w.doneBird),
+		container.NewCenter(w.doneTitle),
+		w.doneText,
+		container.NewCenter(w.again),
+	)
 	w.done.Hide()
 
 	return container.NewStack(w.form, w.waiting, w.done)
@@ -180,11 +241,8 @@ func (w *Window) ApplyOwner(ev client.OwnerEvent) {
 	if usable {
 		w.code.Text = w.peer.Formatted
 	}
-	w.code.Color = theme.Color(theme.ColorNameForeground)
-	if ev.Phase != client.OwnerReady {
-		w.code.Color = dim()
-	}
-	w.code.Refresh()
+	w.codeDim = ev.Phase != client.OwnerReady
+	w.recolor()
 	setEnabled(usable, w.copyCode, w.copyLink, w.newCode)
 
 	if ev.Consent != nil {
@@ -192,6 +250,7 @@ func (w *Window) ApplyOwner(ev client.OwnerEvent) {
 		w.request.Show()
 		return
 	}
+	w.setPose(ownerPose(ev))
 	w.hint.SetText(hintCode)
 	w.copyLink.SetText("Copy link")
 	if note := ownerNote(ev); note != "" {
@@ -199,6 +258,37 @@ func (w *Window) ApplyOwner(ev client.OwnerEvent) {
 		w.note.Show()
 	} else {
 		w.note.Hide()
+	}
+}
+
+// ownerPose is the bird for the owner's phase (docs/ux.md, The bird's
+// states).
+func ownerPose(ev client.OwnerEvent) warm.Pose {
+	switch {
+	case ev.Phase == client.OwnerStarting:
+		return warm.Landing
+	case ev.Phase == client.OwnerReconnecting:
+		return warm.Looking
+	case ev.Phase == client.OwnerOffline:
+		return warm.Asleep
+	case ev.Replaced:
+		return warm.Hop
+	}
+	return warm.Perched
+}
+
+func (w *Window) setPose(p warm.Pose) {
+	w.pose = p
+	w.bird.Resource = warm.Bird(p)
+	w.bird.Refresh()
+	if p == warm.Hop && w.animating {
+		time.AfterFunc(1200*time.Millisecond, func() {
+			fyne.Do(func() {
+				if w.pose == warm.Hop {
+					w.setPose(warm.Perched)
+				}
+			})
+		})
 	}
 }
 
@@ -221,10 +311,16 @@ func (w *Window) ApplyHelper(ev client.HelperEvent) {
 		w.show(w.form)
 	default:
 		title, text, button := outcome(ev.Phase)
-		w.doneTitle.SetText(title)
+		w.doneTitle.Text = title
+		w.doneTitle.Refresh()
 		w.doneText.SetText(text)
 		w.again.SetText(button)
 		w.allowed = ev.Phase == client.HelperAllowed
+		w.doneBird.Resource = warm.Bird(warm.Perched)
+		if w.allowed {
+			w.doneBird.Resource = warm.Bird(warm.Flying)
+		}
+		w.doneBird.Refresh()
 		w.show(w.done)
 	}
 }
@@ -237,6 +333,7 @@ func (w *Window) ShowNoServer(addr string) {
 		title = badServerTitle
 	}
 	w.win.SetContent(container.NewPadded(container.NewVBox(
+		container.NewCenter(birdImage(warm.Asleep, 96)),
 		widget.NewLabelWithStyle(title, fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
 		wrapped(noServerText),
 	)))
@@ -298,10 +395,41 @@ func (w *Window) copyTheLink() {
 	w.relayout()
 }
 
+// recolor gives the hand-drawn text the theme's colours.
+func (w *Window) recolor() {
+	fg := theme.Color(theme.ColorNameForeground)
+	for _, t := range []*canvas.Text{w.mark, w.waitHeading, w.doneTitle} {
+		t.Color = fg
+		t.Refresh()
+	}
+	w.code.Color = fg
+	if w.codeDim {
+		w.code.Color = dim()
+	}
+	w.code.Refresh()
+}
+
 // relayout lays the whole window out again. A label that changes its text,
 // or appears, changes its size, and the containers around it do not notice
 // on their own.
 func (w *Window) relayout() { w.win.Content().Refresh() }
+
+func birdImage(p warm.Pose, size float32) *canvas.Image {
+	img := canvas.NewImageFromResource(warm.Bird(p))
+	img.FillMode = canvas.ImageFillContain
+	img.SetMinSize(fyne.NewSize(size, size))
+	return img
+}
+
+// heading is a title in the display face, which only hand-drawn text can
+// carry (warm.Display).
+func heading(text string) *canvas.Text {
+	t := canvas.NewText(text, theme.Color(theme.ColorNameForeground))
+	t.TextSize = 20
+	t.FontSource = warm.Display
+	t.Alignment = fyne.TextAlignCenter
+	return t
+}
 
 func wrapped(text string) *widget.Label {
 	l := widget.NewLabel(text)

@@ -57,15 +57,22 @@ ALLOWED=(
 	# not just assert that the license is acceptable.
 	"fyne.io/fyne/v2:theme/font/NotoSans-*.ttf|OFL-1.1|Obligations: the copyright notice and the license go with every copy (reproduced in THIRD_PARTY_NOTICES.md); the font is not sold by itself; a modified font stays under the OFL and gives up its Reserved Font Names."
 	"fyne.io/fyne/v2:theme/font/InterSymbols-Regular.ttf|OFL-1.1|Obligations: as for Noto Sans."
+	"github.com/barahn/chirp:cmd/chirp/internal/warm/fonts/NunitoSans-*.ttf|OFL-1.1|Chirp's Warm look (#53). Obligations: as for Noto Sans; the files sit in this repository, so fonts/README.md there also says they are not Fabrintek's."
+	"github.com/barahn/chirp:cmd/chirp/internal/warm/fonts/Fredoka-*.ttf|OFL-1.1|Chirp's Warm look (#53). Obligations: as for Nunito Sans."
+	"github.com/barahn/chirp:cmd/chirp/internal/warm/fonts/JetBrainsMono-*.ttf|OFL-1.1|Chirp's Warm look (#53). Obligations: as for Nunito Sans."
 	"fyne.io/fyne/v2:theme/font/DejaVuSansMono-Powerline.ttf|Bitstream-Vera|Obligations: the copyright, trademark and permission notices go with every copy (reproduced in THIRD_PARTY_NOTICES.md); the font is not sold by itself; a modified font may not be named Bitstream, Vera or Arev."
 )
 
-# Fonts dependencies embed, as
+# Fonts embedded in the binary -- by a dependency, or by Chirp itself from
+# files kept in this repository -- as
 # <module path>|<file glob within the module>|<name>|<license file within the module>.
 # Every embedded font must match one; one that matches none is a review item,
 # so a font a dependency adds later cannot ship unseen. An entry that matches
 # nothing is reported as stale.
 EMBEDDED_FONTS=(
+	"github.com/barahn/chirp|cmd/chirp/internal/warm/fonts/NunitoSans-*.ttf|Nunito Sans|cmd/chirp/internal/warm/fonts/OFL-NunitoSans.txt"
+	"github.com/barahn/chirp|cmd/chirp/internal/warm/fonts/Fredoka-*.ttf|Fredoka|cmd/chirp/internal/warm/fonts/OFL-Fredoka.txt"
+	"github.com/barahn/chirp|cmd/chirp/internal/warm/fonts/JetBrainsMono-*.ttf|JetBrains Mono|cmd/chirp/internal/warm/fonts/OFL-JetBrainsMono.txt"
 	"fyne.io/fyne/v2|theme/font/NotoSans-*.ttf|Noto Sans|theme/font/LICENSE.txt"
 	"fyne.io/fyne/v2|theme/font/InterSymbols-Regular.ttf|Inter Symbols|theme/font/LICENSE_Inter.txt"
 	"fyne.io/fyne/v2|theme/font/DejaVuSansMono-Powerline.ttf|DejaVu Sans Mono|theme/font/LICENSE_DejaVu-Powerline.txt"
@@ -157,14 +164,16 @@ done | grep -v '^github.com/barahn/chirp|' | LC_ALL=C sort -u | grep -v '^$' >"$
 
 [ -s "$modules_file" ] || die "no modules resolved; is the module cache populated?"
 
-# And every file a dependency embeds, as <module path>|<module dir>|<file>.
+# And every file embedded in the binary, as <module path>|<module dir>|<file>.
+# Chirp's own packages are included: a font kept in this repository is still
+# someone else's, under its own licence.
 embeds_file="$(mktemp)"
 trap 'rm -f "$modules_file" "$embeds_file"' EXIT
 for goos in "${PLATFORMS[@]}"; do
 	GOOS="$goos" CGO_ENABLED=1 go list -deps -f \
 		'{{if and .Module (not .Standard)}}{{range .EmbedFiles}}{{$.Module.Path}}|{{$.Module.Dir}}|{{$.Dir}}/{{.}}{{"\n"}}{{end}}{{end}}' \
 		./... 2>/dev/null
-done | grep -v '^github.com/barahn/chirp|' | LC_ALL=C sort -u | grep -v '^$' >"$embeds_file"
+done | LC_ALL=C sort -u | grep -v '^$' >"$embeds_file"
 
 review=()
 body="$(mktemp)"
@@ -210,8 +219,10 @@ done <"$modules_file"
 fonts_body="$(mktemp)"
 trap 'rm -f "$modules_file" "$embeds_file" "$body" "$fonts_body"' EXIT
 declare -A font_files=()
+declare -A module_dir=()
 while IFS='|' read -r mpath mdir file; do
 	[ -n "$mpath" ] || continue
+	module_dir["$mpath"]="$mdir"
 	rel="${file#"$mdir"/}"
 	case "${rel,,}" in
 	*.ttf | *.otf | *.ttc | *.woff | *.woff2) ;;
@@ -238,7 +249,7 @@ for entry in "${EMBEDDED_FONTS[@]}"; do
 		review+=("EMBEDDED_FONTS entry $fmod:$fglob matched no embedded file; remove or fix it")
 		continue
 	fi
-	mdir="$(awk -F'|' -v m="$fmod" '$1 == m { print $3; exit }' "$modules_file")"
+	mdir="${module_dir[$fmod]}"
 	[ -f "$mdir/$flicense" ] || die "$fname: license file $flicense not found in $fmod"
 	spdx="$(spdx_of "$mdir/$flicense")"
 	is_permissive "$spdx" || is_allowed "$fmod:$fglob" "$spdx" || review+=("$fname ($fmod:$fglob, embedded font) -> $spdx")
@@ -250,7 +261,11 @@ for entry in "${EMBEDDED_FONTS[@]}"; do
 	{
 		echo "### $fname"
 		echo
-		echo "- Embedded by: \`$fmod\` \`${module_version[$fmod]:-}\`"
+		if [ -n "${module_version[$fmod]:-}" ]; then
+			echo "- Embedded by: \`$fmod\` \`${module_version[$fmod]}\`"
+		else
+			echo "- Kept in this repository: \`${fglob%/*}/\` (see the README there)"
+		fi
 		echo "- Files: ${listed% }"
 		echo "- License: $spdx"
 		echo
@@ -307,9 +322,10 @@ cgo for its window: it also compiles GLFW's C sources, which come inside
 there), and it uses the operating system's own graphics and windowing
 libraries, which are part of the system, not of Chirp.
 
-Fyne embeds fonts in every binary built with it. They keep licenses of their
-own, listed under *Embedded fonts*; the OFL and the Bitstream Vera license
-were accepted for them in barahn/chirp#54. Fyne's icons and shaders have no
+Fyne embeds fonts in every binary built with it, and Chirp's Warm look
+embeds three more, kept in this repository. They keep licenses of their own,
+listed under *Embedded fonts*; the OFL and the Bitstream Vera license were
+accepted for them in barahn/chirp#54. Fyne's icons and shaders have no
 license of their own in the module and come under Fyne's. Chirp itself is
 AGPL-3.0-only; see LICENSING.md.
 

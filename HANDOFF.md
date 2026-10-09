@@ -98,6 +98,28 @@ cmd/chirp-relay/main.go
 cmd/chirp/internal/ui/messages.go
 cmd/chirp/internal/ui/window.go
 cmd/chirp/internal/ui/window_test.go
+cmd/chirp/internal/warm/bird.go
+cmd/chirp/internal/warm/bird/asleep.svg
+cmd/chirp/internal/warm/bird/blink.svg
+cmd/chirp/internal/warm/bird/chirping.svg
+cmd/chirp/internal/warm/bird/flying.svg
+cmd/chirp/internal/warm/bird/hop.svg
+cmd/chirp/internal/warm/bird/icon.svg
+cmd/chirp/internal/warm/bird/landing.svg
+cmd/chirp/internal/warm/bird/looking.svg
+cmd/chirp/internal/warm/bird/perched.svg
+cmd/chirp/internal/warm/fonts/Fredoka-SemiBold.ttf
+cmd/chirp/internal/warm/fonts/JetBrainsMono-Medium.ttf
+cmd/chirp/internal/warm/fonts/NunitoSans-Bold.ttf
+cmd/chirp/internal/warm/fonts/NunitoSans-Regular.ttf
+cmd/chirp/internal/warm/fonts/OFL-Fredoka.txt
+cmd/chirp/internal/warm/fonts/OFL-JetBrainsMono.txt
+cmd/chirp/internal/warm/fonts/OFL-NunitoSans.txt
+cmd/chirp/internal/warm/fonts/README.md
+cmd/chirp/internal/warm/palette.go
+cmd/chirp/internal/warm/palette_test.go
+cmd/chirp/internal/warm/theme.go
+cmd/chirp/internal/warm/theme_test.go
 cmd/chirp/main.go
 docs/branching.md
 docs/devsecops.md
@@ -129,6 +151,7 @@ signalling/relay.go
 github.com/barahn/chirp/client
 github.com/barahn/chirp/cmd/chirp
 github.com/barahn/chirp/cmd/chirp/internal/ui
+github.com/barahn/chirp/cmd/chirp/internal/warm
 github.com/barahn/chirp/cmd/chirp-relay
 github.com/barahn/chirp/session
 github.com/barahn/chirp/signalling
@@ -140,6 +163,7 @@ github.com/barahn/chirp/signalling
 ok  	github.com/barahn/chirp/client
 ?   	github.com/barahn/chirp/cmd/chirp	[no test files]
 ok  	github.com/barahn/chirp/cmd/chirp/internal/ui
+ok  	github.com/barahn/chirp/cmd/chirp/internal/warm
 ?   	github.com/barahn/chirp/cmd/chirp-relay	[no test files]
 ok  	github.com/barahn/chirp/session
 ok  	github.com/barahn/chirp/signalling
@@ -156,7 +180,10 @@ client/                 the relay side of cmd/chirp: Client (every endpoint of
                         the code, release on exit), Help (redeem a code or
                         link, follow the session), ParseTarget. No Fyne, no cgo
 cmd/chirp/              the one binary: flags and wiring (-relay, CHIRP_RELAY)
-cmd/chirp/internal/ui/  its Fyne window (docs/ux.md), Fyne's default theme
+cmd/chirp/internal/ui/  its Fyne window (docs/ux.md)
+cmd/chirp/internal/warm/ the Warm look (barahn/chirp#53): Fyne theme, tokens,
+                        fonts (third-party, OFL; see fonts/README.md), the
+                        bird's poses as SVG, the app icon
 cmd/chirp-relay/        serves signalling.Server, for a self-hosted relay
 session/consent.go      ConsentDecision, DefaultPermissions
 session/lookup.go       Contact, SetContact, Lookup, LookupLink (the blind lookup, §4.6)
@@ -716,7 +743,9 @@ may become):
   the fonts Fyne embeds: the maintainer accepted the SIL OFL 1.1 and the
   Bitstream Vera licence for them (barahn/chirp#54). They stay under their own
   licences, and the script gates every embedded font one by one, so a font a
-  dependency adds later fails the build until it is reviewed.
+  dependency adds later fails the build until it is reviewed. The Warm look's
+  own fonts (`cmd/chirp/internal/warm/fonts/`) are OFL too: the only files in
+  this repository Fabrintek does not own (LICENSING.md).
 - **Dependencies point inwards only.** remotekit depends on neither of the
   others; Chirp may depend on remotekit; the Barahn platform may depend on
   both. A change that needs the arrow reversed is a design problem, not a
@@ -772,8 +801,8 @@ Still to decide or do, in order. Each step has an issue, and the
    enforcement (barahn/chirp#20) and the UI library (barahn/chirp#24) are
    decided: `docs/product-model.md` decisions 4 and 5, §5.5 and §5.6.
 2. **`cmd/chirp`** (barahn/chirp#10 → #11 → #12, with barahn/remotekit#68).
-   #10 is in: the window reaches the consent request, in Fyne's default theme
-   (barahn/chirp#53 picks the look), and CI builds it natively on Windows and
+   #10 is in: the window reaches the consent request, in the Warm look
+   (barahn/chirp#53, `cmd/chirp/internal/warm`), and CI builds it natively on Windows and
    macOS and with the system headers on Linux (§5.6). Fyne's embedded fonts
    are OFL 1.1 and Bitstream Vera, accepted by the maintainer and now gated
    font by font (barahn/chirp#54, §6). #11 and #12 wait on barahn/remotekit#83, the

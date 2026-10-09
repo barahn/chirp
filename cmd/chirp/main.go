@@ -28,6 +28,7 @@ import (
 
 	"github.com/barahn/chirp/client"
 	"github.com/barahn/chirp/cmd/chirp/internal/ui"
+	"github.com/barahn/chirp/cmd/chirp/internal/warm"
 )
 
 func main() {
@@ -35,6 +36,8 @@ func main() {
 	flag.Parse()
 
 	a := app.New()
+	a.Settings().SetTheme(warm.New())
+	a.SetIcon(warm.AppIcon)
 	w := ui.New(a)
 
 	c, err := client.New(*relay)
@@ -45,6 +48,7 @@ func main() {
 	}
 
 	ctx, stop := context.WithCancel(context.Background())
+	w.Animate(ctx)
 	owner := client.NewOwner(c, "", func(ev client.OwnerEvent) {
 		fyne.Do(func() { w.ApplyOwner(ev) })
 	})

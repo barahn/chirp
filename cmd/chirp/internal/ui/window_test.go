@@ -11,9 +11,11 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/test"
+	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 
 	"github.com/barahn/chirp/client"
+	"github.com/barahn/chirp/cmd/chirp/internal/warm"
 )
 
 const token = "aZ0-_aZ0-_aZ0-_aZ0-_aZ0-_aZ0-_aZ0-_aZ0-_abc"
@@ -215,4 +217,55 @@ func labels(o fyne.CanvasObject) []string {
 		return out
 	}
 	return nil
+}
+
+func TestTheBirdSaysHowTheMachineStands(t *testing.T) {
+	w := newWindow(t)
+	if w.pose != warm.Landing {
+		t.Errorf("starting: bird is %s, want landing", w.pose)
+	}
+	for _, tc := range []struct {
+		ev   client.OwnerEvent
+		want warm.Pose
+	}{
+		{client.OwnerEvent{Phase: client.OwnerReady, Peer: shown}, warm.Perched},
+		{client.OwnerEvent{Phase: client.OwnerReady, Peer: shown, Replaced: true}, warm.Hop},
+		{client.OwnerEvent{Phase: client.OwnerReconnecting, Peer: shown}, warm.Looking},
+		{client.OwnerEvent{Phase: client.OwnerOffline, Lost: true}, warm.Asleep},
+	} {
+		w.ApplyOwner(tc.ev)
+		if w.pose != tc.want || w.bird.Resource != warm.Bird(tc.want) {
+			t.Errorf("%+v: bird is %s, want %s", tc.ev, w.pose, tc.want)
+		}
+	}
+	// A consent request changes what the owner is told, not the bird.
+	w.ApplyOwner(client.OwnerEvent{Phase: client.OwnerReady, Peer: shown, Consent: &client.ConsentRequest{Name: "Ana"}})
+	if w.pose != warm.Asleep {
+		t.Errorf("a consent request moved the bird to %s", w.pose)
+	}
+}
+
+func TestTheBirdFliesOffOnlyWhenLetIn(t *testing.T) {
+	w := newWindow(t)
+	w.ApplyHelper(client.HelperEvent{Phase: client.HelperAllowed})
+	if w.doneBird.Resource != warm.Bird(warm.Flying) {
+		t.Error("allowed, but the bird is not flying")
+	}
+	w.ApplyHelper(client.HelperEvent{Phase: client.HelperDeclined})
+	if w.doneBird.Resource != warm.Bird(warm.Perched) {
+		t.Error("declined, but the bird is not perched")
+	}
+}
+
+func TestHandDrawnTextFollowsTheTheme(t *testing.T) {
+	a := test.NewTempApp(t)
+	w := New(a)
+	w.ApplyOwner(client.OwnerEvent{Phase: client.OwnerReady, Peer: shown})
+	before := w.mark.Color
+
+	a.Settings().SetTheme(warm.New())
+	want := warm.New().Color(theme.ColorNameForeground, a.Settings().ThemeVariant())
+	if w.mark.Color == before || w.mark.Color != want || w.code.Color != want || w.doneTitle.Color != want {
+		t.Errorf("after switching to Warm the wordmark is %v, the code %v; want %v", w.mark.Color, w.code.Color, want)
+	}
 }

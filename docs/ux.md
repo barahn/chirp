@@ -9,9 +9,8 @@ does; where this page disagrees with it, this page is wrong.
 
 **Status: proposal, partly built.** The open decisions are listed at the end.
 `cmd/chirp` has the main window and the helper's flow (barahn/chirp#10), in
-Fyne's default theme until the chosen Warm look is built (§ Visual
-direction); the consent prompt, the session bar, the tray and the sound are
-not built yet. Mockups of the possible looks are linked from
+the Warm look (§ Visual direction); the consent prompt, the session bar, the
+tray and the sound are not built yet. Mockups of the possible looks are linked from
 § Visual direction.
 
 ## The name is the metaphor
@@ -264,7 +263,11 @@ Avoid *Nest* (a Google brand, and the name of the abandoned web page) and
 ## Visual direction
 
 **The direction is A · Warm**, for the product and for all of its marketing:
-the site, the store listings and the help centre (barahn/chirp#53). The
+the site, the store listings and the help centre (barahn/chirp#53). In
+`cmd/chirp` it is package `cmd/chirp/internal/warm`: a Fyne theme with the
+tokens below in both variants, the three fonts, and the bird's poses as SVG.
+Its contrast is measured in a test, and every text pair in both variants is
+above 4.5:1 (the lowest is 5.38:1). The
 design canvas holds it with the two that were weighed against it: the bird in
 every state, the app and tray icons, the main screens in light and dark, and
 the colour tokens mapped to Fyne —
