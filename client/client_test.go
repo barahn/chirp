@@ -4,9 +4,7 @@
 package client
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"net"
 	"net/http"
@@ -17,7 +15,6 @@ import (
 
 	"github.com/barahn/chirp/session"
 	"github.com/barahn/chirp/signalling"
-	"github.com/barahn/remotekit/bark"
 )
 
 // relay is a real signalling server on a listener whose connections the test
@@ -74,21 +71,6 @@ func (l *cuttable) cut() {
 		_ = c.Close()
 	}
 	l.conns = nil
-}
-
-// consent answers the prompt as the owner's machine would. Drawing the prompt
-// and answering it is barahn/chirp#11; the test plays that part directly.
-func consent(t *testing.T, r *relay, peerID, sessionID string, granted bool) {
-	t.Helper()
-	body, _ := json.Marshal(bark.ConsentResponsePayload{SessionID: sessionID, Granted: granted, Timestamp: time.Now().UTC()})
-	resp, err := http.Post(r.URL+"/api/peers/"+peerID+"/consent", "application/json", bytes.NewReader(body))
-	if err != nil {
-		t.Fatal(err)
-	}
-	_ = resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("consent: status %d", resp.StatusCode)
-	}
 }
 
 // next reads one message, failing the test if none arrives in time.

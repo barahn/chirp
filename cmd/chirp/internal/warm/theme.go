@@ -137,6 +137,11 @@ func (Theme) Font(s fyne.TextStyle) fyne.Resource {
 	return textRegular
 }
 
+// ServesChirpColors says that this theme answers the chirp.* colour names.
+// Fyne's own themes do not, and asking them logs an error, so Chirp's widgets
+// ask only a theme that says so. A theme that wraps this one says so too.
+func (Theme) ServesChirpColors() bool { return true }
+
 // Icon is Fyne's.
 func (Theme) Icon(name fyne.ThemeIconName) fyne.Resource {
 	return theme.DefaultTheme().Icon(name)

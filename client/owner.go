@@ -6,6 +6,7 @@ package client
 import (
 	"context"
 	"errors"
+	"sync"
 	"time"
 )
 
@@ -52,6 +53,11 @@ type Owner struct {
 	name   string
 	emit   func(OwnerEvent)
 	renew  chan struct{}
+
+	// peerID is the registration Answer speaks for. Run sets it; Answer,
+	// called from the window, reads it.
+	mu     sync.Mutex
+	peerID string
 
 	// Poll is how often the code shown is checked against the relay's.
 	Poll time.Duration
@@ -104,9 +110,11 @@ func (o *Owner) Run(ctx context.Context) error {
 		}
 		replaced := shown.Code != "" && peer.Code != shown.Code
 		shown = peer
+		o.setPeerID(peer.ID)
 		o.emit(OwnerEvent{Phase: OwnerReady, Peer: shown, Replaced: replaced})
 
 		err = o.serve(ctx, &shown)
+		o.setPeerID("")
 		switch {
 		case errors.Is(err, errRenew):
 			o.release(shown.ID)
@@ -217,6 +225,11 @@ func (o *Owner) listen(ctx context.Context, sock *Socket, shown *Peer) error {
 			switch m.Type {
 			case TypeConsentRequest:
 				if m.Consent != nil {
+					// The prompt counts down to the session's deadline,
+					// which only the session knows.
+					if s, err := o.client.Session(ctx, m.Consent.SessionID); err == nil {
+						m.Consent.ExpiresIn = s.ExpiresIn
+					}
 					o.emit(OwnerEvent{Phase: OwnerReady, Peer: *shown, Consent: m.Consent})
 				}
 				// The session that asked spent the start code.
@@ -251,6 +264,34 @@ func (o *Owner) refresh(ctx context.Context, shown *Peer) error {
 		o.emit(OwnerEvent{Phase: OwnerReady, Peer: p, Replaced: true})
 	}
 	return nil
+}
+
+// ErrNotRegistered means Answer was called while this machine had no
+// registration to answer for: before the first, or between losing one and
+// getting the next. The request it answered is gone with it.
+var ErrNotRegistered = errors.New("client: not registered")
+
+// Answer gives this machine's user's decision on a consent request. It is
+// the one way consent is given, and only the window calls it, when its user
+// has pressed Allow or Decline in Chirp's own prompt.
+func (o *Owner) Answer(ctx context.Context, sessionID string, granted bool) (Session, error) {
+	o.mu.Lock()
+	id := o.peerID
+	o.mu.Unlock()
+	if id == "" {
+		return Session{}, ErrNotRegistered
+	}
+	reason := "declined by the owner"
+	if granted {
+		reason = "allowed by the owner"
+	}
+	return o.client.Consent(ctx, id, sessionID, granted, reason)
+}
+
+func (o *Owner) setPeerID(id string) {
+	o.mu.Lock()
+	o.peerID = id
+	o.mu.Unlock()
 }
 
 // release gives the registration up. It runs as the owner stops, when ctx may

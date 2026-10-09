@@ -16,7 +16,8 @@ import (
 )
 
 // Two separate processes, one for each side, find each other through a relay
-// and reach the consent request: barahn/chirp#10's "done when".
+// and reach the consent request (barahn/chirp#10's "done when"); the owner
+// lets the other in, and the controller sees it (barahn/chirp#11).
 //
 // The processes are this test binary run again in a role, the usual Go way of
 // testing a program's processes. They run the code cmd/chirp runs -- Owner and
@@ -40,7 +41,8 @@ func TestMain(m *testing.M) {
 }
 
 // ownerProcess prints its code, then the consent request it receives, and
-// stops -- releasing its code on the way out.
+// answers it with Allow, as its user would in the prompt. It keeps running
+// until it is stopped, so the session it allowed stays up.
 func ownerProcess() int {
 	c, err := New(os.Getenv(relayEnv))
 	if err != nil {
@@ -50,11 +52,19 @@ func ownerProcess() int {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 	printed := false
-	o := NewOwner(c, "", func(ev OwnerEvent) {
+	var o *Owner
+	o = NewOwner(c, "", func(ev OwnerEvent) {
 		switch {
 		case ev.Consent != nil:
 			fmt.Println("CONSENT", ev.Consent.Name, ev.Consent.NameVerified)
-			cancel()
+			req := ev.Consent
+			go func() {
+				if _, err := o.Answer(ctx, req.SessionID, true); err != nil {
+					fmt.Println("ERROR", err)
+					return
+				}
+				fmt.Println("ANSWERED")
+			}()
 		case ev.Phase == OwnerReady && !printed:
 			fmt.Println("CODE", ev.Peer.Formatted)
 			printed = true
@@ -64,8 +74,8 @@ func ownerProcess() int {
 	return 0
 }
 
-// controllerProcess types the code it is given and prints when the other
-// side is being asked.
+// controllerProcess types the code it is given, prints when the other side is
+// being asked, and again when it is let in.
 func controllerProcess() int {
 	c, err := New(os.Getenv(relayEnv))
 	if err != nil {
@@ -75,10 +85,16 @@ func controllerProcess() int {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 	status := 1
+	asked := false
 	c.Help(ctx, os.Getenv(codeEnv), "Ana", func(ev HelperEvent) {
 		switch ev.Phase {
 		case HelperAsking:
-			fmt.Println("ASKING")
+			if !asked {
+				fmt.Println("ASKING")
+				asked = true
+			}
+		case HelperAllowed:
+			fmt.Println("ALLOWED")
 			status = 0
 			cancel()
 		case HelperFailed:
@@ -143,7 +159,7 @@ func (p *process) expect(t *testing.T, prefix string) string {
 	}
 }
 
-func TestTwoProcessesReachTheConsentRequest(t *testing.T) {
+func TestTwoProcessesReachConsentAndTheAnswer(t *testing.T) {
 	if testing.Short() {
 		t.Skip("starts two processes")
 	}
@@ -158,4 +174,6 @@ func TestTwoProcessesReachTheConsentRequest(t *testing.T) {
 	if got := owner.expect(t, "CONSENT"); got != "Ana false" {
 		t.Errorf("the owner was asked by %q, want the name Ana, unverified", got)
 	}
+	owner.expect(t, "ANSWERED")
+	controller.expect(t, "ALLOWED")
 }

@@ -95,6 +95,8 @@ client/socket.go
 client/target.go
 client/target_test.go
 cmd/chirp-relay/main.go
+cmd/chirp/internal/ui/consent.go
+cmd/chirp/internal/ui/consent_test.go
 cmd/chirp/internal/ui/messages.go
 cmd/chirp/internal/ui/window.go
 cmd/chirp/internal/ui/window_test.go
@@ -180,7 +182,8 @@ client/                 the relay side of cmd/chirp: Client (every endpoint of
                         the code, release on exit), Help (redeem a code or
                         link, follow the session), ParseTarget. No Fyne, no cgo
 cmd/chirp/              the one binary: flags and wiring (-relay, CHIRP_RELAY)
-cmd/chirp/internal/ui/  its Fyne window (docs/ux.md)
+cmd/chirp/internal/ui/  its Fyne window (docs/ux.md) and the consent prompt
+                        (consent.go, barahn/chirp#11)
 cmd/chirp/internal/warm/ the Warm look (barahn/chirp#53): Fyne theme, tokens,
                         fonts (third-party, OFL; see fonts/README.md), the
                         bird's poses as SVG, the app icon
@@ -805,8 +808,11 @@ Still to decide or do, in order. Each step has an issue, and the
    (barahn/chirp#53, `cmd/chirp/internal/warm`), and CI builds it natively on Windows and
    macOS and with the system headers on Linux (§5.6). Fyne's embedded fonts
    are OFL 1.1 and Bitstream Vera, accepted by the maintainer and now gated
-   font by font (barahn/chirp#54, §6). #11 and #12 wait on barahn/remotekit#83, the
-   session runner moved out of `tunnel` (barahn/chirp#20, §5.5). It is the one
+   font by font (barahn/chirp#54, §6). #11 is in too: the prompt, and the
+   owner's answer sent to the relay (`Owner.Answer`). Making the screen and
+   input obey that answer is the session runner's job, so it comes with #12,
+   which waits on barahn/remotekit#83, the session runner moved out of `tunnel`
+   (barahn/chirp#20, §5.5). It is the one
    binary: it registers, shows its code and link, holds the owner socket,
    shows the consent prompt with the controller's name as a claim, redeems
    other people's codes and pasted links (`docs/product-model.md`, decision
