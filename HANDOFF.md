@@ -664,7 +664,7 @@ before deciding:
 
 | | Draws windows | Modules imported | Licences | Builds with `CGO_ENABLED=0` |
 | --- | --- | --- | --- | --- |
-| Fyne v2.8.1 | yes | 26 | all permissive (BSD, MIT, Apache-2.0, ISC) | none of Linux, Windows, macOS |
+| Fyne v2.8.1 | yes | 26 | all permissive (BSD, MIT, Apache-2.0, ISC) at module level; its embedded fonts are not (barahn/chirp#54) | none of Linux, Windows, macOS |
 | `fyne.io/systray` | no, tray only | 2 | permissive | Linux and Windows; not macOS |
 | `getlantern/systray` | no, tray only | 9 | permissive | Windows only (GTK + appindicator on Linux) |
 
@@ -712,7 +712,11 @@ may become):
   for its proprietary platform on the strength of owning all of Chirp, and it
   owns none of its dependencies. Permissive only (MIT/BSD/Apache-2.0). CI
   enforces this via `scripts/gen-third-party-notices.sh`; after any dependency
-  change, re-run it and commit `THIRD_PARTY_NOTICES.md`.
+  change, re-run it and commit `THIRD_PARTY_NOTICES.md`. The one exception is
+  the fonts Fyne embeds: the maintainer accepted the SIL OFL 1.1 and the
+  Bitstream Vera licence for them (barahn/chirp#54). They stay under their own
+  licences, and the script gates every embedded font one by one, so a font a
+  dependency adds later fails the build until it is reviewed.
 - **Dependencies point inwards only.** remotekit depends on neither of the
   others; Chirp may depend on remotekit; the Barahn platform may depend on
   both. A change that needs the arrow reversed is a design problem, not a
@@ -771,8 +775,8 @@ Still to decide or do, in order. Each step has an issue, and the
    #10 is in: the window reaches the consent request, in Fyne's default theme
    (barahn/chirp#53 picks the look), and CI builds it natively on Windows and
    macOS and with the system headers on Linux (§5.6). Fyne's embedded fonts
-   are outside the licence gate's view and need a decision before a release
-   (barahn/chirp#54). #11 and #12 wait on barahn/remotekit#83, the
+   are OFL 1.1 and Bitstream Vera, accepted by the maintainer and now gated
+   font by font (barahn/chirp#54, §6). #11 and #12 wait on barahn/remotekit#83, the
    session runner moved out of `tunnel` (barahn/chirp#20, §5.5). It is the one
    binary: it registers, shows its code and link, holds the owner socket,
    shows the consent prompt with the controller's name as a claim, redeems
