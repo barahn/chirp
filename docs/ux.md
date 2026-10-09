@@ -175,7 +175,7 @@ written to make an unexpected request easy to decline. It is built in
 | Title | Someone wants to control this computer | Alguém quer controlar este computador |
 | Name | They say they're "João da TI". Chirp can't check names. | Diz se chamar "João da TI". O Chirp não verifica nomes. |
 | Permissions | See your screen · use your mouse and keyboard · share your clipboard · send and receive files | Ver sua tela · usar seu mouse e teclado · compartilhar a área de transferência · enviar e receber arquivos |
-| Warning | Allow only if you asked this person for help just now. Banks, government agencies and Microsoft never ask for this. | Só permita se você pediu ajuda a essa pessoa agora. Bancos, órgãos do governo e a Microsoft nunca pedem isso. |
+| Warning | Allow only if you asked this person for help just now. Banks, government agencies and big tech companies never ask for this. | Só permita se você pediu ajuda a essa pessoa agora. Bancos, órgãos do governo e grandes empresas de tecnologia nunca pedem isso. |
 | Countdown | Declines by itself in 1:40 | Recusa sozinho em 1:40 |
 | Buttons | Decline · Allow (3) | Recusar · Permitir (3) |
 
