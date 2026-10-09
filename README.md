@@ -31,7 +31,7 @@ What is here today:
 - **The `cmd/chirp` binary, up to the consent request** — the one program
   both sides run. Its window shows this machine's code and link, and lets its
   user type someone else's code or paste their link; the other machine is then
-  asked for consent. The window is Fyne in its default theme
+  asked for consent. The window is Fyne in Chirp's Warm look
   ([docs/ux.md](docs/ux.md) has the plan for the rest).
 
 All of it is tested, AGPL-3.0, and follow the [product model](docs/product-model.md):

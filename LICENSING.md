@@ -8,7 +8,8 @@ nothing on this page reduces the rights it gives you.
 
 Fabrintek Engenharia Digital Ltda holds the copyright in all of Chirp and, as
 copyright holder, also licenses it under separate commercial terms — including
-for use in its own proprietary products.
+for use in its own proprietary products. The one exception is a handful of
+third-party font files, described under *Third-party code* below.
 
 ## Why this page exists
 
@@ -64,6 +65,15 @@ The dual-licensing above rests on Fabrintek owning what is in this repository.
 It is no defence against third-party code arriving here under terms Fabrintek
 cannot pass on, which is why that check exists and why it treats an
 unrecognised licence as a failure rather than a warning.
+
+One directory holds files that are not Fabrintek's:
+`cmd/chirp/internal/warm/fonts/`, the fonts of Chirp's look (Nunito Sans,
+Fredoka and JetBrains Mono). They are under the SIL Open Font License 1.1,
+which the maintainer accepted in barahn/chirp#54, and neither the AGPL nor
+Fabrintek's commercial terms cover them. They stay under the OFL whichever
+licence Chirp is used under, which the OFL allows for fonts bundled with
+software. The README in that directory says where each one came from, and the
+fonts Fyne embeds are under the same arrangement.
 
 ---
 
