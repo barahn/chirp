@@ -84,6 +84,15 @@ LICENSING.md
 README.md
 SECURITY.md
 THIRD_PARTY_NOTICES.md
+client/client.go
+client/client_test.go
+client/e2e_test.go
+client/flow_test.go
+client/helper.go
+client/owner.go
+client/socket.go
+client/target.go
+client/target_test.go
 docs/branching.md
 docs/devsecops.md
 docs/product-model.md
@@ -111,6 +120,7 @@ signalling/relay.go
 **Packages:**
 
 ```
+github.com/barahn/chirp/client
 github.com/barahn/chirp/session
 github.com/barahn/chirp/signalling
 ```
@@ -118,6 +128,7 @@ github.com/barahn/chirp/signalling
 **Test state** at this refresh:
 
 ```
+ok  	github.com/barahn/chirp/client
 ok  	github.com/barahn/chirp/session
 ok  	github.com/barahn/chirp/signalling
 ```
