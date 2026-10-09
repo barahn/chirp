@@ -97,7 +97,9 @@ assumes, is in [docs/devsecops.md](docs/devsecops.md).
 
 CI checks that every non-merge commit in a pull request carries a
 `Signed-off-by` trailer, and that the dependency licences in
-[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) are current and permissive.
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) are current and permissive,
+apart from exceptions the maintainer has accepted by name (today, the fonts
+Fyne embeds: barahn/chirp#54).
 
 Fabrintek's ownership of Chirp is no defence against third-party code arriving
 here under terms Fabrintek cannot pass on. The licence gate treats an

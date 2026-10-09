@@ -17,6 +17,11 @@
 # Apache-2.0, Zlib). Copyleft (GPL, LGPL, AGPL) and the file-level copyleft of
 # MPL-2.0 are reported as review items, not silently accepted. See LICENSING.md.
 #
+# A module's top-level license does not cover everything inside it. Fonts a
+# dependency embeds in the binary (go:embed) carry licenses of their own, so
+# every embedded font must match an EMBEDDED_FONTS entry below, and its own
+# license is classified and gated like a module's (barahn/chirp#54).
+#
 # Usage: scripts/gen-third-party-notices.sh [output-file]
 set -euo pipefail
 
@@ -39,11 +44,32 @@ VENDORED=()
 # An entry here is a legal decision, not a lint suppression. Do not add one
 # without reading what the license obliges Chirp to do.
 ALLOWED=(
-	# Empty. Chirp has no copyleft dependencies and should acquire none; see
-	# the header for why compatibility with the AGPL is not the test here.
+	# Chirp has no copyleft code dependencies and should acquire none; see the
+	# header for why compatibility with the AGPL is not the test here.
+	#
+	# The entries below are fonts Fyne embeds in every binary (#24, #54). The
+	# maintainer accepted the SIL Open Font License 1.1 and the Bitstream Vera
+	# license for them in barahn/chirp#54. Bundling them with Chirp, under the
+	# AGPL or Fabrintek's commercial terms, is what both licenses allow; they
+	# stay under their own licenses and are never relicensed with Chirp.
 	#
 	# An entry added later must name the specific obligation that was checked,
 	# not just assert that the license is acceptable.
+	"fyne.io/fyne/v2:theme/font/NotoSans-*.ttf|OFL-1.1|Obligations: the copyright notice and the license go with every copy (reproduced in THIRD_PARTY_NOTICES.md); the font is not sold by itself; a modified font stays under the OFL and gives up its Reserved Font Names."
+	"fyne.io/fyne/v2:theme/font/InterSymbols-Regular.ttf|OFL-1.1|Obligations: as for Noto Sans."
+	"fyne.io/fyne/v2:theme/font/DejaVuSansMono-Powerline.ttf|Bitstream-Vera|Obligations: the copyright, trademark and permission notices go with every copy (reproduced in THIRD_PARTY_NOTICES.md); the font is not sold by itself; a modified font may not be named Bitstream, Vera or Arev."
+)
+
+# Fonts dependencies embed, as
+# <module path>|<file glob within the module>|<name>|<license file within the module>.
+# Every embedded font must match one; one that matches none is a review item,
+# so a font a dependency adds later cannot ship unseen. An entry that matches
+# nothing is reported as stale.
+EMBEDDED_FONTS=(
+	"fyne.io/fyne/v2|theme/font/NotoSans-*.ttf|Noto Sans|theme/font/LICENSE.txt"
+	"fyne.io/fyne/v2|theme/font/InterSymbols-Regular.ttf|Inter Symbols|theme/font/LICENSE_Inter.txt"
+	"fyne.io/fyne/v2|theme/font/DejaVuSansMono-Powerline.ttf|DejaVu Sans Mono|theme/font/LICENSE_DejaVu-Powerline.txt"
+	"fyne.io/fyne/v2|theme/font/EmojiOneColor.otf|EmojiOne Color|theme/font/LICENSE_EmojiOneColor.txt"
 )
 
 die() {
@@ -59,6 +85,9 @@ spdx_of() {
 	text="$(tr -d '\r' <"$1")"
 
 	case "$text" in
+	*"SIL OPEN FONT LICENSE"*"1.1"* | *"SIL Open Font License"*"1.1"*) echo "OFL-1.1" ;;
+	# Before MIT: the Bitstream Vera grant opens with MIT's own phrase.
+	*"Bitstream Vera Fonts Copyright"*) echo "Bitstream-Vera" ;;
 	*"Apache License"*"Version 2.0"*) echo "Apache-2.0" ;;
 	*"Mozilla Public License"*"2.0"*) echo "MPL-2.0" ;;
 	*"GNU LESSER GENERAL PUBLIC LICENSE"*) echo "LGPL" ;;
@@ -92,6 +121,14 @@ is_allowed() {
 	return 1
 }
 
+# True for the licenses Chirp accepts without review.
+is_permissive() {
+	case "$1" in
+	MIT | BSD-2-Clause | BSD-3-Clause | ISC | Apache-2.0 | Zlib) return 0 ;;
+	esac
+	return 1
+}
+
 find_license_file() {
 	find "$1" -maxdepth 1 -type f \
 		\( -iname 'LICENSE' -o -iname 'LICENSE.*' -o -iname 'LICENCE' -o -iname 'COPYING' -o -iname 'COPYING.*' \) \
@@ -120,9 +157,19 @@ done | grep -v '^github.com/barahn/chirp|' | LC_ALL=C sort -u | grep -v '^$' >"$
 
 [ -s "$modules_file" ] || die "no modules resolved; is the module cache populated?"
 
+# And every file a dependency embeds, as <module path>|<module dir>|<file>.
+embeds_file="$(mktemp)"
+trap 'rm -f "$modules_file" "$embeds_file"' EXIT
+for goos in "${PLATFORMS[@]}"; do
+	GOOS="$goos" CGO_ENABLED=1 go list -deps -f \
+		'{{if and .Module (not .Standard)}}{{range .EmbedFiles}}{{$.Module.Path}}|{{$.Module.Dir}}|{{$.Dir}}/{{.}}{{"\n"}}{{end}}{{end}}' \
+		./... 2>/dev/null
+done | grep -v '^github.com/barahn/chirp|' | LC_ALL=C sort -u | grep -v '^$' >"$embeds_file"
+
 review=()
 body="$(mktemp)"
-trap 'rm -f "$modules_file" "$body"' EXIT
+trap 'rm -f "$modules_file" "$embeds_file" "$body"' EXIT
+declare -A module_version=()
 
 emit() {
 	local name="$1" version="$2" spdx="$3" url="$4" license_file="$5"
@@ -154,11 +201,69 @@ while IFS='|' read -r path version dir; do
 	esac
 
 	emit "$path" "$version" "$spdx" "https://$path" "$license_file"
+	module_version["$path"]="$version"
 	count=$((count + 1))
 done <"$modules_file"
 
+# Embedded fonts: each must match an EMBEDDED_FONTS entry, and each entry's
+# license is gated like a module's.
+fonts_body="$(mktemp)"
+trap 'rm -f "$modules_file" "$embeds_file" "$body" "$fonts_body"' EXIT
+declare -A font_files=()
+while IFS='|' read -r mpath mdir file; do
+	[ -n "$mpath" ] || continue
+	rel="${file#"$mdir"/}"
+	case "${rel,,}" in
+	*.ttf | *.otf | *.ttc | *.woff | *.woff2) ;;
+	*) continue ;;
+	esac
+	matched=""
+	for entry in "${EMBEDDED_FONTS[@]}"; do
+		IFS='|' read -r fmod fglob _ _ <<<"$entry"
+		# shellcheck disable=SC2053 # the glob is meant to match
+		if [ "$fmod" = "$mpath" ] && [[ "$rel" == $fglob ]]; then
+			font_files["$fmod|$fglob"]+="${rel##*/} "
+			matched=1
+			break
+		fi
+	done
+	[ -n "$matched" ] || review+=("$mpath: $rel (embedded font) -> no EMBEDDED_FONTS entry")
+done <"$embeds_file"
+
+font_count=0
+for entry in "${EMBEDDED_FONTS[@]}"; do
+	IFS='|' read -r fmod fglob fname flicense <<<"$entry"
+	files="${font_files["$fmod|$fglob"]:-}"
+	if [ -z "$files" ]; then
+		review+=("EMBEDDED_FONTS entry $fmod:$fglob matched no embedded file; remove or fix it")
+		continue
+	fi
+	mdir="$(awk -F'|' -v m="$fmod" '$1 == m { print $3; exit }' "$modules_file")"
+	[ -f "$mdir/$flicense" ] || die "$fname: license file $flicense not found in $fmod"
+	spdx="$(spdx_of "$mdir/$flicense")"
+	is_permissive "$spdx" || is_allowed "$fmod:$fglob" "$spdx" || review+=("$fname ($fmod:$fglob, embedded font) -> $spdx")
+	read -r -a names <<<"$files"
+	listed=""
+	for f in "${names[@]}"; do
+		listed+="\`$f\` "
+	done
+	{
+		echo "### $fname"
+		echo
+		echo "- Embedded by: \`$fmod\` \`${module_version[$fmod]:-}\`"
+		echo "- Files: ${listed% }"
+		echo "- License: $spdx"
+		echo
+		echo '```'
+		tr -d '\r' <"$mdir/$flicense"
+		echo '```'
+		echo
+	} >>"$fonts_body"
+	font_count=$((font_count + 1))
+done
+
 vendored_body="$(mktemp)"
-trap 'rm -f "$modules_file" "$body" "$vendored_body"' EXIT
+trap 'rm -f "$modules_file" "$embeds_file" "$body" "$fonts_body" "$vendored_body"' EXIT
 vendored_count=0
 for entry in "${VENDORED[@]}"; do
 	IFS='|' read -r vpath vname vurl vlicense <<<"$entry"
@@ -202,19 +307,27 @@ cgo for its window: it also compiles GLFW's C sources, which come inside
 there), and it uses the operating system's own graphics and windowing
 libraries, which are part of the system, not of Chirp.
 
-Fyne embeds fonts and icons in every binary built with it, under licenses of
-their own that are not listed here yet (barahn/chirp#54). Chirp itself is
+Fyne embeds fonts in every binary built with it. They keep licenses of their
+own, listed under *Embedded fonts*; the OFL and the Bitstream Vera license
+were accepted for them in barahn/chirp#54. Fyne's icons and shaders have no
+license of their own in the module and come under Fyne's. Chirp itself is
 AGPL-3.0-only; see LICENSING.md.
 
 ## Contents
 
 - $count Go modules
+- $font_count embedded font(s)
 - $vendored_count vendored source tree(s)
 
 ## Go modules
 
 EOF
 	cat "$body"
+	if [ "$font_count" -gt 0 ]; then
+		echo "## Embedded fonts"
+		echo
+		cat "$fonts_body"
+	fi
 	if [ "$vendored_count" -gt 0 ]; then
 		echo "## Vendored source"
 		echo
@@ -222,7 +335,7 @@ EOF
 	fi
 } >"$OUT"
 
-echo "wrote $OUT ($count modules, $vendored_count vendored)"
+echo "wrote $OUT ($count modules, $font_count embedded fonts, $vendored_count vendored)"
 
 status=0
 
@@ -232,9 +345,10 @@ if [ "${#review[@]}" -gt 0 ]; then
 		echo "LICENSES REQUIRING REVIEW:"
 		printf '  %s\n' "${review[@]}"
 		echo
-		echo "Each of these is copyleft or unrecognised. Read the license, decide"
-		echo "whether Chirp can carry it, and either drop the dependency or add a"
-		echo "justified entry to ALLOWED in $0."
+		echo "Each of these is copyleft, unrecognised, or an embedded font nobody"
+		echo "has reviewed. Read the license, decide whether Chirp can carry it, and"
+		echo "either drop the dependency or add a justified entry to ALLOWED (and,"
+		echo "for a font, to EMBEDDED_FONTS) in $0."
 	} >&2
 	status=2
 fi
