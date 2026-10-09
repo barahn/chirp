@@ -305,7 +305,7 @@ The canvas is private until it is shared from its page.
 
 ## Open decisions
 
-The first four have issues on the roadmap project.
+Each has an issue, on the roadmap project.
 
 1. **Does Chirp write anything to disk** — a name, a self-hosted server
    address, a muted sound? Decision 4 treats a URL handler as installation by
@@ -319,7 +319,8 @@ The first four have issues on the roadmap project.
    is shared, if Screen Recording does require a relaunch (barahn/chirp#51).
 4. **Per-permission consent.** Needs a change to remotekit's `bark`
    consent response. Out of the first runnable Chirp (barahn/chirp#52).
-5. **Which visual direction:** Warm, Calm or Native (§ Visual direction).
+5. **Which visual direction:** Warm, Calm or Native (§ Visual direction,
+   barahn/chirp#53).
 
 ---
 
