@@ -9,8 +9,9 @@ does; where this page disagrees with it, this page is wrong.
 
 **Status: proposal, partly built.** The open decisions are listed at the end.
 `cmd/chirp` has the main window and the helper's flow (barahn/chirp#10), in
-Fyne's default theme; the consent prompt, the session bar, the tray and the
-sound are not built yet. Mockups of the possible looks are linked from
+Fyne's default theme until the chosen Warm look is built (§ Visual
+direction); the consent prompt, the session bar, the tray and the sound are
+not built yet. Mockups of the possible looks are linked from
 § Visual direction.
 
 ## The name is the metaphor
@@ -262,23 +263,26 @@ Avoid *Nest* (a Google brand, and the name of the abandoned web page) and
 
 ## Visual direction
 
-Nothing visual is chosen yet. A design canvas shows the possibilities: three
-directions side by side, the bird in every state, the app and tray icons, the
-main screens in each direction and in dark mode, and the colour tokens mapped
-to Fyne — [Chirp visual directions](https://claude.ai/artifact/JroqdRHaFU7wochyTrfMNB).
+**The direction is A · Warm**, for the product and for all of its marketing:
+the site, the store listings and the help centre (barahn/chirp#53). The
+design canvas holds it with the two that were weighed against it: the bird in
+every state, the app and tray icons, the main screens in light and dark, and
+the colour tokens mapped to Fyne —
+[Chirp visual directions](https://claude.ai/artifact/JroqdRHaFU7wochyTrfMNB).
 The screens there switch direction, dark mode and state from their *Tweaks*,
 and the consent prompt, the helper's flow and the session bar can be clicked
 through.
 
-- **A · Warm.** An illustrated, filled bird, rounded shapes, yolk yellow for
-  the bird and deep teal for actions; Fredoka, Nunito Sans and JetBrains
-  Mono. The closest to TunnelBear.
+- **A · Warm, chosen.** An illustrated, filled bird, rounded shapes, yolk
+  yellow for the bird and deep teal for actions; Fredoka, Nunito Sans and
+  JetBrains Mono, all under the OFL, which barahn/chirp#54 accepted. The
+  closest to TunnelBear.
 - **B · Calm.** A line-drawn bird, quieter surfaces, teal and blue; IBM Plex
   Sans and IBM Plex Mono.
 - **C · Native.** A silhouette bird used as a logo and little else, close to
   what Fyne draws by default; Noto Sans and Noto Sans Mono. The least work.
 
-Whichever is chosen, some things stay fixed:
+Some things were fixed whichever was chosen, and still are:
 
 - **The consent prompt and the session bar look the same in every
   direction:** no bird, no accent colour, the warning in the warning colour,
@@ -309,7 +313,7 @@ The canvas is private until it is shared from its page.
 
 ## Open decisions
 
-Each has an issue, on the roadmap project.
+Each has an issue, on the roadmap project. The fifth is decided.
 
 1. **Does Chirp write anything to disk** — a name, a self-hosted server
    address, a muted sound? Decision 4 treats a URL handler as installation by
@@ -323,7 +327,7 @@ Each has an issue, on the roadmap project.
    is shared, if Screen Recording does require a relaunch (barahn/chirp#51).
 4. **Per-permission consent.** Needs a change to remotekit's `bark`
    consent response. Out of the first runnable Chirp (barahn/chirp#52).
-5. **Which visual direction:** Warm, Calm or Native (§ Visual direction,
+5. **Which visual direction — decided: A · Warm** (§ Visual direction,
    barahn/chirp#53).
 
 ---
