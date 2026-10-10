@@ -76,8 +76,12 @@ features to be traded away:
 And Chirp never:
 
 - installs itself, or starts with your computer;
-- reads your clipboard unless you paste;
-- keeps your code alive after you quit.
+- reads your clipboard unless you paste.
+
+Quitting Chirp cancels your code and link at once. If it can't reach its
+server as it closes, the server drops them on its own, within about two
+minutes by default. Until then nobody can get in, because there is no Chirp
+left to ask you.
 
 ## Status
 
