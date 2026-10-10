@@ -58,3 +58,6 @@ web/static/js/*.map
 # The superseded Nest join page, kept locally for reference (not part of the
 # product model; see HANDOFF.md §5)
 nest/
+
+# Website, assembled by scripts/build-site.sh
+_site/
