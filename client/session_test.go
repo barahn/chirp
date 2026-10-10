@@ -1,0 +1,230 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Fabrintek Engenharia Digital Ltda
+
+package client
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"testing"
+	"time"
+
+	"github.com/barahn/remotekit/stream"
+	"github.com/barahn/remotekit/webrtc"
+)
+
+// serving records each session the Owner hands to Serve, and keeps it open
+// until the session ends.
+func serving() (func(context.Context, *SessionConn), <-chan *SessionConn) {
+	served := make(chan *SessionConn, 4)
+	return func(ctx context.Context, conn *SessionConn) {
+		served <- conn
+		select {
+		case <-conn.Done():
+		case <-ctx.Done():
+		}
+	}, served
+}
+
+// controller redeems shown's code as Ana and joins the session, without
+// following it: the test drives the socket itself.
+func controller(t *testing.T, c *Client, shown Peer) (Session, *Socket) {
+	t.Helper()
+	ctx := context.Background()
+	sess, err := c.Redeem(ctx, shown.Formatted, "Ana")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sock, err := c.DialController(ctx, sess.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = sock.Close() })
+	return sess, sock
+}
+
+// signal returns the next message on s that the relay did not send itself.
+func signal(t *testing.T, s *Socket) string {
+	t.Helper()
+	for {
+		if m := next(t, s); !m.FromRelay() {
+			return string(m.Raw)
+		}
+	}
+}
+
+func read(t *testing.T, conn *SessionConn) string {
+	t.Helper()
+	got := make(chan []byte, 1)
+	go func() {
+		if m, err := conn.ReadMessage(); err == nil {
+			got <- m
+		}
+	}()
+	select {
+	case m := <-got:
+		return string(m)
+	case <-time.After(5 * time.Second):
+		t.Fatal("no signal reached the session")
+		return ""
+	}
+}
+
+func ended(t *testing.T, conn *SessionConn, why string) {
+	t.Helper()
+	select {
+	case <-conn.Done():
+	case <-time.After(5 * time.Second):
+		t.Fatalf("the session was still served after %s", why)
+	}
+	if _, err := conn.ReadMessage(); !errors.Is(err, ErrSessionOver) {
+		t.Errorf("ReadMessage after %s = %v, want ErrSessionOver", why, err)
+	}
+	if err := conn.WriteMessage([]byte(`{}`)); !errors.Is(err, ErrSessionOver) {
+		t.Errorf("WriteMessage after %s = %v, want ErrSessionOver", why, err)
+	}
+}
+
+func TestAnAllowedSessionIsServedOverTheOwnerSocket(t *testing.T) {
+	r := newRelay(t)
+	c := newClient(t, r)
+	serve, served := serving()
+	o, events, _, _ := runOwnerServing(t, c, serve)
+	shown := await(t, events, "a code", ready).Peer
+
+	sess, ctrl := controller(t, c, shown)
+	asked := await(t, events, "the request", func(ev OwnerEvent) bool { return ev.Consent != nil }).Consent
+
+	// Nothing is served before the owner answers, and what the controller
+	// sends meanwhile goes nowhere.
+	if err := ctrl.Send([]byte(`{"type":"offer","sdp":"too early"}`)); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-served:
+		t.Fatal("a session was served before the owner allowed it")
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	if _, err := o.Answer(context.Background(), asked.SessionID, true); err != nil {
+		t.Fatal(err)
+	}
+	conn := await(t, served, "the allowed session", func(*SessionConn) bool { return true })
+	if conn.ID != sess.ID {
+		t.Errorf("served session %q, want %q", conn.ID, sess.ID)
+	}
+	if len(conn.Permissions) == 0 {
+		t.Error("the session was served with no permissions")
+	}
+
+	if err := ctrl.Send([]byte(`{"type":"offer","sdp":"v=0"}`)); err != nil {
+		t.Fatal(err)
+	}
+	if got := read(t, conn); got != `{"type":"offer","sdp":"v=0"}` {
+		t.Errorf("the session read %s, want the offer sent after consent", got)
+	}
+	if err := conn.WriteMessage([]byte(`{"type":"answer","sdp":"v=0"}`)); err != nil {
+		t.Fatal(err)
+	}
+	if got := signal(t, ctrl); got != `{"type":"answer","sdp":"v=0"}` {
+		t.Errorf("the controller got %s, want the answer", got)
+	}
+
+	// The controller leaving ends the session.
+	_ = ctrl.Close()
+	ended(t, conn, "the controller left")
+}
+
+func TestADeclinedSessionIsNotServed(t *testing.T) {
+	r := newRelay(t)
+	c := newClient(t, r)
+	serve, served := serving()
+	o, events, _, _ := runOwnerServing(t, c, serve)
+	shown := await(t, events, "a code", ready).Peer
+
+	controller(t, c, shown)
+	asked := await(t, events, "the request", func(ev OwnerEvent) bool { return ev.Consent != nil }).Consent
+	if _, err := o.Answer(context.Background(), asked.SessionID, false); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-served:
+		t.Fatal("a declined session was served")
+	case <-time.After(200 * time.Millisecond):
+	}
+}
+
+func TestEndingTheSessionStopsServingIt(t *testing.T) {
+	r := newRelay(t)
+	c := newClient(t, r)
+	serve, served := serving()
+	o, events, stop, done := runOwnerServing(t, c, serve)
+	shown := await(t, events, "a code", ready).Peer
+
+	controller(t, c, shown)
+	asked := await(t, events, "the request", func(ev OwnerEvent) bool { return ev.Consent != nil }).Consent
+	if _, err := o.Answer(context.Background(), asked.SessionID, true); err != nil {
+		t.Fatal(err)
+	}
+	conn := await(t, served, "the allowed session", func(*SessionConn) bool { return true })
+
+	// The window's End session asks for a new code.
+	o.NewCode()
+	ended(t, conn, "the owner ended it")
+
+	// A new code is a new registration, so wait for the new peer, not for
+	// the code that replaced the one the first session spent.
+	shown = await(t, events, "the new registration", func(ev OwnerEvent) bool { return ready(ev) && ev.Peer.ID != shown.ID }).Peer
+	controller(t, c, shown)
+	asked = await(t, events, "the second request", func(ev OwnerEvent) bool { return ev.Consent != nil }).Consent
+	if _, err := o.Answer(context.Background(), asked.SessionID, true); err != nil {
+		t.Fatal(err)
+	}
+	conn = await(t, served, "the second session", func(*SessionConn) bool { return true })
+
+	// Quitting ends it too, and Run waits for Serve to return.
+	stop()
+	<-done
+	ended(t, conn, "the owner quit")
+}
+
+// remotekit's runner, served over a SessionConn, talks to the controller
+// through the relay: what it writes arrives, and what the controller sends is
+// read and gated by consent.
+func TestRemotekitsRunnerServesOverTheOwnerSocket(t *testing.T) {
+	r := newRelay(t)
+	c := newClient(t, r)
+	o, events, _, _ := runOwnerServing(t, c, func(ctx context.Context, conn *SessionConn) {
+		// Granted nothing, so the screen stays withheld whatever is asked.
+		runner := stream.New(stream.Config{ID: conn.ID, PeerConfig: &webrtc.PeerConfig{}})
+		runner.RequireScreenViewConsent(true)
+		_ = runner.Serve(ctx, conn)
+	})
+	shown := await(t, events, "a code", ready).Peer
+
+	sess, ctrl := controller(t, c, shown)
+	asked := await(t, events, "the request", func(ev OwnerEvent) bool { return ev.Consent != nil }).Consent
+	if _, err := o.Answer(context.Background(), asked.SessionID, true); err != nil {
+		t.Fatal(err)
+	}
+
+	var hello struct {
+		Type      string `json:"type"`
+		SessionID string `json:"session_id"`
+	}
+	if err := json.Unmarshal([]byte(signal(t, ctrl)), &hello); err != nil || hello.Type != "agent_ready" || hello.SessionID != sess.ID {
+		t.Fatalf("the controller got %+v (%v), want the runner's agent_ready for %s", hello, err, sess.ID)
+	}
+
+	if err := ctrl.Send([]byte(`{"type":"session_start","viewer_id":"ana"}`)); err != nil {
+		t.Fatal(err)
+	}
+	var refused struct {
+		Type       string `json:"type"`
+		Permission string `json:"permission"`
+	}
+	if err := json.Unmarshal([]byte(signal(t, ctrl)), &refused); err != nil || refused.Type != "consent_required" || refused.Permission != stream.PermissionScreenView {
+		t.Fatalf("the controller got %+v (%v), want the screen refused for want of consent", refused, err)
+	}
+}

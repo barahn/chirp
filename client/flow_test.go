@@ -31,9 +31,16 @@ func await[T any](t *testing.T, ch <-chan T, what string, ok func(T) bool) T {
 // a cancel that stops it, and a channel closed when Run returns.
 func runOwner(t *testing.T, c *Client) (*Owner, <-chan OwnerEvent, context.CancelFunc, <-chan struct{}) {
 	t.Helper()
+	return runOwnerServing(t, c, nil)
+}
+
+// runOwnerServing is runOwner with serve as the Owner's Serve.
+func runOwnerServing(t *testing.T, c *Client, serve func(context.Context, *SessionConn)) (*Owner, <-chan OwnerEvent, context.CancelFunc, <-chan struct{}) {
+	t.Helper()
 	events := make(chan OwnerEvent, 64)
 	o := NewOwner(c, "", func(ev OwnerEvent) { events <- ev })
 	o.Poll, o.Retry, o.Grace = 50*time.Millisecond, 20*time.Millisecond, 5*time.Second
+	o.Serve = serve
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
 	go func() {
