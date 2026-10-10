@@ -1,0 +1,118 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: AGPL-3.0-only. Copyright (C) 2026 Fabrintek Engenharia Digital Ltda -->
+<html lang="en" data-release="pre">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>A Chirp link — remote help</title>
+<meta name="description" content="Someone sent you a Chirp link. Paste it into Chirp to help them; they'll be asked on their own screen first.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/assets/site.css">
+<script src="/assets/site.js" defer></script>
+</head>
+<body>
+<svg width="0" height="0" class="sprite" aria-hidden="true">
+  <defs>
+    <g id="bird-body">
+      <path d="M30 64 L12 56 L18 72 Z" fill="#DB8E22"/>
+      <g class="perch" stroke-width="3" stroke-linecap="round"><line x1="52" y1="92" x2="52" y2="101"/><line x1="64" y1="92" x2="64" y2="101"/></g>
+      <circle cx="58" cy="64" r="30" fill="#F5B83D"/><ellipse cx="65" cy="75" rx="18" ry="13" fill="#FFF4D6"/>
+      <path d="M38 62 Q52 48 70 60 Q58 78 38 62 Z" fill="#DB8E22"/>
+      <circle cx="70" cy="54" r="4.2" fill="#2A2118"/><circle cx="71.6" cy="52.4" r="1.4" fill="#FFFFFF"/>
+    </g>
+    <g id="bird-perched"><use href="#bird-body"/><path d="M86 57 L101 63 L86 69 Z" fill="#E8692C"/></g>
+    <g id="bird-chirping">
+      <use href="#bird-body"/>
+      <path d="M86 56 L102 53 L87 62 Z" fill="#E8692C"/><path d="M87 65 L100 73 L86 69 Z" fill="#E8692C"/>
+      <g fill="#DB8E22" stroke="#DB8E22" stroke-linecap="round"><ellipse cx="104" cy="42" rx="4.6" ry="3.4" transform="rotate(-20 104 42)" stroke="none"/><ellipse cx="94" cy="32" rx="3.8" ry="2.9" transform="rotate(-20 94 32)" stroke="none"/><line x1="108.3" y1="41" x2="108.3" y2="26" stroke-width="2.4"/><line x1="97.6" y1="31.2" x2="97.6" y2="16" stroke-width="2.2"/><line x1="97.6" y1="16" x2="108.3" y2="26" stroke-width="2.4"/></g>
+    </g>
+    <g id="bird-asleep">
+      <g transform="translate(0 3)"><path d="M30 64 L12 56 L18 72 Z" fill="#DB8E22"/><g class="perch" stroke-width="3" stroke-linecap="round"><line x1="52" y1="92" x2="52" y2="98"/><line x1="64" y1="92" x2="64" y2="98"/></g><circle cx="58" cy="64" r="30" fill="#F5B83D"/><ellipse cx="65" cy="75" rx="18" ry="13" fill="#FFF4D6"/><path d="M38 62 Q52 48 70 60 Q58 78 38 62 Z" fill="#DB8E22"/><path d="M65 55 Q70 59.5 75 55" fill="none" stroke="#2A2118" stroke-width="2.6" stroke-linecap="round"/><path d="M86 57 L101 63 L86 69 Z" fill="#E8692C"/></g>
+      <g fill="none" class="zz" stroke-linecap="round" stroke-linejoin="round"><path d="M84 36 H91 L84 44 H91" stroke-width="2.2"/><path d="M95 22 H104 L95 32 H104" stroke-width="2.6"/><path d="M106 6 H116 L106 18 H116" stroke-width="3"/></g>
+    </g>
+    <g id="perch-line"><line x1="6" y1="103" x2="114" y2="103" class="perch" stroke-width="4" stroke-linecap="round"/></g>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.2 4.2L19 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 19.5h14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="11" height="11" rx="2.5" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M15.5 5.5v-.5a2 2 0 0 0-2-2h-8a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+  </defs>
+</svg>
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="/" data-i18n-attr="aria-label:brandHome" aria-label="Chirp — remote help, home">
+      <svg viewBox="0 0 120 120" aria-hidden="true"><use href="#bird-perched"/><use href="#perch-line"/></svg>
+      <b>Chirp</b><small data-i18n="descriptor">remote help</small>
+    </a>
+    <nav class="nav" data-i18n-attr="aria-label:navLabel" aria-label="Sections">
+      <a href="/#how" data-i18n="navHow">How it works</a>
+      <a href="/#safety" data-i18n="navSafety">Safety</a>
+      <a href="/#free" data-i18n="navFree">Free for good</a>
+      <a class="btn small" href="/#download" data-i18n="navDownload">Download</a>
+    </nav>
+    <div class="lang seg" role="group" data-i18n-attr="aria-label:langLabel" aria-label="Language">
+      <button type="button" data-lang="en" lang="en" aria-label="English" aria-pressed="true">EN</button>
+      <button type="button" data-lang="pt-BR" lang="pt-BR" aria-label="Português (Brasil)" aria-pressed="false">PT</button>
+    </div>
+  </div>
+</header>
+
+<main id="link">
+  <div class="linkpage">
+    <div class="wrap">
+      <div class="card">
+        <div class="intro">
+          <h1 data-i18n="linkTitle">Someone sent you a Chirp link</h1>
+          <p class="lede" data-i18n="linkLede">Paste it into Chirp to help them. They'll be asked on their own screen before anything starts.</p>
+        </div>
+        <div class="linkbox" id="linkbox" hidden>
+          <code id="the-link"></code>
+          <button class="btn small" type="button" id="copy-link"><svg aria-hidden="true"><use href="#i-copy"/></svg><span data-i18n="copy">Copy link</span></button>
+        </div>
+        <p class="status" id="no-token" data-i18n="noToken" hidden><b>This link is incomplete.</b> Ask the person who sent it to copy it again from their Chirp, whole.</p>
+        <div class="paths">
+          <div class="path have">
+            <h2 data-i18n="haveTitle">Have Chirp?</h2>
+            <ol data-i18n="haveSteps">
+              <li>Open Chirp.</li>
+              <li>Paste the link under <b>Help someone</b>.</li>
+              <li>Type your name and press <b>Connect</b>.</li>
+            </ol>
+          </div>
+          <div class="path new">
+            <h2 data-i18n="newTitle">Don't have it yet?</h2>
+            <ol data-i18n="newSteps">
+              <li>Download Chirp, then run it. Nothing to install.</li>
+              <li>Paste the link under <b>Help someone</b>.</li>
+              <li>Type your name and press <b>Connect</b>.</li>
+            </ol>
+            <div class="when-launch"><a class="btn" href="/#download"><svg aria-hidden="true"><use href="#i-down"/></svg><span data-os-label>Download Chirp</span></a></div>
+            <div class="when-pre"><span class="btn" aria-disabled="true" data-i18n="notOut">Not out yet</span></div>
+          </div>
+        </div>
+        <div class="plain" data-i18n="plain">
+          <b>Pasting a link lets you help the person who sent it.</b>
+          <p>It never gives anyone your computer. That only happens when you share your own code and press Allow.</p>
+        </div>
+        <p class="hashnote" data-i18n="hashnote">This page never receives your link. The part after the # stays in your browser, which doesn't send it.</p>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <a class="brand" href="/"><svg viewBox="0 0 120 120" aria-hidden="true"><use href="#bird-perched"/><use href="#perch-line"/></svg><b>Chirp</b><small data-i18n="descriptor">remote help</small></a>
+    <span data-i18n="by">By Fabrintek · AGPL-3.0</span>
+    <div class="links">
+      <a href="https://github.com/barahn/chirp" data-i18n="source">Source</a>
+      <a href="https://github.com/barahn/chirp/blob/develop/docs/product-model.md" data-i18n="howChirpWorks">How Chirp works</a>
+      <span><span data-i18n="security">Security reports:</span> <span class="sel">security@mendsec.com</span></span>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

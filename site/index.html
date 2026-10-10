@@ -1,0 +1,270 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: AGPL-3.0-only. Copyright (C) 2026 Fabrintek Engenharia Digital Ltda -->
+<html lang="en" data-release="pre">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Chirp — remote help</title>
+<meta name="description" content="Remote help between two people who trust each other. Nothing to install, no account, and nothing happens on your screen until you press Allow.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/assets/site.css">
+<script src="/assets/site.js" defer></script>
+</head>
+<body>
+<svg width="0" height="0" class="sprite" aria-hidden="true">
+  <defs>
+    <g id="bird-body">
+      <path d="M30 64 L12 56 L18 72 Z" fill="#DB8E22"/>
+      <g class="perch" stroke-width="3" stroke-linecap="round"><line x1="52" y1="92" x2="52" y2="101"/><line x1="64" y1="92" x2="64" y2="101"/></g>
+      <circle cx="58" cy="64" r="30" fill="#F5B83D"/><ellipse cx="65" cy="75" rx="18" ry="13" fill="#FFF4D6"/>
+      <path d="M38 62 Q52 48 70 60 Q58 78 38 62 Z" fill="#DB8E22"/>
+      <circle cx="70" cy="54" r="4.2" fill="#2A2118"/><circle cx="71.6" cy="52.4" r="1.4" fill="#FFFFFF"/>
+    </g>
+    <g id="bird-perched"><use href="#bird-body"/><path d="M86 57 L101 63 L86 69 Z" fill="#E8692C"/></g>
+    <g id="bird-chirping">
+      <use href="#bird-body"/>
+      <path d="M86 56 L102 53 L87 62 Z" fill="#E8692C"/><path d="M87 65 L100 73 L86 69 Z" fill="#E8692C"/>
+      <g fill="#DB8E22" stroke="#DB8E22" stroke-linecap="round"><ellipse cx="104" cy="42" rx="4.6" ry="3.4" transform="rotate(-20 104 42)" stroke="none"/><ellipse cx="94" cy="32" rx="3.8" ry="2.9" transform="rotate(-20 94 32)" stroke="none"/><line x1="108.3" y1="41" x2="108.3" y2="26" stroke-width="2.4"/><line x1="97.6" y1="31.2" x2="97.6" y2="16" stroke-width="2.2"/><line x1="97.6" y1="16" x2="108.3" y2="26" stroke-width="2.4"/></g>
+    </g>
+    <g id="bird-asleep">
+      <g transform="translate(0 3)"><path d="M30 64 L12 56 L18 72 Z" fill="#DB8E22"/><g class="perch" stroke-width="3" stroke-linecap="round"><line x1="52" y1="92" x2="52" y2="98"/><line x1="64" y1="92" x2="64" y2="98"/></g><circle cx="58" cy="64" r="30" fill="#F5B83D"/><ellipse cx="65" cy="75" rx="18" ry="13" fill="#FFF4D6"/><path d="M38 62 Q52 48 70 60 Q58 78 38 62 Z" fill="#DB8E22"/><path d="M65 55 Q70 59.5 75 55" fill="none" stroke="#2A2118" stroke-width="2.6" stroke-linecap="round"/><path d="M86 57 L101 63 L86 69 Z" fill="#E8692C"/></g>
+      <g fill="none" class="zz" stroke-linecap="round" stroke-linejoin="round"><path d="M84 36 H91 L84 44 H91" stroke-width="2.2"/><path d="M95 22 H104 L95 32 H104" stroke-width="2.6"/><path d="M106 6 H116 L106 18 H116" stroke-width="3"/></g>
+    </g>
+    <g id="perch-line"><line x1="6" y1="103" x2="114" y2="103" class="perch" stroke-width="4" stroke-linecap="round"/></g>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.2 4.2L19 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 19.5h14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="11" height="11" rx="2.5" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M15.5 5.5v-.5a2 2 0 0 0-2-2h-8a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+  </defs>
+</svg>
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="/" data-i18n-attr="aria-label:brandHome" aria-label="Chirp — remote help, home">
+      <svg viewBox="0 0 120 120" aria-hidden="true"><use href="#bird-perched"/><use href="#perch-line"/></svg>
+      <b>Chirp</b><small data-i18n="descriptor">remote help</small>
+    </a>
+    <nav class="nav" data-i18n-attr="aria-label:navLabel" aria-label="Sections">
+      <a href="/#how" data-i18n="navHow">How it works</a>
+      <a href="/#safety" data-i18n="navSafety">Safety</a>
+      <a href="/#free" data-i18n="navFree">Free for good</a>
+      <a class="btn small" href="/#download" data-i18n="navDownload">Download</a>
+    </nav>
+    <div class="lang seg" role="group" data-i18n-attr="aria-label:langLabel" aria-label="Language">
+      <button type="button" data-lang="en" lang="en" aria-label="English" aria-pressed="true">EN</button>
+      <button type="button" data-lang="pt-BR" lang="pt-BR" aria-label="Português (Brasil)" aria-pressed="false">PT</button>
+    </div>
+  </div>
+</header>
+
+<main id="home">
+  <div class="hero">
+    <div class="wrap">
+      <div>
+        <h1><span data-i18n="h1a">Download it.</span><span data-i18n="h1b">Run it.</span><span data-i18n="h1c">Read your <span class="chirp">chirp</span>.</span></h1>
+        <p class="lede" data-i18n="lede">Remote help between two people who trust each other. Nothing to install, no account, and nothing happens on your screen until <em>you press Allow</em>.</p>
+        <div class="cta">
+          <div class="when-launch stack">
+            <div class="row">
+              <a class="btn" href="#download"><svg aria-hidden="true"><use href="#i-down"/></svg><span data-os-label>Download Chirp</span></a>
+              <a href="#download" data-i18n="otherSystems">Other systems</a>
+            </div>
+            <p class="fine" data-os-note data-i18n="fine">Free. One file, nothing to install, the same download for everyone.</p>
+          </div>
+          <div class="when-pre">
+            <div class="status" role="note">
+              <span class="pill" data-i18n="pill">In development</span>
+              <span data-i18n="statusText"><b>Chirp isn't out yet.</b> Two Chirps already find each other and ask for consent. Sharing the screen comes next.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="stage">
+        <div class="perched" id="hero-bird" aria-hidden="true">
+          <svg viewBox="0 0 120 120"><g class="pose-perch"><use href="#bird-perched"/></g><g class="pose-chirp"><use href="#bird-chirping"/></g></svg>
+        </div>
+        <div class="frame">
+          <img class="shot-light" src="/assets/images/window-light.webp" width="690" height="758" data-i18n-attr="alt:altWindow" alt="Chirp's window: your code, 482-913, with a hint to read it only to someone you called, buttons to copy the link or get a new code, and a Help someone form to type another person's code.">
+          <img class="shot-dark" src="/assets/images/window-dark.webp" width="690" height="758" data-i18n-attr="alt:altWindowDark" alt="Chirp's window in dark mode: your code, 482-913, and the Help someone form.">
+        </div>
+        <p class="shotnote" data-lang-only="pt-BR">Capturas da versão atual, que por enquanto está só em inglês.</p>
+      </div>
+    </div>
+  </div>
+
+  <section id="how">
+    <div class="wrap">
+      <div class="head">
+        <span class="kicker" data-i18n="howKicker">How it works</span>
+        <h2 data-i18n="howTitle">Three steps, and the last one is yours.</h2>
+      </div>
+      <ol class="steps">
+        <li class="step">
+          <div class="vis" aria-hidden="true">
+            <svg class="bird" viewBox="0 0 120 120"><use href="#bird-perched"/><use href="#perch-line"/></svg>
+            <span class="mini-label" data-i18n="miniYourCode">Your code</span>
+            <span class="mini-code">482-913</span>
+            <div class="mini-row"><span class="chip" data-i18n="miniCopyLink">Copy link</span><span class="chip" data-i18n="miniNewCode">New code</span></div>
+          </div>
+          <h3 data-i18n="s1Title">Run Chirp</h3>
+          <p data-i18n="s1Text">One program, the same for everyone: no installer, no account, no technician edition. It opens on your chirp, a short code, and a link you can send instead.</p>
+        </li>
+        <li class="step">
+          <div class="vis" aria-hidden="true">
+            <svg class="bird" viewBox="0 0 120 120"><use href="#bird-chirping"/><use href="#perch-line"/></svg>
+            <span class="mini-label" data-i18n="miniTheirCode">Their code or link</span>
+            <div class="field"><span>482 913</span><span class="chip go" data-i18n="miniConnect">Connect</span></div>
+          </div>
+          <h3 data-i18n="s2Title">Read your chirp to someone you trust</h3>
+          <p data-i18n="s2Text">They type it into their own Chirp, or paste your link. Every use of the link makes a fresh single-use code, so a code that leaks after it was used opens nothing.</p>
+        </li>
+        <li class="step">
+          <div class="vis" aria-hidden="true">
+            <span class="ask" data-i18n="miniAsk">Someone wants to control this computer</span>
+            <div class="mini-row"><span class="chip off" data-i18n="miniAllow">Allow (3)</span><span class="chip go" data-i18n="miniDecline">Decline</span></div>
+          </div>
+          <h3 data-i18n="s3Title">You decide</h3>
+          <p data-i18n="s3Text">Your Chirp asks you, on your own screen, who is asking and for what. Nothing starts until you press Allow, and you can end the session at any moment.</p>
+        </li>
+      </ol>
+      <div class="whose">
+        <strong data-i18n="whose">Whoever types the code controls. Whoever shared it decides.</strong>
+        <p data-i18n="sound">And on the helper's side, Chirp makes its one sound when the other person lets them in. It never plays on the computer being helped.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="safety" id="safety">
+    <div class="wrap">
+      <div class="head">
+        <span class="kicker" data-i18n="safetyKicker">Safety</span>
+        <h2 data-i18n="safetyTitle">A prompt that is easy to say no to</h2>
+        <p data-i18n="safetyText">Remote-help tools are a favourite of phone scammers. Chirp's consent prompt is built so that an unexpected request is easy to decline.</p>
+      </div>
+      <div class="grid">
+        <div>
+          <div class="frame">
+            <img class="shot-light" src="/assets/images/consent-light.webp" width="720" height="634" data-i18n-attr="alt:altConsent" alt="Chirp's consent prompt: Someone wants to control this computer. They say they're “João da TI”. Chirp can't check names. They're asking to see your screen, use your mouse and keyboard, share your clipboard, and send and receive files. A warning: allow only if you asked this person for help just now; banks, government agencies and big tech companies never ask for this. Declines by itself in 1:40. Allow (3), still locked, and Decline.">
+            <img class="shot-dark" src="/assets/images/consent-dark.webp" width="720" height="634" data-i18n-attr="alt:altConsentDark" alt="The same consent prompt in dark mode.">
+          </div>
+          <p class="shotnote" data-lang-only="pt-BR">Na versão em português, a janela dirá: “Alguém quer controlar este computador”, com Recusar e Permitir.</p>
+        </div>
+        <div>
+          <ul class="points">
+            <li><svg aria-hidden="true"><use href="#i-check"/></svg><div data-i18n="p1"><b>Decline has the focus.</b><span>Allow only becomes clickable after three seconds, so neither a reflexive Enter nor a stray click lets anyone in.</span></div></li>
+            <li><svg aria-hidden="true"><use href="#i-check"/></svg><div data-i18n="p2"><b>The name is a claim.</b><span>“They say they're João da TI.” Chirp can't check names, says so, and cleans the name so it can't pass for a line of the prompt.</span></div></li>
+            <li><svg aria-hidden="true"><use href="#i-check"/></svg><div data-i18n="p3"><b>Every permission is spelled out.</b><span>Under a fixed warning: banks, government agencies and big tech companies never ask for this.</span></div></li>
+            <li><svg aria-hidden="true"><use href="#i-check"/></svg><div data-i18n="p4"><b>Doing nothing declines.</b><span>Closing the prompt, or letting it run out of time, says no.</span></div></li>
+          </ul>
+          <p class="surprise" data-i18n="surprise">Didn't expect a request? Press Decline. Nobody gets in without you.</p>
+          <p class="why" data-i18n="why">This is the one screen in Chirp without the bird. A cheerful prompt is what a scammer counts on, so it stays plain.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="never">
+    <div class="wrap never">
+      <div class="head">
+        <span class="kicker" data-i18n="neverKicker">Promises</span>
+        <h2 data-i18n="neverTitle">What Chirp never does</h2>
+        <p data-i18n="neverText">The things a remote-help tool could do, and Chirp won't.</p>
+      </div>
+      <ul>
+        <li><i data-i18n="never">Never</i><span data-i18n="n1">installs itself, or starts with your computer</span></li>
+        <li><i data-i18n="never">Never</i><span data-i18n="n2">reads your clipboard unless you paste</span></li>
+        <li><i data-i18n="never">Never</i><span data-i18n="n3">lets anyone in without you pressing Allow on your own screen</span></li>
+        <li><i data-i18n="never">Never</i><span data-i18n="n4">keeps your code alive after you quit</span></li>
+        <li><i data-i18n="never">Never</i><span data-i18n="n5">puts screen sharing, control, files, clipboard or multiple monitors behind a payment</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="free">
+    <div class="wrap">
+      <div class="pair">
+        <div class="panel free">
+          <span class="kicker" data-i18n="freeKicker">Free for good</span>
+          <h3 data-i18n="freeTitle">The whole thing, free, permanently</h3>
+          <div class="feats"><span data-i18n="f1">Screen sharing</span><span data-i18n="f2">Mouse and keyboard</span><span data-i18n="f3">Multiple monitors</span><span data-i18n="f4">Files</span><span data-i18n="f5">Clipboard</span></div>
+          <p data-i18n="freeText">No tiers, no trial, no licence check. Chirp is open source under the AGPL-3.0, so a hosted copy has to share its changes too.</p>
+        </div>
+        <div class="panel own">
+          <span class="kicker" data-i18n="ownKicker">Run your own</span>
+          <h3 data-i18n="ownTitle">Your server, no strings</h3>
+          <p data-i18n="ownText">Anyone may run their own relay, with no restrictions. Chirp's hosted server is a convenience, never a requirement.</p>
+<pre><span class="c" data-i18n="ownC1"># on a machine you control</span>
+chirp-relay
+<span class="c" data-i18n="ownC2"># point both Chirps at it</span>
+CHIRP_RELAY=https://relay.example.org chirp</pre>
+          <p class="muted" data-i18n="ownNote">Bring your own STUN/TURN for now; coturn works. When Chirp runs a public server, it will be blind: it finds the other computer from the first part of your code and never sees the rest.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="download">
+    <div class="wrap">
+      <div class="head">
+        <span class="kicker" data-i18n="dlKicker">Download</span>
+        <h2 data-i18n="dlTitle">One file. Run it, and you're ready.</h2>
+        <p class="when-launch" data-i18n="dlText">Your system may warn you the first time. Here is what it says, and what to press.</p>
+      </div>
+      <div class="when-launch">
+        <div class="platforms">
+          <article class="os" data-os="windows">
+            <h3>Windows</h3>
+            <a class="btn" href="https://github.com/barahn/chirp/releases/latest"><svg aria-hidden="true"><use href="#i-down"/></svg><span data-i18n="dlWindows">Download for Windows</span></a>
+            <p class="says" data-i18n="saysWindows"><b>SmartScreen may say</b> “Windows protected your PC”. Choose <b>More info</b>, then <b>Run anyway</b>.</p>
+          </article>
+          <article class="os" data-os="macos">
+            <h3>macOS</h3>
+            <a class="btn" href="https://github.com/barahn/chirp/releases/latest"><svg aria-hidden="true"><use href="#i-down"/></svg><span data-i18n="dlMac">Download for macOS</span></a>
+            <p class="says" data-i18n="saysMac"><b>macOS asks</b> whether to open an app from the internet. Choose <b>Open</b>. It also asks you to allow <b>Screen Recording</b> and <b>Accessibility</b> for Chirp.</p>
+          </article>
+          <article class="os" data-os="linux">
+            <h3>Linux</h3>
+            <a class="btn" href="https://github.com/barahn/chirp/releases/latest"><svg aria-hidden="true"><use href="#i-down"/></svg><span data-i18n="dlLinux">Download for Linux</span></a>
+            <p class="says" data-i18n="saysLinux"><b>Make it executable</b> and run it. On Wayland, after you press Allow, the system asks once more <b>which screen to share</b>.</p>
+          </article>
+        </div>
+        <div class="verify">
+          <span data-i18n="verify">Every copy is identical. Check yours against the SHA-256 and signature published with each release.</span>
+          <code data-i18n="verifyCode">sha256 · published with the first release</code>
+        </div>
+      </div>
+      <div class="when-pre">
+        <div class="notyet">
+          <svg viewBox="0 0 120 120" aria-hidden="true"><use href="#bird-asleep"/><use href="#perch-line"/></svg>
+          <div data-i18n="notYet">
+            <h3>Nothing to download yet</h3>
+            <p>Chirp is in development. What already works:</p>
+            <ul>
+              <li>the window, with your code and link, and the form to help someone;</li>
+              <li>the consent prompt, and your answer reaching the relay;</li>
+              <li>a relay you can host yourself.</li>
+            </ul>
+            <p>Sharing the screen is next. <a href="https://github.com/barahn/chirp#status">Follow the progress</a>.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <a class="brand" href="/"><svg viewBox="0 0 120 120" aria-hidden="true"><use href="#bird-perched"/><use href="#perch-line"/></svg><b>Chirp</b><small data-i18n="descriptor">remote help</small></a>
+    <span data-i18n="by">By Fabrintek · AGPL-3.0</span>
+    <div class="links">
+      <a href="https://github.com/barahn/chirp" data-i18n="source">Source</a>
+      <a href="https://github.com/barahn/chirp/blob/develop/docs/product-model.md" data-i18n="howChirpWorks">How Chirp works</a>
+      <span><span data-i18n="security">Security reports:</span> <span class="sel">security@mendsec.com</span></span>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
