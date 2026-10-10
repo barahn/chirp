@@ -109,8 +109,8 @@ and recorded where pull requests actually arrive. See
 ## Security
 
 Report vulnerabilities privately to
-[security@mendsec.com](mailto:security@mendsec.com) — not in a public issue. See
-[SECURITY.md](SECURITY.md).
+[security@fabrintek.com.br](mailto:security@fabrintek.com.br) — not in a public
+issue. See [SECURITY.md](SECURITY.md).
 
 Chirp grants remote control of an end user's machine, so its pipeline treats
 that as the threat model rather than an afterthought: every pull request runs

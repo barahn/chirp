@@ -119,8 +119,8 @@ gate in its own pull request.
 ## Reporting security vulnerabilities
 
 Do **not** open a public issue for a security-sensitive bug. Email
-[security@mendsec.com](mailto:security@mendsec.com). Scope, response targets and
-disclosure terms are in [SECURITY.md](SECURITY.md).
+[security@fabrintek.com.br](mailto:security@fabrintek.com.br). Scope, response
+targets and disclosure terms are in [SECURITY.md](SECURITY.md).
 
 Chirp hands a remote technician control of someone else's desktop. A defect in
 PIN generation, PIN redemption, the session lifecycle or the consent flow is
