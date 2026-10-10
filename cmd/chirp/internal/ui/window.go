@@ -432,11 +432,15 @@ func (w *Window) copyTheCode() {
 	w.relayout()
 }
 
-// copyTheLink copies the link's token. The page a link opens, which would
-// carry the token after "#", comes with the download site (product-model
-// decision 4); until then the token itself is what Chirp accepts as a link.
+// linkPage is the page a link opens (product-model decisions 4 and 6). The
+// token goes after "#", which the browser never sends, so the site never
+// receives it; client.ParseTarget reads it back from there.
+const linkPage = "https://usechirp.app/l#"
+
+// copyTheLink copies the link as the person sends it: the page that says
+// what to do with it, with the token in its fragment.
 func (w *Window) copyTheLink() {
-	w.app.Clipboard().SetContent(w.peer.Link)
+	w.app.Clipboard().SetContent(linkPage + w.peer.Link)
 	w.copyLink.SetText("Link copied")
 	w.relayout()
 }
