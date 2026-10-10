@@ -171,6 +171,18 @@ Decided by the maintainer:
      relay to anyone. Changing the code format then is accepted: Chirp is
      pre-1.0.
 
+6. **Chirp's domain is `usechirp.app`.** It was registered on 2026-10-10.
+   The public server of decision 5 is served under it: the download, the
+   page a link opens and the lookup. The links people send each other then
+   carry it, so it is the address people will learn to trust. "Use Chirp"
+   reads the same in Portuguese and in English, and `.app` is preloaded as
+   HTTPS-only in browsers, so a link to it never opens over plain HTTP.
+
+   - **No code names it until that server exists.** Today a Chirp reaches
+     only a relay its users run or trust, given with `-relay`, so examples
+     and tests keep names reserved for examples (RFC 2606). Showing `usechirp.app`
+     there would suggest a public relay that is not offered yet.
+
 ## Where the pieces live
 
 The mechanism behind this — allocating and redeeming codes, minting codes from a
