@@ -283,7 +283,7 @@ Consequences to know about:
 
 ### 4.3 Still open
 
-- **Branch protection and code scanning are on; two rulesets on GitHub are
+- **Branch protection and code scanning are on; one ruleset on GitHub is
   not in `.github/rulesets/`** (barahn/chirp#17). Making the repository
   public is what turned them on: while it was private on GitHub's free plan,
   `GET /repos/barahn/chirp/rulesets` answered the maintainer's own account
@@ -294,19 +294,16 @@ Consequences to know about:
   `CODE_SCANNING` is `true`, so CodeQL and dependency review run and are
   enforced (`docs/devsecops.md`). The reasoning behind the rules, and the
   defects their first version had, are in `docs/branching.md`.
-  Two more rulesets are active that the files do not hold, which
-  `docs/branching.md` calls drift:
-  - *release tags protected*, on `refs/tags/v*`: refuses deleting, moving or
-    force-pushing a release tag, as `docs/devsecops.md` item 5 asks. It is
-    sound and belongs in the files.
-  - *main*, created on 2026-09-25 in GitHub's settings: on `main` it requires
-    linear history and signed commits, allows merge or rebase, and adds
-    code-quality, code-scanning and Copilot-review rules. *main protected*
-    allows only merge commits, and linear history refuses them, so the two
-    together leave no merge method for a release pull request: the deadlock
-    `docs/branching.md` describes the first version of the rules having.
-    Delete it or bring what it should keep into the files before the next
-    release.
+  One more ruleset is active that the files do not hold, which
+  `docs/branching.md` calls drift: *release tags protected*, on
+  `refs/tags/v*`. It refuses deleting, moving or force-pushing a release tag,
+  as `docs/devsecops.md` item 5 asks, and belongs in the files.
+  A ruleset named *main*, created on 2026-09-25 in GitHub's settings, was
+  deleted on 2026-10-10 at the maintainer's request. It required linear
+  history and signed commits on `main`, while *main protected* allows only
+  merge commits, so together they left a release pull request no merge
+  method: the deadlock `docs/branching.md` describes the first version of the
+  rules having. `main` now carries *main protected*'s rules alone.
 Three items that used to be listed here no longer apply. The `Session` mutex
 carries no `json:"-"` tag any more. `CreateSession`'s retry loop went to
 remotekit's `rendezvous` with the code allocation (§4.5). `WaitForConsent`
@@ -851,5 +848,5 @@ Still to decide or do, in order. Each step has an issue, and the
    §5.5): the lookup (barahn/chirp#42, §4.6), the PAKE (barahn/chirp#21) and
    Nostr signalling (barahn/chirp#43).
 4. **Branch protection and code scanning** (barahn/chirp#17, §4.3). On since
-   the repository went public. Left: the two rulesets that are not in
-   `.github/rulesets/`, before the next release.
+   the repository went public. Left: version the *release tags protected*
+   ruleset in `.github/rulesets/`.
