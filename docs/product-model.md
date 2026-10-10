@@ -182,9 +182,7 @@ Decided by the maintainer:
      GitHub Pages: it offers the download and the page a link opens
      (decision 4), and needs no relay. *Copy link* copies
      `https://usechirp.app/l#<token>`, which works whatever relay its users
-     run, because the page only says what to do with the link. Both arrive
-     with barahn/chirp#64 and #65; until then *Copy link* copies the bare
-     token, which Chirp accepts just the same.
+     run, because the page only says what to do with the link.
    - **The relay and the lookup do not, yet.** They come with the public
      server of decision 5. Until then a Chirp reaches only a relay its users
      run or trust, given with `-relay`, so relay examples and tests keep
