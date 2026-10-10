@@ -105,6 +105,14 @@ Nothing else in the repository pushes to a protected branch. The `HANDOFF.md`
 snapshot used to be committed to `main` by a workflow; it is now checked in CI
 instead, so no bot needs a bypass.
 
+### Release tags
+
+A release tag, `v*`, cannot be deleted, moved or force-pushed once it exists,
+by anyone: `release-tags-protected.json` has no bypass. The SBOM attached to a
+release describes the commit its tag points at, and a tag that could move would
+leave the SBOM describing something else. Creating a tag is not restricted, so
+tagging a release needs nothing new.
+
 ## Applying the rules
 
 In the UI: **Settings → Rules → Rulesets → New ruleset → Import a ruleset**,
@@ -115,6 +123,7 @@ Through the API (needs a token with `administration:write`):
 ```sh
 gh api -X POST repos/barahn/chirp/rulesets --input .github/rulesets/main-protected.json
 gh api -X POST repos/barahn/chirp/rulesets --input .github/rulesets/develop-protected.json
+gh api -X POST repos/barahn/chirp/rulesets --input .github/rulesets/release-tags-protected.json
 ```
 
 To make `develop` the default branch:
