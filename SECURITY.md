@@ -3,7 +3,7 @@
 ## Reporting a vulnerability
 
 **Do not open a public issue.** Email
-[security@mendsec.com](mailto:security@mendsec.com).
+[security@fabrintek.com.br](mailto:security@fabrintek.com.br).
 
 Chirp lets one person control another person's machine. A bug in code or link
 generation, redemption, the lookup, the session lifecycle or the consent flow is
