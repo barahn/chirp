@@ -283,24 +283,30 @@ Consequences to know about:
 
 ### 4.3 Still open
 
-- **Branch protection and code scanning cannot be turned on while the
-  repository is private on GitHub's free plan** (barahn/chirp#17). An earlier
-  version of this list said importing the rulesets only needed an admin token.
-  It does not: `GET /repos/barahn/chirp/rulesets` answers the maintainer's own
-  account with `403 Upgrade to GitHub Pro or make this repository public`.
-  CodeQL and dependency review stay off until the repository variable
-  `CODE_SCANNING` is set, and they need GitHub Advanced Security on a private
-  repository, for the same reason (confirmed on barahn/chirp#1). The real
-  decision is to make the repository public or move to a paid plan.
-  Until then nothing is enforced: `develop` takes direct pushes and merge
-  commits, although `docs/branching.md` prescribes squash or rebase there.
-  The rules themselves are settled and versioned in `.github/rulesets/`, with
-  the reasoning in `docs/branching.md`. Their first version could not have
-  worked — `main` required linear history while allowing only merge commits,
-  required a check under the wrong name, and would have deadlocked from the
-  second release on — and those defects are fixed. `docs/devsecops.md`
-  explains why marking the code-scanning pair required before then enforces
-  nothing.
+- **Branch protection and code scanning are on; two rulesets on GitHub are
+  not in `.github/rulesets/`** (barahn/chirp#17). Making the repository
+  public is what turned them on: while it was private on GitHub's free plan,
+  `GET /repos/barahn/chirp/rulesets` answered the maintainer's own account
+  with `403 Upgrade to GitHub Pro or make this repository public`, and CodeQL
+  and dependency review needed GitHub Advanced Security (barahn/chirp#1). Now
+  the two versioned rulesets are active as *develop protected* and *main
+  protected*, each requiring the four checks, and the repository variable
+  `CODE_SCANNING` is `true`, so CodeQL and dependency review run and are
+  enforced (`docs/devsecops.md`). The reasoning behind the rules, and the
+  defects their first version had, are in `docs/branching.md`.
+  Two more rulesets are active that the files do not hold, which
+  `docs/branching.md` calls drift:
+  - *release tags protected*, on `refs/tags/v*`: refuses deleting, moving or
+    force-pushing a release tag, as `docs/devsecops.md` item 5 asks. It is
+    sound and belongs in the files.
+  - *main*, created on 2026-09-25 in GitHub's settings: on `main` it requires
+    linear history and signed commits, allows merge or rebase, and adds
+    code-quality, code-scanning and Copilot-review rules. *main protected*
+    allows only merge commits, and linear history refuses them, so the two
+    together leave no merge method for a release pull request: the deadlock
+    `docs/branching.md` describes the first version of the rules having.
+    Delete it or bring what it should keep into the files before the next
+    release.
 Three items that used to be listed here no longer apply. The `Session` mutex
 carries no `json:"-"` tag any more. `CreateSession`'s retry loop went to
 remotekit's `rendezvous` with the code allocation (§4.5). `WaitForConsent`
@@ -844,6 +850,6 @@ Still to decide or do, in order. Each step has an issue, and the
    the *Blind public network* milestone (`docs/product-model.md`, decision 5,
    §5.5): the lookup (barahn/chirp#42, §4.6), the PAKE (barahn/chirp#21) and
    Nostr signalling (barahn/chirp#43).
-4. **Branch protection and code scanning** (barahn/chirp#17, §4.3). Blocked on
-   making the repository public or moving to a paid plan, not on an admin
-   token.
+4. **Branch protection and code scanning** (barahn/chirp#17, §4.3). On since
+   the repository went public. Left: the two rulesets that are not in
+   `.github/rulesets/`, before the next release.
