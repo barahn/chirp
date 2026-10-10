@@ -126,6 +126,8 @@ cmd/chirp/internal/warm/theme_test.go
 cmd/chirp/main.go
 docs/branching.md
 docs/devsecops.md
+docs/images/chirp-dark.png
+docs/images/chirp-light.png
 docs/product-model.md
 docs/rendezvous-proposal.md
 docs/stun-turn.md

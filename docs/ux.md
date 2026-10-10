@@ -260,9 +260,14 @@ The help centre follows TunnelBear's four sections:
 - installs itself, or starts with your computer;
 - reads your clipboard unless you paste;
 - lets anyone in without you pressing *Allow* on your own screen;
-- keeps your code alive after you quit;
 - puts screen sharing, control, files, clipboard or multiple monitors behind
   a payment.
+
+It does not promise that a code dies the moment Chirp quits. Quitting
+releases the code and link at once, but a Chirp that cannot reach its server
+as it closes is released only when the server's grace runs out, two minutes
+by default (decision 1). Nobody can be let in meanwhile, because no prompt
+can be shown.
 
 Help articles may end on a light line in the bird's voice. Articles about
 consent, scams and security do not.
