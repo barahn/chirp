@@ -204,6 +204,7 @@ section { padding-block: clamp(56px, 9vw, 112px); }
 .never li { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 16px; padding-block: 18px; border-bottom: 1px solid var(--line); align-items: baseline; }
 .never li:first-child { border-top: 1px solid var(--line); }
 .never li i { font: 600 var(--step--1)/1 var(--display); font-style: normal; color: var(--muted); }
+.quitnote { grid-column: 2; margin-top: 18px; color: var(--muted); font-size: var(--step--1); max-width: 60ch; }
 .never li span { font: 700 var(--step-1)/1.35 var(--body); }
 
 /* Free and self-hosted */
@@ -273,6 +274,7 @@ footer .sel { user-select: all; color: var(--text); }
 
 @media (max-width: 900px) {
   .hero .wrap, .safety .grid, .never, .pair { grid-template-columns: minmax(0, 1fr); }
+  .quitnote { grid-column: auto; }
   .steps, .platforms { grid-template-columns: minmax(0, 1fr); }
   .stage { margin-top: 96px; }
 }
