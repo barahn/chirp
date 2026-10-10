@@ -48,6 +48,10 @@ jobs:
   deploy:
     name: Deploy to GitHub Pages
     needs: build
+    # A manual run can be started on any branch; only develop, which takes
+    # changes through review, may reach usechirp.app. Other runs still build,
+    # so a branch can be checked without publishing it.
+    if: github.ref == 'refs/heads/develop'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     # Only this job can publish, and only through the github-pages
