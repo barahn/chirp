@@ -106,13 +106,13 @@ own policy.
 | gitleaks | Is a credential being committed | every push and PR, weekly |
 | Third-party licence gate | Can Fabrintek pass every dependency on | every push and PR |
 | DCO sign-off | Is the origin of each commit certified | every PR |
-| CodeQL (`security-extended`) | Does untrusted data reach a dangerous sink | once `CODE_SCANNING` is set |
-| Dependency Review | What does this pull request *add*, and under what licence | once `CODE_SCANNING` is set |
+| CodeQL (`security-extended`) | Does untrusted data reach a dangerous sink | every push and PR |
+| Dependency Review | What does this pull request *add*, and under what licence | every PR |
 
-CodeQL and dependency review need GitHub Advanced Security on a private
-repository, so they are wired in but off until the `CODE_SCANNING` variable is
-set, and every run warns while they are; see
-[docs/devsecops.md](docs/devsecops.md).
+Both are gated on the `CODE_SCANNING` repository variable, which is set now that
+the repository is public; see [docs/devsecops.md](docs/devsecops.md). Secret
+scanning with push protection, Dependabot alerts and private vulnerability
+reporting are on as well.
 
 None of these is a substitute for reading the diff. They catch the classes of
 mistake a reviewer reliably misses; they do not catch a consent check that is
