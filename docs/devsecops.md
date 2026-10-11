@@ -126,8 +126,11 @@ are the half of DevSecOps that a pull request cannot deliver:
    - Workflow permissions: read-only by default.
    - Require approval for all outside collaborators' workflow runs.
 
-5. **Tag protection** for `v*.*.*`, so a release tag cannot be moved after an
-   SBOM has been published against it.
+5. **Tag protection** for release tags, so a tag cannot be moved after an SBOM
+   has been published against it. It is a ruleset too,
+   `.github/rulesets/release-tags-protected.json`, imported like the branch
+   rules: no one may delete, move or force-push a `v*` tag
+   ([branching.md](branching.md#release-tags)).
 
 ## When a gate fails
 
