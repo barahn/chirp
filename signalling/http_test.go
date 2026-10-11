@@ -709,3 +709,37 @@ func TestAnOversizedMessageClosesTheSocket(t *testing.T) {
 		t.Fatalf("owner got %v, want %s", m, PeerLeftType)
 	}
 }
+
+// The grace runs from the latest departure: a controller that leaves, comes
+// back and leaves again is not cut off by the first departure's timer.
+func TestTheControllerGraceRunsFromTheLatestDeparture(t *testing.T) {
+	srv, ts := newServer(t)
+	srv.ControllerGrace = time.Second
+	owner := register(t, ts, "Ana")
+	ownerWS := dialOwner(t, ts, owner.PeerID)
+	sess, _ := redeem(t, ts, owner.Code, "Bruno")
+	ctrl := dialController(t, ts, sess.SessionID)
+	awaitPeer(t, ctrl, RoleOwner)
+	awaitPeer(t, ownerWS, RoleController)
+	awaitConsentRequest(t, ownerWS)
+	_ = consent(t, ts, owner.PeerID, sess.SessionID, true)
+
+	gone := func() bool { c, _ := srv.Hub().Connected(sess.SessionID); return !c }
+	_ = ctrl.Close()
+	first := time.Now()
+	waitFor(t, "controller left", gone)
+	time.Sleep(500 * time.Millisecond)
+	again := dialController(t, ts, sess.SessionID)
+	awaitPeer(t, again, RoleOwner)
+	_ = again.Close()
+	waitFor(t, "controller left again", gone)
+
+	// Past the first departure's grace, inside the second's.
+	time.Sleep(time.Until(first.Add(1300 * time.Millisecond)))
+	if got := state(t, ts, sess.SessionID); got != string(session.StateConsentGranted) {
+		t.Fatalf("state %s, want the session kept until the latest grace runs out", got)
+	}
+	waitFor(t, "the session to end", func() bool {
+		return state(t, ts, sess.SessionID) == string(session.StateTerminated)
+	})
+}
