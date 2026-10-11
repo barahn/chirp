@@ -563,8 +563,11 @@ func (s *Server) holdSession(sessionID string) *graceEnd {
 	return e
 }
 
-// scheduleEnd ends sessionID at due unless a controller is connected then,
-// replacing any end already pending. Nothing else ends a session its owner
+// scheduleEnd ends sessionID at due unless a controller is connected then.
+// Of two ends, the later is kept: the grace runs from the latest departure,
+// so an earlier one is always stale -- an attempt that never joined putting
+// back the end it held, after a controller came and went meanwhile, must not
+// cut that controller's grace short. Nothing else ends a session its owner
 // has not given up: without this, a controller that left an allowed session
 // kept its owner busy until the session expired, and every other controller
 // was told the owner was already being helped.
@@ -576,6 +579,9 @@ func (s *Server) scheduleEnd(sessionID string, due time.Time) {
 	s.graceMu.Lock()
 	defer s.graceMu.Unlock()
 	if old, ok := s.graces[sessionID]; ok {
+		if !due.After(old.due) {
+			return
+		}
 		old.timer.Stop()
 	}
 	e := &graceEnd{due: due}

@@ -776,3 +776,37 @@ func TestAFailedAttemptDoesNotExtendTheControllerGrace(t *testing.T) {
 		t.Fatalf("state %s; failed attempts pushed the end back", got)
 	}
 }
+
+// Of two pending ends the later is kept: an earlier one, put back by an
+// attempt that never joined, does not replace the grace of a controller that
+// left more recently.
+func TestTheLaterControllerGraceWins(t *testing.T) {
+	srv, _ := newServer(t)
+	sm, sess := newSession(t)
+	srv.sessions = sm
+	late := time.Now().Add(time.Hour)
+	srv.scheduleEnd(sess.ID, late)
+	srv.scheduleEnd(sess.ID, time.Now()) // stale: would end it at once
+	time.Sleep(100 * time.Millisecond)
+	got, err := sm.GetSession(sess.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.State == session.StateTerminated {
+		t.Fatal("an earlier end replaced a later one")
+	}
+	srv.graceMu.Lock()
+	due := srv.graces[sess.ID].due
+	srv.graceMu.Unlock()
+	if !due.Equal(late) {
+		t.Fatalf("pending end due %v, want the later %v", due, late)
+	}
+	// A later end still replaces an earlier one.
+	srv.scheduleEnd(sess.ID, late.Add(time.Minute))
+	srv.graceMu.Lock()
+	due = srv.graces[sess.ID].due
+	srv.graceMu.Unlock()
+	if !due.Equal(late.Add(time.Minute)) {
+		t.Fatalf("pending end due %v, want the later one", due)
+	}
+}
