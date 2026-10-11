@@ -5,6 +5,7 @@ package signalling
 
 import (
 	"encoding/json"
+	"strings"
 
 	"github.com/barahn/remotekit/bark"
 )
@@ -48,6 +49,17 @@ const (
 	// so on the wire as well as in the prompt.
 	ConsentRequestType = "chirp.consent_request"
 )
+
+// relayTyped reports whether data carries a type in the relay's namespace. It
+// reads the type with the same decoder a client does (client.decode), and
+// with fewer fields to fail on, so anything a client would read as a relay
+// message, this reads as one too.
+func relayTyped(data []byte) bool {
+	var head struct {
+		Type string `json:"type"`
+	}
+	return json.Unmarshal(data, &head) == nil && strings.HasPrefix(head.Type, "chirp.")
+}
 
 // encodeError builds a relay error message for err.
 func encodeError(err error) []byte {
