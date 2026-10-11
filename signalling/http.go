@@ -351,6 +351,7 @@ func (s *Server) serveOwner(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		return // Upgrade has already written a response.
 	}
+	conn.SetReadLimit(MaxMessageSize)
 	peer := newWSConn(conn)
 
 	s.ownersMu.Lock()
@@ -467,6 +468,7 @@ func (s *Server) serveController(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		return
 	}
+	conn.SetReadLimit(MaxMessageSize)
 	peer := newWSConn(conn)
 	if err := s.hub.Join(sess.ID, RoleController, peer); err != nil {
 		_ = peer.Send(encodeError(err))
@@ -493,6 +495,13 @@ func (s *Server) serveController(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 }
+
+// MaxMessageSize bounds one message from either end, in bytes. A larger one
+// closes the socket that sent it, before the relay reads it into memory or
+// parses it (Hub.Forward reads every message's type). It matches what a Chirp
+// client accepts (client.Socket), so the relay never forwards a message the
+// other end would refuse anyway; signalling itself is a few kilobytes.
+const MaxMessageSize = 1 << 20
 
 // DefaultControllerGrace is ControllerGrace's default.
 const DefaultControllerGrace = 30 * time.Second

@@ -6,6 +6,7 @@ package signalling
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -669,5 +670,42 @@ func TestALeftSessionWaitsForTheControllerWithinTheGrace(t *testing.T) {
 	call(t, ts, "GET", "/api/peers/"+owner.PeerID, "", &p)
 	if _, st := redeem(t, ts, p.Code, "Carla"); st != http.StatusConflict {
 		t.Fatalf("redeeming within the grace: status %d, want 409", st)
+	}
+}
+
+// A message past MaxMessageSize closes the socket that sent it, unread and
+// unforwarded, whichever end it comes from.
+func TestAnOversizedMessageClosesTheSocket(t *testing.T) {
+	_, ts := newServer(t)
+	owner := register(t, ts, "Ana")
+	ownerWS := dialOwner(t, ts, owner.PeerID)
+	sess, _ := redeem(t, ts, owner.Code, "Bruno")
+	ctrl := dialController(t, ts, sess.SessionID)
+	awaitPeer(t, ctrl, RoleOwner)
+	awaitPeer(t, ownerWS, RoleController)
+	awaitConsentRequest(t, ownerWS)
+
+	big := append([]byte(`{"type":"offer","sdp":"`), make([]byte, MaxMessageSize)...)
+	if err := ctrl.WriteMessage(websocket.TextMessage, big); err != nil {
+		t.Fatal(err)
+	}
+	_ = ctrl.SetReadDeadline(time.Now().Add(5 * time.Second))
+	for {
+		if _, _, err := ctrl.ReadMessage(); err != nil {
+			if websocket.IsCloseError(err, websocket.CloseMessageTooBig) {
+				break
+			}
+			var ne interface{ Timeout() bool }
+			if errors.As(err, &ne) && ne.Timeout() {
+				t.Fatal("the relay kept the socket open after an oversized message")
+			}
+			break // closed
+		}
+	}
+	// The owner got a leave notice, not the message.
+	_ = ownerWS.SetReadDeadline(time.Now().Add(5 * time.Second))
+	_, m := read(t, ownerWS)
+	if m["type"] != PeerLeftType {
+		t.Fatalf("owner got %v, want %s", m, PeerLeftType)
 	}
 }
