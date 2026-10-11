@@ -8,8 +8,9 @@
 // It asks for consent in its own prompt and sends the answer (barahn/chirp#11).
 // A session the owner allows is served by remotekit's stream.Runner over the
 // owner socket, granted what the owner allowed and nothing more
-// (barahn/chirp#12). The controller's side, which shows that screen, is not
-// here yet: until it is, a session that is let in shows nothing.
+// (barahn/chirp#12). The controller's side shows that screen in a window of its
+// own with remotekit's stream.Viewer, decoded in Go, and sends the mouse and
+// keyboard back over the same WebRTC session.
 //
 // Usage:
 //
@@ -38,6 +39,7 @@ import (
 	"github.com/barahn/chirp/client"
 	"github.com/barahn/chirp/cmd/chirp/internal/ui"
 	"github.com/barahn/chirp/cmd/chirp/internal/warm"
+	"github.com/barahn/remotekit/bark"
 	"github.com/barahn/remotekit/stream"
 	"github.com/barahn/remotekit/webrtc"
 )
@@ -99,6 +101,12 @@ func main() {
 		})
 	}
 	w.OnCancel = func() { cancelHelp() }
+	// A session this machine is let into opens the other computer's screen
+	// in a window of its own; ending it, or closing that window, gives up
+	// the session like Cancel does.
+	c.View = func(ctx context.Context, conn *client.SessionConn) {
+		viewSession(ctx, conn, ice, w)
+	}
 
 	// Closing the window quits, and quitting gives the code and link up at
 	// once (barahn/chirp#50): no tray icon keeps a live code behind the
@@ -140,4 +148,21 @@ func iceConfig(list, username, password string) webrtc.PeerConfig {
 		}
 	}
 	return webrtc.PeerConfig{ICEServers: servers, TURNUsername: username, TURNPassword: password}
+}
+
+// viewSession shows a session this machine was let into, until it ends: the
+// other computer's screen through remotekit's viewer, and the user's mouse and
+// keyboard sent back over it. Whether input is applied is the other side's
+// runner's decision, from what its user allowed.
+func viewSession(ctx context.Context, conn *client.SessionConn, ice webrtc.PeerConfig, w *ui.Window) {
+	v := stream.NewViewer(stream.ViewerConfig{ID: "chirp-controller", AgentID: conn.ID, PeerConfig: &ice})
+	opened := make(chan *ui.Remote, 1)
+	fyne.Do(func() {
+		opened <- w.OpenRemote(func(ev bark.InputEvent) { _ = v.SendInput(ev) })
+	})
+	remote := <-opened
+	defer fyne.Do(remote.Close)
+	v.OnFrame(remote.Show)
+	v.OnNotice(func(n stream.Notice) { remote.Notice(n.Type) })
+	_ = v.Serve(ctx, conn)
 }

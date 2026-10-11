@@ -339,7 +339,7 @@ SOFTWARE.
 
 ### github.com/barahn/remotekit
 
-- Version: `v0.4.0`
+- Version: `v0.4.1-0.20261011140308-1fa867b04915`
 - License: Apache-2.0
 - Homepage: https://github.com/barahn/remotekit
 

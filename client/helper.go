@@ -6,6 +6,7 @@ package client
 import (
 	"context"
 	"errors"
+	"sync"
 	"time"
 )
 
@@ -106,6 +107,34 @@ func (c *Client) follow(ctx context.Context, sock *Socket, sess Session, emit fu
 	poll := time.NewTicker(c.pollEvery)
 	defer poll.Stop()
 	allowed := false
+
+	// conn carries the session's signals once the owner lets this machine
+	// in; before that, what arrives is dropped. Whatever shows the session
+	// is waited for before Help returns.
+	var conn *SessionConn
+	var viewing sync.WaitGroup
+	defer func() {
+		if conn != nil {
+			_ = conn.Close()
+		}
+		viewing.Wait()
+	}()
+	letIn := func(s Session) {
+		emit(HelperEvent{Phase: HelperAllowed, Session: s})
+		allowed = true
+		if c.View == nil {
+			return
+		}
+		cn := newSessionConn(s.ID, nil, sock.Send)
+		conn = cn
+		viewing.Add(1)
+		go func() {
+			defer viewing.Done()
+			defer func() { _ = cn.Close() }()
+			c.View(ctx, cn)
+		}()
+	}
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -116,6 +145,12 @@ func (c *Client) follow(ctx context.Context, sock *Socket, sess Session, emit fu
 			}
 			return
 		case m := <-msgs:
+			if !m.FromRelay() {
+				if conn != nil {
+					conn.deliver(m.Raw, ctx.Done())
+				}
+				continue
+			}
 			switch m.Type {
 			case TypePeerJoined:
 				// Both ends are in, so the relay is asking the owner now
@@ -143,8 +178,7 @@ func (c *Client) follow(ctx context.Context, sock *Socket, sess Session, emit fu
 				emit(HelperEvent{Phase: HelperAsking, Session: s})
 			case StateConsentGranted, StateActive:
 				if !allowed {
-					emit(HelperEvent{Phase: HelperAllowed, Session: s})
-					allowed = true
+					letIn(s)
 				}
 			case StateConsentDenied:
 				emit(HelperEvent{Phase: HelperDeclined, Session: s})

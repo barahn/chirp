@@ -354,7 +354,7 @@ func (o *Owner) startSession(ctx context.Context, sessionID string) {
 		return
 	}
 	o.endSession()
-	conn := newSessionConn(o, req)
+	conn := newSessionConn(req.SessionID, req.Permissions, o.send)
 	o.active = conn
 	o.serving.Add(1)
 	go func() {

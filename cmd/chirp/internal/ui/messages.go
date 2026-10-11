@@ -33,7 +33,21 @@ const (
 	noServerTitle  = "No Chirp server is set"
 	noServerText   = "Start Chirp with -relay and the address of your server, or set CHIRP_RELAY. There is no public Chirp server yet."
 	badServerTitle = "That server address doesn't work"
+	remoteTitle    = "Their screen"
+	remoteEnd      = "End"
 )
+
+// remoteNotice is what the remote screen says when the other computer sends a
+// notice instead of its picture, or "" for one not worth showing.
+func remoteNotice(kind string) string {
+	switch kind {
+	case "consent_required":
+		return "They haven't allowed you to see their screen."
+	case "capture_unavailable":
+		return "Their computer can't share its screen right now. Ask them whether it allows screen recording."
+	}
+	return ""
+}
 
 // statusText names the owner's phase, for the label beside the wordmark.
 func statusText(p client.OwnerPhase) string {
