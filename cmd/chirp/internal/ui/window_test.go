@@ -49,8 +49,13 @@ func TestTheCodeAndLinkCanBeCopied(t *testing.T) {
 		t.Errorf("copied code = %q", got)
 	}
 	test.Tap(w.copyLink)
-	if got := w.app.Clipboard().Content(); got != token {
+	got := w.app.Clipboard().Content()
+	if got != "https://usechirp.app/l#"+token {
 		t.Errorf("copied link = %q", got)
+	}
+	// What one Chirp copies, another must accept when it is pasted.
+	if target, err := client.ParseTarget(got); err != nil || target.Token != token {
+		t.Errorf("ParseTarget(copied link) = %+v, %v", target, err)
 	}
 	if w.copyLink.Text != "Link copied" {
 		t.Errorf("copy link button says %q after copying", w.copyLink.Text)
