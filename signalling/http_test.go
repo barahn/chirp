@@ -488,20 +488,27 @@ func TestRoleIsRequired(t *testing.T) {
 }
 
 func TestOwnerSocketNeedsItsCredential(t *testing.T) {
-	_, ts := newServer(t)
+	srv, ts := newServer(t)
 	if _, resp, err := dial(t, ts, url.Values{"role": {"owner"}, "peer": {"nobody"}}); err == nil ||
 		resp == nil || resp.StatusCode != http.StatusNotFound {
 		t.Fatalf("unknown peer: err %v", err)
 	}
 	owner := register(t, ts, "Ana")
 	first := dialOwner(t, ts, owner.PeerID)
-	// A second socket for the same peer is refused -- before the upgrade, or
-	// on it if the first was still registering -- and the first stays.
-	c, _, err := dial(t, ts, url.Values{"role": {"owner"}, "peer": {owner.PeerID}})
-	if err == nil {
-		if _, m := read(t, c); m["type"] != RelayErrorType {
-			t.Fatalf("second owner socket got %v, want a relay error", m)
-		}
+	// Dial returns once the upgrade is written, and the relay registers the
+	// socket only after that. A second socket dialled before then can register
+	// first, and the first socket is the one refused, so wait for it.
+	waitFor(t, "the relay to register the first owner socket", func() bool {
+		srv.ownersMu.Lock()
+		defer srv.ownersMu.Unlock()
+		_, open := srv.owners[rendezvous.PeerID(owner.PeerID)]
+		return open
+	})
+	// A second socket for the same peer is then refused before the upgrade,
+	// and the first stays.
+	if _, resp, err := dial(t, ts, url.Values{"role": {"owner"}, "peer": {owner.PeerID}}); err == nil ||
+		resp == nil || resp.StatusCode != http.StatusConflict {
+		t.Fatalf("second owner socket: err %v, want %d", err, http.StatusConflict)
 	}
 	sess, _ := redeem(t, ts, owner.Code, "Bruno")
 	ctrl := dialController(t, ts, sess.SessionID)

@@ -46,10 +46,10 @@ anything configured on GitHub that is not there is drift.
 
 Required checks, on both: `Build, Test & SAST` (build, vet, lint, `-race`
 tests, DCO, third-party licences, gosec, govulncheck), `gitleaks`,
-`Analyze (Go)` (CodeQL) and `Review dependency changes`. The last two are
-skipped until the `CODE_SCANNING` variable is set — see
-[devsecops.md](devsecops.md) — and a skipped required check counts as
-passing, so they enforce nothing until then.
+`Analyze (Go)` (CodeQL) and `Review dependency changes`. The last two run
+only while the `CODE_SCANNING` variable is set, as it is here — see
+[devsecops.md](devsecops.md). Where it is not set they are skipped, and a
+skipped required check counts as passing, so they enforce nothing there.
 
 On `main`, `bypass_actors` is empty on purpose: the rules bind administrators
 too. On `develop` the repository admin may bypass them — see below.
@@ -88,10 +88,10 @@ first written would have blocked every merge. The maintainer's decision:
   `develop-protected.json` that is `bypass_actors` with `actor_type`
   `RepositoryRole`, `actor_id` `5` and `bypass_mode` `pull_request`. The admin
   can merge a pull request into `develop` without a second approval, but cannot
-  push to it directly. Role `5` is the repository admin role as far as this
-  file's author first assumed. Confirmed on import (2026-10-10): the rulesets
-  API reports `current_user_can_bypass: pull_requests_only` on `develop` for
-  the repository admin.
+  push to it directly. Role `5` is the repository admin role, as this file's
+  author first assumed. Confirmed on import (2026-10-10): the rulesets API
+  reports `current_user_can_bypass: pull_requests_only` on `develop` for the
+  repository admin.
 - **`main`: no bypass.** A release still needs a second person with write
   access to approve it.
 
@@ -105,6 +105,14 @@ Nothing else in the repository pushes to a protected branch. The `HANDOFF.md`
 snapshot used to be committed to `main` by a workflow; it is now checked in CI
 instead, so no bot needs a bypass.
 
+### Release tags
+
+A release tag, `v*`, cannot be deleted, moved or force-pushed once it exists,
+by anyone: `release-tags-protected.json` has no bypass. The SBOM attached to a
+release describes the commit its tag points at, and a tag that could move would
+leave the SBOM describing something else. Creating a tag is not restricted, so
+tagging a release needs nothing new.
+
 ## Applying the rules
 
 In the UI: **Settings → Rules → Rulesets → New ruleset → Import a ruleset**,
@@ -115,12 +123,8 @@ Through the API (needs a token with `administration:write`):
 ```sh
 gh api -X POST repos/barahn/chirp/rulesets --input .github/rulesets/main-protected.json
 gh api -X POST repos/barahn/chirp/rulesets --input .github/rulesets/develop-protected.json
-gh api -X POST repos/barahn/chirp/rulesets --input .github/rulesets/tags-protected.json
+gh api -X POST repos/barahn/chirp/rulesets --input .github/rulesets/release-tags-protected.json
 ```
-
-`tags-protected.json` keeps a `v*` tag from being deleted or moved once it is
-pushed, so an SBOM published against a release always describes that release.
-Creating a tag is not restricted.
 
 All three are imported (barahn/chirp#17). Any ruleset on GitHub that is not one
 of these files is drift: compare with

@@ -3,7 +3,7 @@
 ## Reporting a vulnerability
 
 **Do not open a public issue.** Email
-[security@mendsec.com](mailto:security@mendsec.com).
+[security@fabrintek.com.br](mailto:security@fabrintek.com.br).
 
 Chirp lets one person control another person's machine. A bug in code or link
 generation, redemption, the lookup, the session lifecycle or the consent flow is
@@ -106,13 +106,13 @@ own policy.
 | gitleaks | Is a credential being committed | every push and PR, weekly |
 | Third-party licence gate | Can Fabrintek pass every dependency on | every push and PR |
 | DCO sign-off | Is the origin of each commit certified | every PR |
-| CodeQL (`security-extended`) | Does untrusted data reach a dangerous sink | every push and PR |
+| CodeQL (`security-extended`) | Does untrusted data reach a dangerous sink | every push and PR, weekly |
 | Dependency Review | What does this pull request *add*, and under what licence | every PR |
 
-Both are gated on the `CODE_SCANNING` repository variable, which is set now that
-the repository is public; see [docs/devsecops.md](docs/devsecops.md). Secret
-scanning with push protection, Dependabot alerts and private vulnerability
-reporting are on as well.
+CodeQL and dependency review run while the `CODE_SCANNING` variable is set, as
+it is on this public repository. A private copy needs GitHub Advanced Security
+for them; there the variable stays unset, and every run warns that they are
+off. See [docs/devsecops.md](docs/devsecops.md).
 
 None of these is a substitute for reading the diff. They catch the classes of
 mistake a reviewer reliably misses; they do not catch a consent check that is
