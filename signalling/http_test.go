@@ -743,3 +743,36 @@ func TestTheControllerGraceRunsFromTheLatestDeparture(t *testing.T) {
 		return state(t, ts, sess.SessionID) == string(session.StateTerminated)
 	})
 }
+
+// An attempt that never joins -- here a plain request, not a WebSocket --
+// does not buy the session more time: the end stays due when it was.
+func TestAFailedAttemptDoesNotExtendTheControllerGrace(t *testing.T) {
+	srv, ts := newServer(t)
+	srv.ControllerGrace = time.Second
+	owner := register(t, ts, "Ana")
+	ownerWS := dialOwner(t, ts, owner.PeerID)
+	sess, _ := redeem(t, ts, owner.Code, "Bruno")
+	ctrl := dialController(t, ts, sess.SessionID)
+	awaitPeer(t, ctrl, RoleOwner)
+	awaitPeer(t, ownerWS, RoleController)
+	awaitConsentRequest(t, ownerWS)
+	_ = consent(t, ts, owner.PeerID, sess.SessionID, true)
+
+	_ = ctrl.Close()
+	left := time.Now()
+	waitFor(t, "controller left", func() bool { c, _ := srv.Hub().Connected(sess.SessionID); return !c })
+	time.Sleep(500 * time.Millisecond)
+	for i := 0; i < 3; i++ {
+		resp, err := http.Get(ts.URL + "/ws?role=controller&session=" + sess.SessionID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = resp.Body.Close()
+	}
+
+	// Due a second after the departure, not a second after the attempts.
+	time.Sleep(time.Until(left.Add(1300 * time.Millisecond)))
+	if got := state(t, ts, sess.SessionID); got != string(session.StateTerminated) {
+		t.Fatalf("state %s; failed attempts pushed the end back", got)
+	}
+}

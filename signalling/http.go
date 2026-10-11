@@ -62,9 +62,16 @@ type Server struct {
 	owners   map[rendezvous.PeerID]*ownerConn
 
 	// graces holds, per session, the pending end of a controller that
-	// left; see holdSession and releaseSession.
+	// left; see holdSession and scheduleEnd.
 	graceMu sync.Mutex
-	graces  map[string]*time.Timer
+	graces  map[string]*graceEnd
+}
+
+// graceEnd is a session's pending end: when it is due, and the timer that
+// carries it out.
+type graceEnd struct {
+	due   time.Time
+	timer *time.Timer
 }
 
 // ownerConn is an owner's socket and the session it is joined to, if any.
@@ -90,7 +97,7 @@ func NewServer(sm *session.SessionManager) *Server {
 		hub:      NewHub(sm),
 		sessions: sm,
 		owners:   make(map[rendezvous.PeerID]*ownerConn),
-		graces:   make(map[string]*time.Timer),
+		graces:   make(map[string]*graceEnd),
 		upgrader: websocket.Upgrader{
 			HandshakeTimeout: 10 * time.Second,
 			// Same-origin checking is left off because Chirp is a binary, not
@@ -461,12 +468,23 @@ func (s *Server) serveController(w http.ResponseWriter, r *http.Request) {
 		writeSessionError(w, err)
 		return
 	}
-	// A controller dialling back cancels the end its leaving scheduled, and
-	// schedules a new one however this attempt ends. The session is read
-	// again after the cancellation: an end that won the race has already
-	// made it inadmissible.
-	s.holdSession(id)
-	defer s.releaseSession(id)
+	// A controller dialling back holds the end its leaving scheduled, before
+	// admission is decided; the session is read again after, since an end
+	// that won the race has already made it inadmissible. If this attempt
+	// never joins -- refused, or not a WebSocket at all -- the end goes back
+	// as it was, due when it was due: a failed attempt must not buy the
+	// session more time. Only a controller that joined schedules a new one,
+	// when it leaves.
+	held := s.holdSession(id)
+	joined := false
+	defer func() {
+		switch {
+		case joined:
+			s.scheduleEnd(id, time.Now().Add(s.controllerGrace()))
+		case held != nil:
+			s.scheduleEnd(id, held.due)
+		}
+	}()
 	sess, err := s.sessions.GetSession(id)
 	if err != nil {
 		writeSessionError(w, err)
@@ -491,6 +509,7 @@ func (s *Server) serveController(w http.ResponseWriter, r *http.Request) {
 		_ = peer.Close()
 		return
 	}
+	joined = true
 	defer func() {
 		s.hub.Leave(sess.ID, RoleController)
 		_ = peer.Close()
@@ -521,51 +540,58 @@ const MaxMessageSize = 1 << 20
 // DefaultControllerGrace is ControllerGrace's default.
 const DefaultControllerGrace = 30 * time.Second
 
-// holdSession cancels the pending end of sessionID, if a controller that
-// left scheduled one.
-func (s *Server) holdSession(sessionID string) {
-	s.graceMu.Lock()
-	defer s.graceMu.Unlock()
-	if t, ok := s.graces[sessionID]; ok {
-		t.Stop()
-		delete(s.graces, sessionID)
+// controllerGrace is ControllerGrace, or its default.
+func (s *Server) controllerGrace() time.Duration {
+	if s.ControllerGrace > 0 {
+		return s.ControllerGrace
 	}
+	return DefaultControllerGrace
 }
 
-// releaseSession schedules sessionID's end once ControllerGrace has passed
-// without a controller dialling back, replacing any end already pending, so
-// the grace always runs from the latest departure. Nothing else ends a session
-// its owner has not given up: without this, a controller that left an allowed
-// session kept its owner busy until the session expired, and every other
-// controller was told the owner was already being helped.
+// holdSession takes sessionID's pending end, if a controller that left
+// scheduled one, and stops it. The caller puts it back with scheduleEnd if it
+// turns out not to be needed.
+func (s *Server) holdSession(sessionID string) *graceEnd {
+	s.graceMu.Lock()
+	defer s.graceMu.Unlock()
+	e, ok := s.graces[sessionID]
+	if !ok {
+		return nil
+	}
+	e.timer.Stop()
+	delete(s.graces, sessionID)
+	return e
+}
+
+// scheduleEnd ends sessionID at due unless a controller is connected then,
+// replacing any end already pending. Nothing else ends a session its owner
+// has not given up: without this, a controller that left an allowed session
+// kept its owner busy until the session expired, and every other controller
+// was told the owner was already being helped.
 //
 // The end runs under graceMu and only if it is still the pending one, so a
 // controller dialling back -- whose holdSession takes the same lock before
-// admission is decided -- either cancels it first or finds the session over.
-func (s *Server) releaseSession(sessionID string) {
-	grace := s.ControllerGrace
-	if grace <= 0 {
-		grace = DefaultControllerGrace
-	}
+// admission is decided -- either takes it first or finds the session over.
+func (s *Server) scheduleEnd(sessionID string, due time.Time) {
 	s.graceMu.Lock()
 	defer s.graceMu.Unlock()
 	if old, ok := s.graces[sessionID]; ok {
-		old.Stop()
+		old.timer.Stop()
 	}
-	var t *time.Timer
-	t = time.AfterFunc(grace, func() {
+	e := &graceEnd{due: due}
+	e.timer = time.AfterFunc(time.Until(due), func() {
 		s.graceMu.Lock()
 		defer s.graceMu.Unlock()
-		if s.graces[sessionID] != t {
-			return // replaced or cancelled
+		if s.graces[sessionID] != e {
+			return // replaced or taken
 		}
 		delete(s.graces, sessionID)
 		if controller, _ := s.hub.Connected(sessionID); controller {
-			return // another controller connection is still up
+			return // a controller is connected
 		}
 		_, _ = s.sessions.EndSession(sessionID)
 	})
-	s.graces[sessionID] = t
+	s.graces[sessionID] = e
 }
 
 // maybeAskConsent asks the owner for consent once both ends are in the hub,
