@@ -88,10 +88,10 @@ first written would have blocked every merge. The maintainer's decision:
   `develop-protected.json` that is `bypass_actors` with `actor_type`
   `RepositoryRole`, `actor_id` `5` and `bypass_mode` `pull_request`. The admin
   can merge a pull request into `develop` without a second approval, but cannot
-  push to it directly. Role `5` is the repository admin role as far as this
-  file's author knows; **after importing, confirm in the UI that the bypass
-  list names "Repository admin"**, since the numeric role ids were not checked
-  against the API.
+  push to it directly. Role `5` is the repository admin role, as this file's
+  author first assumed. Confirmed on import (2026-10-10): the rulesets API
+  reports `current_user_can_bypass: pull_requests_only` on `develop` for the
+  repository admin.
 - **`main`: no bypass.** A release still needs a second person with write
   access to approve it.
 
@@ -125,6 +125,10 @@ gh api -X POST repos/barahn/chirp/rulesets --input .github/rulesets/main-protect
 gh api -X POST repos/barahn/chirp/rulesets --input .github/rulesets/develop-protected.json
 gh api -X POST repos/barahn/chirp/rulesets --input .github/rulesets/release-tags-protected.json
 ```
+
+All three are imported (barahn/chirp#17). Any ruleset on GitHub that is not one
+of these files is drift: compare with
+`gh api repos/barahn/chirp/rulesets --jq '.[].name'`.
 
 To make `develop` the default branch:
 

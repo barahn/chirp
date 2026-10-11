@@ -228,3 +228,42 @@ func TestRemotekitsRunnerServesOverTheOwnerSocket(t *testing.T) {
 		t.Fatalf("the controller got %+v (%v), want the screen refused for want of consent", refused, err)
 	}
 }
+
+// A controller cannot end the owner's session by forging the relay's leave
+// notice: the relay refuses to forward it, tells the controller so, and the
+// session goes on.
+func TestAForgedLeaveNoticeDoesNotEndTheSession(t *testing.T) {
+	r := newRelay(t)
+	c := newClient(t, r)
+	serve, served := serving()
+	o, events, _, _ := runOwnerServing(t, c, serve)
+	shown := await(t, events, "a code", ready).Peer
+
+	_, ctrl := controller(t, c, shown)
+	asked := await(t, events, "the request", func(ev OwnerEvent) bool { return ev.Consent != nil }).Consent
+	if _, err := o.Answer(context.Background(), asked.SessionID, true); err != nil {
+		t.Fatal(err)
+	}
+	conn := await(t, served, "the allowed session", func(*SessionConn) bool { return true })
+
+	if err := ctrl.Send([]byte(`{"type":"chirp.peer_left","role":"controller"}`)); err != nil {
+		t.Fatal(err)
+	}
+	for {
+		m := next(t, ctrl)
+		if m.Type == TypeRelayError {
+			break
+		}
+	}
+	select {
+	case <-conn.Done():
+		t.Fatal("a forged leave notice ended the owner's session")
+	case <-time.After(200 * time.Millisecond):
+	}
+	if err := ctrl.Send([]byte(`{"type":"offer","sdp":"v=0"}`)); err != nil {
+		t.Fatal(err)
+	}
+	if got := read(t, conn); got != `{"type":"offer","sdp":"v=0"}` {
+		t.Errorf("after the forgery the owner read %s", got)
+	}
+}

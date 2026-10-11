@@ -692,7 +692,12 @@ The plan, with what decision 5 settled:
    replay-checked with `NonceCache`.
 4. **Relay messages stay unauthenticated** — they come from the relay by
    definition — so an end must treat `chirp.*` messages as hints (presence,
-   errors) and never act on them for anything security-relevant.
+   errors) and never act on them for anything security-relevant. Clients tell
+   them from forwarded signals by the prefix alone, so the hub refuses to
+   forward any payload typed `chirp.*` (`ErrReservedType`): otherwise either
+   end could forge one, as a controller sending `chirp.peer_left` would stop
+   the owner's runner while staying connected (found in review of
+   barahn/chirp#60).
 
 This is why decision 5 cannot be met by adopting `signed.go` alone.
 
