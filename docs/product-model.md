@@ -171,6 +171,24 @@ Decided by the maintainer:
      relay to anyone. Changing the code format then is accepted: Chirp is
      pre-1.0.
 
+6. **Chirp's domain is `usechirp.app`.** It was registered on 2026-10-10.
+   It carries the website, and the page a link opens is part of it, so the
+   links people send each other carry the domain too. That makes it the
+   address people will learn to trust. "Use Chirp" reads the same in
+   Portuguese and in English, and `.app` is preloaded as HTTPS-only in
+   browsers, so a link to it never opens over plain HTTP.
+
+   - **The site and the link use it first.** The site is static, served by
+     GitHub Pages: it offers the download and the page a link opens
+     (decision 4), and needs no relay. *Copy link* copies
+     `https://usechirp.app/l#<token>`, which works whatever relay its users
+     run, because the page only says what to do with the link.
+   - **The relay and the lookup do not, yet.** They come with the public
+     server of decision 5. Until then a Chirp reaches only a relay its users
+     run or trust, given with `-relay`, so relay examples and tests keep
+     names reserved for examples (RFC 2606). Showing `usechirp.app` there
+     would suggest a public relay that is not offered yet.
+
 ## Where the pieces live
 
 The mechanism behind this — allocating and redeeming codes, minting codes from a

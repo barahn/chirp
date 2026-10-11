@@ -1,0 +1,67 @@
+name: Website
+
+# Publishes usechirp.app (product-model decision 6) to GitHub Pages from the
+# default branch. The pages are in site/; scripts/build-site.sh adds the
+# fonts and icon cmd/chirp embeds, so a change to either republishes.
+on:
+  push:
+    branches: [ develop ]
+    paths:
+      - 'site/**'
+      - 'cmd/chirp/internal/warm/fonts/**'
+      - 'cmd/chirp/internal/warm/bird/icon.svg'
+      - 'scripts/build-site.sh'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One deployment at a time, and never cut one off halfway: a newer push
+# waits for it and then publishes over it.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build the site
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        continue-on-error: true
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Assemble
+        run: ./scripts/build-site.sh _site
+
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: _site
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    # A manual run can be started on any branch; only develop, which takes
+    # changes through review, may reach usechirp.app. Other runs still build,
+    # so a branch can be checked without publishing it.
+    if: github.ref == 'refs/heads/develop'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Only this job can publish, and only through the github-pages
+    # environment, whose deployment-branch rule is the repository's to set.
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

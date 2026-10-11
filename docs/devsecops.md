@@ -40,24 +40,26 @@ not CLA acceptance, and that external pull requests are not merged yet.
 | `dependency-review.yml` | PR — **when `CODE_SCANNING` is set** | what the PR adds: advisories at `low` and above, denied licences |
 | `sbom.yml` | release tags | SPDX SBOM attached to the release |
 
-### CodeQL and dependency review are off until `CODE_SCANNING` is set
+### CodeQL and dependency review are gated on `CODE_SCANNING`
 
-This repository is private, and on a private repository GitHub runs both only
-with GitHub Advanced Security (Code Security). That was observed, not assumed:
-on barahn/chirp#1, dependency review failed with *"not supported on this
-repository ... ensure Dependency graph is enabled along with GitHub Advanced
-Security"*, and CodeQL's analysis completed but the job ended in a
-configuration error. The CodeQL licence also permits analysing private code
-only under that entitlement, so this is not a gate to force through.
+Both jobs run only when the repository variable `CODE_SCANNING` is `true`.
+This repository is public, where both are free, and the variable is set: they
+run on every pull request and are required checks on `develop` and `main`.
 
-Both jobs therefore run only when the repository variable `CODE_SCANNING` is
-`true`. Set it once the repository is public — where both are free — or once
+The gate exists for private copies. On a private repository GitHub runs both
+only with GitHub Advanced Security (Code Security). That was observed, not
+assumed: while this repository was private, on barahn/chirp#1, dependency
+review failed with *"not supported on this repository ... ensure Dependency
+graph is enabled along with GitHub Advanced Security"*, and CodeQL's analysis
+completed but the job ended in a configuration error. The CodeQL licence also
+permits analysing private code only under that entitlement, so this is not a
+gate to force through. On such a copy leave the variable unset, or set it once
 Code Security is enabled. Until then each run carries a warning saying the gate
 is off, so its absence is visible rather than quietly green.
 
 Note the interaction with required checks: a skipped job **counts as passing**.
-Marking `Analyze (Go)` or `Review dependency changes` as required before
-`CODE_SCANNING` is set enforces nothing.
+Where `CODE_SCANNING` is not set, marking `Analyze (Go)` or
+`Review dependency changes` as required enforces nothing.
 
 Why the overlaps are not redundant:
 
@@ -124,8 +126,11 @@ are the half of DevSecOps that a pull request cannot deliver:
    - Workflow permissions: read-only by default.
    - Require approval for all outside collaborators' workflow runs.
 
-5. **Tag protection** for `v*.*.*`, so a release tag cannot be moved after an
-   SBOM has been published against it.
+5. **Tag protection** for release tags, so a tag cannot be moved after an SBOM
+   has been published against it. It is a ruleset too,
+   `.github/rulesets/release-tags-protected.json`, imported like the branch
+   rules: no one may delete, move or force-push a `v*` tag
+   ([branching.md](branching.md#release-tags)).
 
 ## When a gate fails
 
