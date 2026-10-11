@@ -4,7 +4,7 @@
 
 # Chirp — remote help
 
-**Download it, run it, read your chirp.**
+**Download it, run it, send your chirp.**
 
 Remote help between two people who trust each other. Nothing to install, no
 account, and nothing happens on your screen until you press *Allow*.
@@ -38,9 +38,10 @@ account, and nothing happens on your screen until you press *Allow*.
 1. **Run Chirp.** It is one program, the same for everyone: no installer, no
    account, no technician edition. It shows your chirp — a short code — and a
    link you can send instead.
-2. **Read your chirp to someone you trust.** They type it into their own
-   Chirp, or paste your link. Every use of the link makes a fresh single-use
-   code, so a code that leaks after it was used opens nothing.
+2. **Send your chirp to someone you trust.** Read them the code, or send them
+   the link. They type the code into their own Chirp, or paste the link. Every
+   use of the link makes a fresh single-use code, so a code that leaks after it
+   was used opens nothing.
 3. **You decide.** Your Chirp asks you, on your own screen, who is asking and
    for what. Nothing starts until you press *Allow*.
 
