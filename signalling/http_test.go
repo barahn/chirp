@@ -619,3 +619,55 @@ func TestControllerReconnectionDoesNotAskAgain(t *testing.T) {
 		t.Fatalf("owner got %s after a reconnection", data)
 	}
 }
+
+// A controller that leaves and does not come back frees its owner once the
+// grace is over: the session ends, and the owner's next code opens a new one.
+func TestALeftSessionEndsAfterTheControllerGrace(t *testing.T) {
+	srv, ts := newServer(t)
+	srv.ControllerGrace = 100 * time.Millisecond
+	owner := register(t, ts, "Ana")
+	ownerWS := dialOwner(t, ts, owner.PeerID)
+	sess, _ := redeem(t, ts, owner.Code, "Bruno")
+	ctrl := dialController(t, ts, sess.SessionID)
+	awaitPeer(t, ctrl, RoleOwner)
+	awaitPeer(t, ownerWS, RoleController)
+	awaitConsentRequest(t, ownerWS)
+	if st := consent(t, ts, owner.PeerID, sess.SessionID, true); st != http.StatusOK {
+		t.Fatalf("consent status %d", st)
+	}
+
+	_ = ctrl.Close()
+	waitFor(t, "the session to end", func() bool {
+		return state(t, ts, sess.SessionID) == string(session.StateTerminated)
+	})
+	var p peerView
+	call(t, ts, "GET", "/api/peers/"+owner.PeerID, "", &p)
+	if _, st := redeem(t, ts, p.Code, "Carla"); st != http.StatusCreated {
+		t.Fatalf("redeeming the owner's next code: status %d, want 201", st)
+	}
+}
+
+// Within the grace the owner is still busy, so the controller can resume.
+func TestALeftSessionWaitsForTheControllerWithinTheGrace(t *testing.T) {
+	srv, ts := newServer(t)
+	srv.ControllerGrace = time.Hour
+	owner := register(t, ts, "Ana")
+	ownerWS := dialOwner(t, ts, owner.PeerID)
+	sess, _ := redeem(t, ts, owner.Code, "Bruno")
+	ctrl := dialController(t, ts, sess.SessionID)
+	awaitPeer(t, ctrl, RoleOwner)
+	awaitPeer(t, ownerWS, RoleController)
+	awaitConsentRequest(t, ownerWS)
+	_ = consent(t, ts, owner.PeerID, sess.SessionID, true)
+
+	_ = ctrl.Close()
+	waitFor(t, "controller left", func() bool { c, _ := srv.Hub().Connected(sess.SessionID); return !c })
+	if got := state(t, ts, sess.SessionID); got != string(session.StateConsentGranted) {
+		t.Fatalf("state %s within the grace, want it still granted", got)
+	}
+	var p peerView
+	call(t, ts, "GET", "/api/peers/"+owner.PeerID, "", &p)
+	if _, st := redeem(t, ts, p.Code, "Carla"); st != http.StatusConflict {
+		t.Fatalf("redeeming within the grace: status %d, want 409", st)
+	}
+}

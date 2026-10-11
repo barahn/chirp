@@ -52,6 +52,12 @@ type Server struct {
 	// itself and choose a fresh origin for every guess.
 	ClientIP func(*http.Request) string
 
+	// ControllerGrace is how long a session waits for a controller whose
+	// socket dropped to dial back before the relay ends it. Until then the
+	// owner stays busy, so a dropped controller can resume; after, the owner
+	// is free for the next one. Zero means DefaultControllerGrace.
+	ControllerGrace time.Duration
+
 	ownersMu sync.Mutex
 	owners   map[rendezvous.PeerID]*ownerConn
 }
@@ -470,6 +476,7 @@ func (s *Server) serveController(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		s.hub.Leave(sess.ID, RoleController)
 		_ = peer.Close()
+		s.endUnlessRejoined(sess.ID)
 	}()
 
 	s.maybeAskConsent(sess.ID)
@@ -485,6 +492,27 @@ func (s *Server) serveController(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+}
+
+// DefaultControllerGrace is ControllerGrace's default.
+const DefaultControllerGrace = 30 * time.Second
+
+// endUnlessRejoined ends a session whose controller has left, once
+// ControllerGrace has passed without it dialling back. Nothing else ends a
+// session its owner has not given up: without this, a controller that left
+// an allowed session kept its owner busy until the session expired, and every
+// other controller was told the owner was already being helped.
+func (s *Server) endUnlessRejoined(sessionID string) {
+	grace := s.ControllerGrace
+	if grace <= 0 {
+		grace = DefaultControllerGrace
+	}
+	time.AfterFunc(grace, func() {
+		if controller, _ := s.hub.Connected(sessionID); controller {
+			return // it came back
+		}
+		_, _ = s.sessions.EndSession(sessionID)
+	})
 }
 
 // maybeAskConsent asks the owner for consent once both ends are in the hub,
