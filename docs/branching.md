@@ -46,10 +46,10 @@ anything configured on GitHub that is not there is drift.
 
 Required checks, on both: `Build, Test & SAST` (build, vet, lint, `-race`
 tests, DCO, third-party licences, gosec, govulncheck), `gitleaks`,
-`Analyze (Go)` (CodeQL) and `Review dependency changes`. The last two are
-skipped until the `CODE_SCANNING` variable is set — see
-[devsecops.md](devsecops.md) — and a skipped required check counts as
-passing, so they enforce nothing until then.
+`Analyze (Go)` (CodeQL) and `Review dependency changes`. The last two run
+only while the `CODE_SCANNING` variable is set, as it is here — see
+[devsecops.md](devsecops.md). Where it is not set they are skipped, and a
+skipped required check counts as passing, so they enforce nothing there.
 
 On `main`, `bypass_actors` is empty on purpose: the rules bind administrators
 too. On `develop` the repository admin may bypass them — see below.

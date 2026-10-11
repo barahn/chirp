@@ -9,6 +9,10 @@
 Remote help between two people who trust each other. Nothing to install, no
 account, and nothing happens on your screen until you press *Allow*.
 
+**[usechirp.app](https://usechirp.app)** ·
+[How Chirp works](docs/product-model.md) ·
+[Roadmap](https://github.com/orgs/barahn/projects/2)
+
 [![License](https://img.shields.io/badge/License-AGPL--3.0-blue.svg?style=flat-square)](LICENSE)
 [![CI](https://github.com/barahn/chirp/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/barahn/chirp/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/barahn/chirp/actions/workflows/codeql.yml/badge.svg?branch=develop)](https://github.com/barahn/chirp/actions/workflows/codeql.yml)
@@ -154,10 +158,10 @@ issue. See [SECURITY.md](SECURITY.md).
 
 Chirp grants remote control of an end user's machine, so its pipeline treats
 that as the threat model rather than an afterthought: every pull request runs
-gosec, govulncheck, gitleaks and a third-party licence gate, with every action
-pinned to a commit SHA. CodeQL and dependency review are wired in too, and
-turn on when the repository has code scanning available. What each gate is
-for, and the repository settings that back it, are in
+gosec, govulncheck, gitleaks, a third-party licence gate, CodeQL and
+dependency review, with every action pinned to a commit SHA, and all of them
+are required checks on `develop` and `main`. What each gate is for, and the
+repository settings that back it, are in
 [docs/devsecops.md](docs/devsecops.md).
 
 ## Contributing
