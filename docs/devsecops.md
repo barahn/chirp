@@ -132,6 +132,9 @@ are the half of DevSecOps that a pull request cannot deliver:
    rules: no one may delete, move or force-push a `v*` tag
    ([branching.md](branching.md#release-tags)).
 
+All five are applied as of 2026-10-10 (barahn/chirp#17), when the repository
+went public.
+
 ## When a gate fails
 
 Fix the finding. The escape hatches, in order of preference:
