@@ -23,7 +23,7 @@ of that single image, and nothing else needs inventing.
 | Thing | Word on screen | Word in marketing and help |
 | --- | --- | --- |
 | The product | Chirp | Chirp |
-| The code | your code | your chirp ("read your chirp to someone you trust") |
+| The code | your code | your chirp ("send your chirp to someone you trust") |
 | The link | your link | your chirp, sent as a link |
 | Typing someone else's code | Help someone | answer a chirp |
 | The mascot | the bird | your bird |
@@ -60,8 +60,15 @@ and has no name of its own: it is *your bird*, as TunnelBear's is *your Bear*.
 | A skippable Quick Guide | Hints inside the main window, so nothing has to remember that the guide was seen (open decision 1, barahn/chirp#49) |
 
 What Chirp does **not** take: the installer, the account, email
-verification and two-factor login. *Download it, run it, read your chirp* is
+verification and two-factor login. *Download it, run it, send your chirp* is
 the whole setup, and it is the thing to sell.
+
+*Send* covers both ways to share: reading the code aloud and sending the
+link. In Portuguese it is *Baixe, abra, mande seu chirp*; "manda o código" is
+what a technician already says on the phone. The site stacks the three parts
+as its title, one under the other, so their initials read down a column:
+check what they spell in every language before changing a word. *Baixe. Abra.
+Dite seu chirp.* once read B-A-D.
 
 ## The bird's states
 
@@ -246,7 +253,7 @@ needs the same, mostly on the machine being controlled:
 
 The help centre follows TunnelBear's four sections:
 
-- **Setup guides** — Windows, macOS, Linux. Each is *download, run, read your
+- **Setup guides** — Windows, macOS, Linux. Each is *download, run, send your
   chirp*, plus the system warnings above. None mentions installing, because
   there is nothing to install.
 - **FAQ** — What does Chirp do? How do I know nobody is on my screen? I got a
