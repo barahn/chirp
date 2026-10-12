@@ -319,3 +319,35 @@ func TestAQueuedApprovalForASessionThatIsGoneStartsNothing(t *testing.T) {
 		t.Error("the answered request was kept after the session ended")
 	}
 }
+
+func TestAFailedLookupKeepsTheApprovalPendingInsteadOfDecidingOnIt(t *testing.T) {
+	r := newRelay(t)
+	c := newClient(t, r)
+	r.Close() // every lookup now fails without an answer
+	var events []OwnerEvent
+	o := NewOwner(c, "", func(ev OwnerEvent) { events = append(events, ev) })
+	o.Retry = 10 * time.Millisecond
+	o.Serve = func(context.Context, *SessionConn) { t.Error("served a session the relay never confirmed") }
+	o.setAsked(&ConsentRequest{SessionID: "s1", Name: "Ana"})
+
+	o.startSession(context.Background(), "s1")
+	if o.active != nil || len(events) != 0 {
+		t.Fatalf("an unconfirmed session started: active %v, events %+v", o.active, events)
+	}
+	select {
+	case id := <-o.allowed:
+		if id != "s1" {
+			t.Errorf("handed back %q", id)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("the approval was dropped instead of retried")
+	}
+
+	// Once the session is over, a pending retry hands nothing back.
+	o.startSession(context.Background(), "s1")
+	o.endSession()
+	time.Sleep(50 * time.Millisecond)
+	if len(o.allowed) != 0 {
+		t.Error("a retry brought back an approval for a session that ended")
+	}
+}

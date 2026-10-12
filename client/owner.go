@@ -365,15 +365,19 @@ func (o *Owner) startSession(ctx context.Context, sessionID string) {
 		return
 	}
 	// An approval can sit queued while the controller leaves or the code is
-	// replaced. A session the relay no longer has, or holds as anything but
-	// allowed, is not served. A lookup that merely fails is no such answer:
-	// the owner's Allow already succeeded, so the session is served as
-	// decided rather than dropped on a passing network error.
+	// replaced, so the session is served only once the relay confirms it is
+	// allowed. A definitive answer otherwise drops it. A lookup that fails
+	// decides nothing: the approval is handed back to Run after a pause and
+	// looked up again, for as long as this is still the request answered
+	// (endSession forgets it, and stops the retries).
 	st, err := o.client.Session(ctx, sessionID)
 	switch {
-	case errors.Is(err, ErrNotFound):
+	case ctx.Err() != nil, errors.Is(err, ErrNotFound):
 		return
-	case err == nil && st.State != StateConsentGranted && st.State != StateActive:
+	case err != nil:
+		time.AfterFunc(o.Retry, func() { o.retryApproval(sessionID) })
+		return
+	case st.State != StateConsentGranted && st.State != StateActive:
 		return
 	}
 	if o.active != nil && o.active.ID == sessionID {
@@ -389,6 +393,21 @@ func (o *Owner) startSession(ctx context.Context, sessionID string) {
 		defer func() { _ = conn.Close() }()
 		o.Serve(ctx, conn)
 	}()
+}
+
+// retryApproval hands an approval back to Run, if it is still for the
+// request answered last.
+func (o *Owner) retryApproval(sessionID string) {
+	o.mu.Lock()
+	current := o.asked != nil && o.asked.SessionID == sessionID
+	o.mu.Unlock()
+	if !current {
+		return
+	}
+	select {
+	case o.allowed <- sessionID:
+	default:
+	}
 }
 
 // endSession stops serving the active session, if there is one, and says
