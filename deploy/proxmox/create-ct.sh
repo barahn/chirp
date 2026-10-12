@@ -31,7 +31,8 @@
 #   --template-storage NAME  storage holding templates (default: local)
 #   --ssh-key FILE       public key(s) to authorise for root in the container
 #   --memory MIB         (default: 256)
-#   --disk GIB           (default: 2)
+#   --disk GIB           (default: 2). 0 on a directory storage gives the
+#                        container a plain directory instead of a disk image
 #
 # SPDX-License-Identifier: AGPL-3.0-only
 # Copyright (C) 2026 Fabrintek Engenharia Digital Ltda
@@ -100,10 +101,14 @@ fi
 
 # --- Template ---------------------------------------------------------------
 
-log "Looking for the newest Debian 13 template"
+# pveam offers templates for every architecture, and sorting by version alone
+# can pick another architecture's newer build. Only this node's will boot.
+ARCH="$(dpkg --print-architecture)"
+log "Looking for the newest Debian 13 template for $ARCH"
 pveam update >/dev/null
-TEMPLATE="$(pveam available --section system | awk '{print $2}' | grep '^debian-13-standard_' | sort -V | tail -n 1)"
-[ -n "$TEMPLATE" ] || die "no debian-13-standard template offered by pveam"
+TEMPLATE="$(pveam available --section system | awk '{print $2}' |
+	grep "^debian-13-standard_.*_${ARCH}\.tar\." | sort -V | tail -n 1)"
+[ -n "$TEMPLATE" ] || die "no debian-13-standard template for $ARCH offered by pveam"
 if ! pveam list "$TSTORAGE" | grep -q "$TEMPLATE"; then
 	log "Downloading $TEMPLATE to $TSTORAGE"
 	pveam download "$TSTORAGE" "$TEMPLATE"
