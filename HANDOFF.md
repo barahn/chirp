@@ -542,6 +542,25 @@ relays:
 6. **Coexistence:** An owner listening on Nostr can still be helped through the
    traditional server relay by a client without Nostr configured.
 
+**Known limits, and what #43 still needs:**
+
+- **The ends are not bound yet.** The controller trusts the key the lookup
+  returns, and signed viewers stay off (`RequireSignedViewers`), until the
+  PAKE (barahn/chirp#21). Until then the lookup is as trusted as the relay.
+- **No tagged `signal/nostr`.** Chirp pins a pseudo-version of remotekit's
+  `develop`; #43's "done when" asks for a tagged release.
+- **Relays are not redialled** (barahn/remotekit#70): when every relay drops,
+  the owner listens again under a new key and registers it, and a session in
+  progress ends. **NIP-42 auth** (barahn/remotekit#71) is not supported, so
+  relays that require it cannot be used.
+- **No default relay list.** `-nostr` must be given; there is no public
+  network yet (decision 5).
+- **The key lives for a registration**, not for one session: it changes with
+  every new code asked for (and after a session, which asks for one), and
+  when the relays drop.
+- A request over Nostr is open for **2 minutes** (`nostrAskFor`), then the
+  prompt declines by itself.
+
 ## 5. The roadmap — what is missing, in dependency order
 
 From `README.md`'s own "not here yet" list:
@@ -943,10 +962,12 @@ Still to decide or do, in order. Each step has an issue, and the
 3. **Before any public relay:** per-session TURN credentials handed out by
    the relay (`docs/stun-turn.md`, *Credentials*; barahn/remotekit#64); then
    the *Blind public network* milestone (`docs/product-model.md`, decision 5,
-   §5.5): the lookup (barahn/chirp#42, §4.6) and Nostr signalling
-   (barahn/chirp#43, §4.7) are done. What remains of that milestone is the PAKE
-   (barahn/chirp#21) to bind the two ends without trusting the server's
-   lookup.
+   §5.5): the lookup (barahn/chirp#42, §4.6) is done, and Nostr signalling
+   (barahn/chirp#43, §4.7) works but is not finished: Chirp pins
+   `signal/nostr` at a pseudo-version until remotekit tags a release, has no
+   default relay list, and inherits remotekit's open limits (§4.7). What
+   remains besides is the PAKE (barahn/chirp#21), which binds the two ends
+   without trusting the server's lookup.
 4. **Branch protection and code scanning — done** (barahn/chirp#17, §4.3).
    On since the repository went public, and every active ruleset is a file in
    `.github/rulesets/`.
