@@ -106,6 +106,9 @@ caddy_version_ok() {
 	[ "$major" -gt 2 ] || { [ "$major" -eq 2 ] && [ "$minor" -ge 7 ]; }
 }
 
+# The first line of a Caddyfile this script wrote, and so may replace.
+MANAGED="# Managed by Chirp's deploy/install.sh: replaced on every run. Do not edit."
+
 if [ -n "$DOMAIN" ]; then
 	caddy_was_installed=false
 	if command -v caddy >/dev/null; then
@@ -139,7 +142,15 @@ if [ -n "$DOMAIN" ]; then
 	# The relay's socket is open to its group, and only Caddy joins it.
 	usermod -a -G chirp-relay caddy
 
-	if $caddy_was_installed && ! grep -q 'CHIRP_RELAY_DOMAIN' /etc/caddy/Caddyfile 2>/dev/null; then
+	# The Caddyfile is ours to replace only when this script installed Caddy
+	# just now, or wrote the file itself on an earlier run: then its first
+	# line is MANAGED, exactly. Anything else belongs to someone else.
+	owned=false
+	if ! $caddy_was_installed || [ "$(head -n 1 /etc/caddy/Caddyfile 2>/dev/null)" = "$MANAGED" ]; then
+		owned=true
+	fi
+
+	if ! $owned; then
 		# Caddy was here before us and serves something else: do not
 		# replace its configuration, add our site beside it. Global options
 		# cannot be imported, so the logger that keeps credentials out of
@@ -154,7 +165,9 @@ if [ -n "$DOMAIN" ]; then
 		log "its global options, or Caddy's error log will record relay credentials."
 		systemctl daemon-reload
 	else
-		install -m 0644 "$HERE/caddy/Caddyfile" /etc/caddy/Caddyfile
+		{ echo "$MANAGED"; cat "$HERE/caddy/Caddyfile"; } >/etc/caddy/Caddyfile.new
+		chmod 0644 /etc/caddy/Caddyfile.new
+		mv -f /etc/caddy/Caddyfile.new /etc/caddy/Caddyfile
 		CHIRP_RELAY_DOMAIN="$DOMAIN" caddy validate --adapter caddyfile --config /etc/caddy/Caddyfile >/dev/null 2>&1 ||
 			die "Caddy rejects /etc/caddy/Caddyfile: run caddy validate --config /etc/caddy/Caddyfile"
 		systemctl daemon-reload

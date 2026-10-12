@@ -353,8 +353,11 @@ The installer:
   socket;
 - starts the relay and checks that it answers.
 
-If Caddy was already installed and serving other sites, the installer leaves
-`/etc/caddy/Caddyfile` alone. It writes `/etc/caddy/chirp-relay.caddy` and
+The installer replaces `/etc/caddy/Caddyfile` only if it installed Caddy
+itself, or if the file's first line is the marker it writes (`# Managed by
+Chirp's deploy/install.sh`). Don't edit a managed file: the next run
+replaces it. If Caddy was already installed and serving other sites, the
+installer leaves `/etc/caddy/Caddyfile` alone. It writes `/etc/caddy/chirp-relay.caddy` and
 tells you which `import` line to add. Global options cannot be imported, so
 also copy the `log default` block from `deploy/caddy/Caddyfile` into your
 global options. Without it, Caddy's error log records request URIs, and with
