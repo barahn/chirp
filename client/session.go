@@ -33,6 +33,9 @@ type SessionConn struct {
 	in   chan []byte
 	done chan struct{}
 	once sync.Once
+
+	mu     sync.Mutex
+	queued int // bytes waiting in in
 }
 
 func newSessionConn(id string, permissions []string, send func([]byte) error) *SessionConn {
@@ -57,6 +60,9 @@ func (s *SessionConn) ReadMessage() ([]byte, error) {
 	}
 	select {
 	case m := <-s.in:
+		s.mu.Lock()
+		s.queued -= len(m)
+		s.mu.Unlock()
 		return m, nil
 	case <-s.done:
 		return nil, ErrSessionOver
@@ -89,14 +95,26 @@ func (s *SessionConn) Done() <-chan struct{} { return s.done }
 // channel, not here.
 const signalQueue = 256
 
+// signalBudget is how many bytes of signals wait for a busy reader, however
+// many signals that is. The other end may send messages up to the socket's
+// read limit, and signalQueue of those would hold 256 MiB of this machine's
+// memory; negotiation needs a few kilobytes.
+const signalBudget = 1 << 20
+
 // deliver hands a signal from the other end to the reader, and drops it if
-// the reader is that far behind. It never waits: the socket loop calling it
-// is also what notices the session ending, a new code being asked for, or the
-// socket dropping, and the other end -- untrusted -- must not be able to
-// stall that by sending faster than the reader reads.
+// the reader is that far behind, in signals or in bytes. It never waits: the
+// socket loop calling it is also what notices the session ending, a new code
+// being asked for, or the socket dropping, and the other end -- untrusted --
+// must not be able to stall that by sending faster than the reader reads.
 func (s *SessionConn) deliver(data []byte) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.queued+len(data) > signalBudget {
+		return
+	}
 	select {
 	case s.in <- data:
+		s.queued += len(data)
 	default:
 	}
 }

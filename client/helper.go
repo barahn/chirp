@@ -118,6 +118,7 @@ func (c *Client) follow(ctx context.Context, sock *Socket, sess Session, emit fu
 	var conn *SessionConn
 	var connDone <-chan struct{}
 	var early [][]byte
+	var earlyBytes int
 	var viewing sync.WaitGroup
 	defer func() {
 		if conn != nil {
@@ -164,8 +165,9 @@ func (c *Client) follow(ctx context.Context, sock *Socket, sess Session, emit fu
 				switch {
 				case conn != nil:
 					conn.deliver(m.Raw)
-				case len(early) < signalQueue:
+				case len(early) < signalQueue && earlyBytes+len(m.Raw) <= signalBudget:
 					early = append(early, m.Raw)
+					earlyBytes += len(m.Raw)
 				}
 				continue
 			}

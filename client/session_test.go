@@ -268,6 +268,31 @@ func TestAForgedLeaveNoticeDoesNotEndTheSession(t *testing.T) {
 	}
 }
 
+// Signals the runner does not read are bounded in bytes as well as in number:
+// a controller sending large ones cannot make this machine hold more than
+// signalBudget of them.
+func TestQueuedSignalsAreBoundedInBytes(t *testing.T) {
+	conn := newSessionConn("s", nil, nil)
+	big := make([]byte, signalBudget/4)
+	for i := 0; i < 8; i++ {
+		conn.deliver(big)
+	}
+	if n := len(conn.in); n != 4 {
+		t.Fatalf("%d signals of %d bytes queued, want the 4 that fit in %d", n, len(big), signalBudget)
+	}
+	conn.deliver([]byte(`{"type":"candidate"}`))
+	if n := len(conn.in); n != 4 {
+		t.Fatalf("a full budget took another signal: %d queued", n)
+	}
+	if _, err := conn.ReadMessage(); err != nil {
+		t.Fatal(err)
+	}
+	conn.deliver(big)
+	if n := len(conn.in); n != 4 {
+		t.Fatalf("after one read, %d signals queued, want its room taken again (4)", n)
+	}
+}
+
 // A controller flooding the owner with signals its runner does not read
 // cannot keep the owner from ending the session.
 func TestAFloodOfSignalsDoesNotHoldTheSessionOpen(t *testing.T) {
