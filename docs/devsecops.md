@@ -216,9 +216,13 @@ the new provider answers:
    `@9.9.9.9`), then wait that TTL again from the parent's removal before
    changing nameservers. Do not assume an hour: it was one on 2026-10-12, and
    the parent sets it.
-2. Create every record at the new provider, then change the nameservers. The
-   parent's NS TTL (three hours on 2026-10-12) is how long resolvers keep
-   asking the old provider, so leave its records in place until then.
+2. Create every record at the new provider. Before changing the nameservers,
+   read the NS TTL from the parent too, in the authority section of
+   `dig NS usechirp.app @ns-tld1.charlestonroadregistry.com +norec`: it is how
+   long resolvers keep asking the old provider. Change the nameservers, and
+   leave the old provider's records in place for at least that TTL after the
+   parent shows the new ones. It was three hours on 2026-10-12; the parent
+   sets it.
 3. **Anything in front of Pages that terminates TLS** (Cloudflare's proxy, or
    another provider's equivalent) goes on only once its certificate for
    `usechirp.app` is active, and checks GitHub's certificate on the way back
