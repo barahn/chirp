@@ -137,7 +137,8 @@ are the half of DevSecOps that a pull request cannot deliver:
    Pages cannot set. See [The website's headers](#the-websites-headers).
 
 The first five are applied as of 2026-10-10 (barahn/chirp#17), when the
-repository went public. The sixth is not applied yet.
+repository went public. The sixth is applied as of 2026-10-12 except for its
+last step, loading the header rules.
 
 ### The website's headers
 
@@ -168,36 +169,52 @@ by anything else, and if `site/` uses an HTML sink: the pages require Trusted
 Types, which keeps sinks out in the browsers that enforce them, and the check
 keeps them out of the source for the rest.
 
-To apply it, once:
+As of 2026-10-12, set up as follows:
 
-1. **Add `usechirp.app` to Cloudflare** (the free plan is enough) and point the
-   registrar's nameservers at it.
-2. **Verify the domain on GitHub** (Settings → Pages → Add a domain, in the
-   organisation or account settings), so no other repository can claim it
-   while DNS moves.
-3. **DNS, unproxied first.** `A` records for the apex to `185.199.108.153`,
-   `185.199.109.153`, `185.199.110.153` and `185.199.111.153`; `AAAA` to
-   `2606:50c0:8000::153`, `2606:50c0:8001::153`, `2606:50c0:8002::153` and
-   `2606:50c0:8003::153`, all *DNS only*. Wait until GitHub Pages issues its
-   certificate and **Enforce HTTPS** can be ticked.
-4. **SSL/TLS → Full (strict)**, so Cloudflare checks GitHub's certificate.
-   Anything weaker leaves the hop to GitHub unauthenticated.
-5. **Turn the proxy on** for those records.
-6. **Load the rules**, with an API token allowed to edit the zone's transform
-   rules:
+| Piece | State |
+| --- | --- |
+| Registrar | Unstoppable Domains, nameservers delegated to Cloudflare (`anuj` and `nancy.ns.cloudflare.com`) |
+| DNS | `A` and `AAAA` for the apex to GitHub Pages' addresses; `www` a `CNAME` to `barahn.github.io`; the `_github-pages-challenge-barahn` `TXT` that verifies the domain on GitHub |
+| Proxy | on for the apex and `www` |
+| SSL/TLS | **Full (strict)**: Cloudflare checks GitHub's certificate, so the hop to GitHub is authenticated |
+| Edge certificate | Cloudflare's, for `usechirp.app` and `*.usechirp.app` |
+| DNSSEC | signed by Cloudflare; DS `2371 13 2 25CFA0663341592F9436373DCB5E87C3B16F0FE043C7169BB7C47D11F9B9AF23` at the registrar, and resolvers validate the chain |
+| Header rules | **not loaded yet** |
 
-   ```sh
-   curl -fsS -X PUT \
-     "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/rulesets/phases/http_response_headers_transform/entrypoint" \
-     -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-     -H "Content-Type: application/json" \
-     --data @.cloudflare/rulesets/response-headers.json
-   ```
+What is left is loading the rules, with an API token allowed to edit the
+zone's transform rules, from the repository root:
 
-   A `PUT` replaces every rule in that phase, which is the point: the file is
-   the reference, and a rule added in the dashboard that is not in it is
-   drift. Run it again after any change to the file.
-7. **Check:** `curl -sI https://usechirp.app/` shows the headers above.
+```sh
+curl -fsS -X PUT \
+  "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/rulesets/phases/http_response_headers_transform/entrypoint" \
+  -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  --data @.cloudflare/rulesets/response-headers.json
+```
+
+A `PUT` replaces every rule in that phase, which is the point: the file is the
+reference, and a rule added in the dashboard that is not in it is drift. Run it
+again after any change to the file, and check with
+`curl -sI https://usechirp.app/` that the headers above come back.
+
+To move the domain again (another registrar, another DNS provider), the order
+matters, and two steps can each take the site down:
+
+1. **Turn DNSSEC off at the registrar first**, and wait until
+   `dig +short DS usechirp.app` is empty plus the DS's TTL (an hour). A new
+   provider's servers do not hold the old keys, so with the old DS still
+   published, every validating resolver refuses the domain.
+2. Create the records at the new provider, *DNS only*, then change the
+   nameservers.
+3. **Proxy only once the edge certificate is Active.** On 2026-10-12 the proxy
+   was on before Cloudflare had issued it, and for a while HTTPS through
+   Cloudflare failed its handshake. `.app` is HTTPS-only, so there was no
+   plain-HTTP fallback: the site and every link page were down for anyone
+   whose resolver had picked up the new nameservers.
+4. Set **Full (strict)**, then turn the proxy on.
+5. Turn DNSSEC on at the new provider and publish its DS at the registrar.
+   Check that `dig A usechirp.app @1.1.1.1 +dnssec` answers with the `ad`
+   flag.
 
 GitHub renews its certificate through the proxy. If a renewal fails, Pages
 says so in its settings; switch the records to *DNS only* until it is renewed,
