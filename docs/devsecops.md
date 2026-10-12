@@ -34,11 +34,12 @@ not CLA acceptance, and that external pull requests are not merged yet.
 
 | Workflow | Runs on | Gate |
 | --- | --- | --- |
-| `ci.yml` | push and PR to `develop`/`main`, tags | DCO, licence gate, build, vet, cross-compile, lint, `go test -race`, `HANDOFF.md` snapshot, gosec, govulncheck |
+| `ci.yml` | push and PR to `develop`/`main`, tags | DCO, licence gate, build, vet, cross-compile, lint, `go test -race`, website check, `HANDOFF.md` snapshot, gosec, govulncheck |
 | `codeql.yml` | push and PR, weekly — **when `CODE_SCANNING` is set** | CodeQL `security-extended` for Go |
 | `secret-scan.yml` | push and PR, weekly | gitleaks over the PR commit range, or the tree and full history |
 | `dependency-review.yml` | PR — **when `CODE_SCANNING` is set** | what the PR adds: advisories at `low` and above, denied licences |
 | `sbom.yml` | release tags | SPDX SBOM attached to the release |
+| `pages.yml` | push to `develop` touching the site | website check, then publishes usechirp.app |
 
 ### CodeQL and dependency review are gated on `CODE_SCANNING`
 
@@ -132,8 +133,75 @@ are the half of DevSecOps that a pull request cannot deliver:
    rules: no one may delete, move or force-push a `v*` tag
    ([branching.md](branching.md#release-tags)).
 
-All five are applied as of 2026-10-10 (barahn/chirp#17), when the repository
-went public.
+6. **usechirp.app behind Cloudflare**, which adds the security headers GitHub
+   Pages cannot set. See [The website's headers](#the-websites-headers).
+
+The first five are applied as of 2026-10-10 (barahn/chirp#17), when the
+repository went public. The sixth is not applied yet.
+
+### The website's headers
+
+The site is static and served by GitHub Pages, which sets no custom headers.
+Each page carries its Content-Security-Policy in a `<meta>` tag instead, and
+that cannot hold `frame-ancestors`, the rule that stops another site from
+framing the page. So Cloudflare's proxy sits in front of GitHub Pages and adds
+the headers, from
+[`.cloudflare/rulesets/response-headers.json`](../.cloudflare/rulesets/response-headers.json):
+
+| Header | Value | Why |
+| --- | --- | --- |
+| `Content-Security-Policy` | the pages' policy, plus `frame-ancestors 'none'` | no framing, so no clickjacking of the link page |
+| `X-Frame-Options` | `DENY` | the same, for browsers that predate `frame-ancestors` |
+| `X-Content-Type-Options` | `nosniff` | a file is only ever what its type says |
+| `Referrer-Policy` | `no-referrer` | as the `<meta>` tag already says |
+| `Cross-Origin-Opener-Policy` | `same-origin` | a page that opens the site keeps no handle on it |
+| `Cross-Origin-Resource-Policy` | `same-origin` | other sites cannot embed its files |
+| `Permissions-Policy` | camera, microphone, geolocation, display capture, USB and payment off | the site needs none of them |
+
+HSTS is not among them: `.app` is on the browsers' HSTS preload list, so a
+browser never asks for it over plain HTTP in the first place.
+
+Both policies are enforced, the header's and the `<meta>` tag's, so a page
+served without Cloudflare (a misconfigured DNS, a preview) keeps every rule but
+`frame-ancestors`. `scripts/check-site.sh`, run in CI, fails if the two differ
+by anything else, and if `site/` uses an HTML sink: the pages require Trusted
+Types, which keeps sinks out in the browsers that enforce them, and the check
+keeps them out of the source for the rest.
+
+To apply it, once:
+
+1. **Add `usechirp.app` to Cloudflare** (the free plan is enough) and point the
+   registrar's nameservers at it.
+2. **Verify the domain on GitHub** (Settings → Pages → Add a domain, in the
+   organisation or account settings), so no other repository can claim it
+   while DNS moves.
+3. **DNS, unproxied first.** `A` records for the apex to `185.199.108.153`,
+   `185.199.109.153`, `185.199.110.153` and `185.199.111.153`; `AAAA` to
+   `2606:50c0:8000::153`, `2606:50c0:8001::153`, `2606:50c0:8002::153` and
+   `2606:50c0:8003::153`, all *DNS only*. Wait until GitHub Pages issues its
+   certificate and **Enforce HTTPS** can be ticked.
+4. **SSL/TLS → Full (strict)**, so Cloudflare checks GitHub's certificate.
+   Anything weaker leaves the hop to GitHub unauthenticated.
+5. **Turn the proxy on** for those records.
+6. **Load the rules**, with an API token allowed to edit the zone's transform
+   rules:
+
+   ```sh
+   curl -fsS -X PUT \
+     "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/rulesets/phases/http_response_headers_transform/entrypoint" \
+     -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+     -H "Content-Type: application/json" \
+     --data @.cloudflare/rulesets/response-headers.json
+   ```
+
+   A `PUT` replaces every rule in that phase, which is the point: the file is
+   the reference, and a rule added in the dashboard that is not in it is
+   drift. Run it again after any change to the file.
+7. **Check:** `curl -sI https://usechirp.app/` shows the headers above.
+
+GitHub renews its certificate through the proxy. If a renewal fails, Pages
+says so in its settings; switch the records to *DNS only* until it is renewed,
+then back.
 
 ## When a gate fails
 

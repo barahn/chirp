@@ -1,0 +1,43 @@
+{
+  "description": "usechirp.app: security headers GitHub Pages cannot set. Versioned in .cloudflare/rulesets/; see docs/devsecops.md.",
+  "rules": [
+    {
+      "ref": "usechirp_security_headers",
+      "description": "Security headers for usechirp.app",
+      "expression": "(http.host eq \"usechirp.app\")",
+      "action": "rewrite",
+      "action_parameters": {
+        "headers": {
+          "Content-Security-Policy": {
+            "operation": "set",
+            "value": "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'; require-trusted-types-for 'script'; trusted-types 'none'; frame-ancestors 'none'"
+          },
+          "X-Frame-Options": {
+            "operation": "set",
+            "value": "DENY"
+          },
+          "X-Content-Type-Options": {
+            "operation": "set",
+            "value": "nosniff"
+          },
+          "Referrer-Policy": {
+            "operation": "set",
+            "value": "no-referrer"
+          },
+          "Cross-Origin-Opener-Policy": {
+            "operation": "set",
+            "value": "same-origin"
+          },
+          "Cross-Origin-Resource-Policy": {
+            "operation": "set",
+            "value": "same-origin"
+          },
+          "Permissions-Policy": {
+            "operation": "set",
+            "value": "camera=(), microphone=(), geolocation=(), display-capture=(), usb=(), payment=()"
+          }
+        }
+      }
+    }
+  ]
+}

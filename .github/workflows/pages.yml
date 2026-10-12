@@ -11,6 +11,7 @@ on:
       - 'cmd/chirp/internal/warm/fonts/**'
       - 'cmd/chirp/internal/warm/bird/icon.svg'
       - 'scripts/build-site.sh'
+      - 'scripts/check-site.sh'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
@@ -37,6 +38,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      - name: Check
+        run: ./scripts/check-site.sh
 
       - name: Assemble
         run: ./scripts/build-site.sh _site

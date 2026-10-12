@@ -9,7 +9,9 @@
 # allows 'self' only, which keeps any script but the site's own off the link
 # page, where the token sits in the fragment. It also requires Trusted Types
 # and allows no policy, so even the site's own script cannot parse a string
-# as HTML: site.js builds its translations into nodes instead.
+# as HTML: site.js builds its translations into nodes instead. Cloudflare,
+# in front of GitHub Pages, sends the same policy as a header, with
+# frame-ancestors added; scripts/check-site.sh keeps the two equal.
 #
 # Preview: scripts/build-site.sh && python3 -m http.server -d _site 8000
 #

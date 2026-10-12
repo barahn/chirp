@@ -139,6 +139,13 @@ jobs:
       - name: Test
         run: go test -race -coverprofile=coverage.out ./...
 
+      # The site's pages require Trusted Types, which not every browser
+      # enforces, and carry their CSP twice: in a <meta> tag and, through
+      # Cloudflare, as a header. This keeps HTML sinks out of site/ and the
+      # two policies equal. See docs/devsecops.md.
+      - name: Website has no HTML sink, and one CSP
+        run: ./scripts/check-site.sh
+
       # HANDOFF.md's snapshot block is generated from the tree. Checked here
       # rather than committed by a bot: a workflow pushing to main would need a
       # bypass of the branch protection in .github/rulesets/, and its commits

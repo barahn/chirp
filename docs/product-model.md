@@ -179,8 +179,9 @@ Decided by the maintainer:
    browsers, so a link to it never opens over plain HTTP.
 
    - **The site and the link use it first.** The site is static, served by
-     GitHub Pages: it offers the download and the page a link opens
-     (decision 4), and needs no relay. *Copy link* copies
+     GitHub Pages behind Cloudflare's proxy, which adds the security headers
+     Pages cannot set (docs/devsecops.md): it offers the download and the
+     page a link opens (decision 4), and needs no relay. *Copy link* copies
      `https://usechirp.app/l#<token>`, which works whatever relay its users
      run, because the page only says what to do with the link.
    - **The relay and the lookup do not, yet.** They come with the public

@@ -166,9 +166,14 @@
   // never handed to innerHTML: each page's Content-Security-Policy turns on
   // Trusted Types with no policy, so the browser refuses every sink that
   // would parse a string as HTML. A translation with markup outside the
-  // list, or unbalanced, keeps its English. Write characters, not entities.
+  // list, or unbalanced, keeps its English, and says so in the console. Write
+  // characters, not entities, except &lt; &gt; and &amp; for < > and &.
   var TAGS = { a: 1, b: 1, em: 1, h3: 1, li: 1, p: 1, span: 1, ul: 1 };
   var TAG_ATTRS = { a: { href: /^https:\/\// }, span: { "class": /^chirp$/ } };
+  var ENTITIES = { lt: "<", gt: ">", amp: "&" };
+  function text(t) {
+    return document.createTextNode(t.replace(/&(lt|gt|amp);/g, function (e, n) { return ENTITIES[n]; }));
+  }
   function build(src) {
     var root = document.createDocumentFragment(), open = [root], m, a;
     var token = /<(\/?)([a-z0-9]+)((?:\s+[a-z-]+="[^"<>]*")*)\s*>|[^<]+|</g;
@@ -176,7 +181,7 @@
       var top = open[open.length - 1];
       if (m[2] === undefined) {
         if (m[0] === "<") return null;
-        top.appendChild(document.createTextNode(m[0]));
+        top.appendChild(text(m[0]));
         continue;
       }
       if (!TAGS[m[2]]) return null;
@@ -199,7 +204,12 @@
   }
   var built = {};
   function translated(k) {
-    if (!(k in built)) built[k] = PT[k] === undefined ? null : build(PT[k]);
+    if (!(k in built)) {
+      built[k] = PT[k] === undefined ? null : build(PT[k]);
+      if (PT[k] !== undefined && !built[k]) {
+        console.warn("chirp: translation " + k + " has markup outside the allowlist; showing English");
+      }
+    }
     return built[k];
   }
   function copyOf(el) {
