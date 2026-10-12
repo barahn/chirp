@@ -904,3 +904,21 @@ func TestASocketThatStopsAnsweringPingsIsClosed(t *testing.T) {
 		t.Fatal("the controller was not told the owner left")
 	}
 }
+
+// A ping interval a Chirp would time out on is capped, and the default fills
+// in for none.
+func TestThePingIntervalIsCapped(t *testing.T) {
+	for set, want := range map[time.Duration]time.Duration{
+		0:                      DefaultPingInterval,
+		-time.Second:           DefaultPingInterval,
+		time.Second:            time.Second,
+		MaxPingInterval:        MaxPingInterval,
+		time.Hour:              MaxPingInterval,
+		time.Duration(1 << 62): MaxPingInterval,
+	} {
+		s := &Server{PingInterval: set}
+		if got := s.pingInterval(); got != want {
+			t.Errorf("PingInterval %v gives %v, want %v", set, got, want)
+		}
+	}
+}

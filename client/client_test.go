@@ -24,7 +24,6 @@ type relay struct {
 	ln *cuttable
 }
 
-//
 // configure, if given, sets the relay up before it starts.
 func newRelay(t *testing.T, configure ...func(*signalling.Server)) *relay {
 	t.Helper()
@@ -108,6 +107,14 @@ func TestRelayMessageTypesMatchTheRelay(t *testing.T) {
 		if got != want {
 			t.Errorf("client says %q, the relay says %q", got, want)
 		}
+	}
+}
+
+// However the relay is configured, a socket waits long enough for two of its
+// pings to go missing.
+func TestPingWaitOutlastsTheRelaysPings(t *testing.T) {
+	if PingWait <= 2*signalling.MaxPingInterval {
+		t.Fatalf("PingWait %v does not outlast two pings at the relay's slowest, %v", PingWait, signalling.MaxPingInterval)
 	}
 }
 

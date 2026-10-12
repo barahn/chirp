@@ -62,8 +62,9 @@ type Server struct {
 	// answers none of the pings for two intervals is closed, so a peer that
 	// vanished without closing is noticed; and the pings keep the socket from
 	// looking idle to a reverse proxy that closes idle connections. Zero
-	// means DefaultPingInterval. It must stay well under client.PingWait, or
-	// a Chirp gives up on a relay that is still there.
+	// means DefaultPingInterval, and anything over MaxPingInterval is taken
+	// as MaxPingInterval: a Chirp gives up on a relay that has not pinged for
+	// client.PingWait.
 	PingInterval time.Duration
 
 	ownersMu sync.Mutex
@@ -607,12 +608,20 @@ const DefaultControllerGrace = 30 * time.Second
 // third of what a Chirp waits between pings before it gives up.
 const DefaultPingInterval = 30 * time.Second
 
-// pingInterval is PingInterval, or its default.
+// MaxPingInterval caps PingInterval. A Chirp waits client.PingWait for each
+// ping before it gives the relay up, so a relay pinging less often would drop
+// healthy clients; the cap leaves that wait room for two pings to go missing.
+const MaxPingInterval = 40 * time.Second
+
+// pingInterval is PingInterval, or its default, capped at MaxPingInterval.
 func (s *Server) pingInterval() time.Duration {
-	if s.PingInterval > 0 {
-		return s.PingInterval
+	switch {
+	case s.PingInterval <= 0:
+		return DefaultPingInterval
+	case s.PingInterval > MaxPingInterval:
+		return MaxPingInterval
 	}
-	return DefaultPingInterval
+	return s.PingInterval
 }
 
 // controllerGrace is ControllerGrace, or its default.

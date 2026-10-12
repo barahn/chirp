@@ -105,8 +105,9 @@ func (c *Client) dial(ctx context.Context, q url.Values) (*Socket, error) {
 
 // PingWait is how long a socket waits for the relay's next ping before it
 // gives the relay up for gone, and Next fails so the caller can dial again.
-// The relay pings every 30 seconds by default (signalling.DefaultPingInterval),
-// so this allows two to go missing.
+// The relay pings every 30 seconds by default, and never less often than
+// every 40 (signalling.DefaultPingInterval, signalling.MaxPingInterval), so
+// this allows two to go missing.
 //
 // The wait starts at the first ping, not at the dial: a relay that sends none
 // leaves the socket without a deadline, as it was before relays pinged.
