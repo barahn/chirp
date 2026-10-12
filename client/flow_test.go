@@ -292,3 +292,30 @@ func TestTheOwnerIsToldWhenASessionStartsAndEnds(t *testing.T) {
 	o.NewCode()
 	await(t, events, "the session ending", func(ev OwnerEvent) bool { return ev.Ended })
 }
+
+func TestAQueuedApprovalForASessionThatIsGoneStartsNothing(t *testing.T) {
+	r := newRelay(t)
+	c := newClient(t, r)
+	var events []OwnerEvent
+	o := NewOwner(c, "", func(ev OwnerEvent) { events = append(events, ev) })
+	o.Serve = func(context.Context, *SessionConn) { t.Error("served a session the relay no longer allows") }
+	// The request the owner answered, for a session the relay does not hold
+	// (the controller left, or the code was replaced, before it was served).
+	o.setAsked(&ConsentRequest{SessionID: "gone", Name: "Ana"})
+	o.startSession(context.Background(), "gone")
+	if o.active != nil || len(events) != 0 {
+		t.Errorf("active %v, events %+v", o.active, events)
+	}
+	// Ending a session forgets the request and any approval still queued.
+	o.allowed <- "gone"
+	o.endSession()
+	if len(o.allowed) != 0 {
+		t.Error("an approval stayed queued after the session ended")
+	}
+	o.mu.Lock()
+	asked := o.asked
+	o.mu.Unlock()
+	if asked != nil {
+		t.Error("the answered request was kept after the session ended")
+	}
+}

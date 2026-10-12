@@ -29,7 +29,8 @@ type sessionBar struct {
 	w       *Window
 	win     fyne.Window
 	session client.ActiveSession
-	elapsed int
+	start   time.Time
+	now     func() time.Time
 	clock   *widget.Label
 	end     *widget.Button
 	closed  func()
@@ -42,7 +43,8 @@ func (w *Window) showSessionBar(s client.ActiveSession) {
 	if w.bar != nil {
 		w.bar.dismiss()
 	}
-	b := &sessionBar{w: w, win: w.app.NewWindow(barTitle), session: s, stop: make(chan struct{})}
+	b := &sessionBar{w: w, win: w.app.NewWindow(barTitle), session: s, now: time.Now, stop: make(chan struct{})}
+	b.start = b.now()
 	w.bar = b
 
 	dot := canvas.NewCircle(theme.Color(theme.ColorNameError))
@@ -79,12 +81,14 @@ func (b *sessionBar) run() {
 	}
 }
 
+// tick redraws the clock from the time the session started, not from the
+// ticks seen: after the machine sleeps, or the window stalls, it still says
+// how long the session has really lasted.
 func (b *sessionBar) tick() {
 	if b.done {
 		return
 	}
-	b.elapsed++
-	b.clock.SetText(elapsedText(b.elapsed))
+	b.clock.SetText(elapsedText(int(b.now().Sub(b.start).Seconds())))
 }
 
 // endNow is End, or the bar's close button: the session ends at once.

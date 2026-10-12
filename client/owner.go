@@ -364,6 +364,12 @@ func (o *Owner) startSession(ctx context.Context, sessionID string) {
 	if req == nil || req.SessionID != sessionID || o.Serve == nil {
 		return
 	}
+	// An approval can sit queued while the controller leaves or the code is
+	// replaced. Serve only a session the relay still holds as allowed.
+	if st, err := o.client.Session(ctx, sessionID); err != nil ||
+		(st.State != StateConsentGranted && st.State != StateActive) {
+		return
+	}
 	if o.active != nil && o.active.ID == sessionID {
 		return
 	}
@@ -380,8 +386,14 @@ func (o *Owner) startSession(ctx context.Context, sessionID string) {
 }
 
 // endSession stops serving the active session, if there is one, and says
-// so.
+// so. It also forgets the request it answered and any approval still queued
+// for it, so a session that ended before it was served is never started.
 func (o *Owner) endSession() {
+	o.setAsked(nil)
+	select {
+	case <-o.allowed:
+	default:
+	}
 	if o.stopServing() {
 		o.emit(OwnerEvent{Ended: true})
 	}

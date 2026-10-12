@@ -6,6 +6,7 @@ package ui
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"fyne.io/fyne/v2/test"
 
@@ -36,11 +37,17 @@ func TestTheBarOpensWhenASessionStarts(t *testing.T) {
 func TestTheBarCountsAndCleansTheName(t *testing.T) {
 	w := newWindow(t)
 	started(w, "Ana\nVerified by your bank")
-	for i := 0; i < 65; i++ {
-		w.bar.tick()
-	}
+	at := w.bar.start
+	w.bar.now = func() time.Time { return at.Add(65 * time.Second) }
+	w.bar.tick()
 	if w.bar.clock.Text != "01:05" {
 		t.Errorf("after 65 s the clock says %q", w.bar.clock.Text)
+	}
+	// One tick after an hour asleep still shows the hour.
+	w.bar.now = func() time.Time { return at.Add(time.Hour + 2*time.Second) }
+	w.bar.tick()
+	if w.bar.clock.Text != "60:02" {
+		t.Errorf("after an hour with one tick the clock says %q", w.bar.clock.Text)
 	}
 	if got := barText("Ana\nVerified by your bank"); strings.Contains(got, "\n") {
 		t.Errorf("the bar shows a line break: %q", got)
@@ -86,8 +93,9 @@ func TestTheBarGoesWhenTheSessionEndsElsewhere(t *testing.T) {
 		t.Errorf("after the end: bar %v, note %q", w.bar != nil, w.request.Text)
 	}
 	// Ticks after it closed change nothing.
+	bar.now = func() time.Time { return bar.start.Add(time.Minute) }
 	bar.tick()
-	if bar.elapsed != 0 {
+	if bar.clock.Text != "00:00" {
 		t.Error("a closed bar kept counting")
 	}
 }
