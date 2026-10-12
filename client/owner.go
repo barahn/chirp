@@ -365,9 +365,15 @@ func (o *Owner) startSession(ctx context.Context, sessionID string) {
 		return
 	}
 	// An approval can sit queued while the controller leaves or the code is
-	// replaced. Serve only a session the relay still holds as allowed.
-	if st, err := o.client.Session(ctx, sessionID); err != nil ||
-		(st.State != StateConsentGranted && st.State != StateActive) {
+	// replaced. A session the relay no longer has, or holds as anything but
+	// allowed, is not served. A lookup that merely fails is no such answer:
+	// the owner's Allow already succeeded, so the session is served as
+	// decided rather than dropped on a passing network error.
+	st, err := o.client.Session(ctx, sessionID)
+	switch {
+	case errors.Is(err, ErrNotFound):
+		return
+	case err == nil && st.State != StateConsentGranted && st.State != StateActive:
 		return
 	}
 	if o.active != nil && o.active.ID == sessionID {
