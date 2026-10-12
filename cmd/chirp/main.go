@@ -121,20 +121,26 @@ func main() {
 }
 
 // serveSession serves a session its owner has allowed, until it ends.
+func serveSession(ctx context.Context, s *client.SessionConn, ice webrtc.PeerConfig) {
+	_ = newRunner(s.ID, s.Permissions, ice).Serve(ctx, s)
+}
+
+// newRunner builds the runner for a session its owner has allowed.
 //
 // remotekit's runner enforces consent, not Chirp (HANDOFF §5.5): it is granted
 // exactly what the owner allowed in the prompt, and withholds the screen until
-// then. Its other checks stay off for the trusted relay the first runnable
-// Chirp ships with (docs/product-model.md, decision 5). Signed viewers need
-// the controller's key from a route the relay does not control, which is the
-// PAKE (barahn/chirp#21); and the JPEG fallback and input over the socket are
-// how a session still works before the controller can decode WebRTC video.
-// A public relay turns them on.
-func serveSession(ctx context.Context, s *client.SessionConn, ice webrtc.PeerConfig) {
-	r := stream.New(stream.Config{ID: s.ID, PeerConfig: &ice})
+// then. The screen goes over WebRTC only: the JPEG fallback through the relay
+// is refused, since Chirp's viewer never uses it and the relay could see every
+// frame. Signed viewers stay off for the trusted relay the first runnable Chirp
+// ships with (docs/product-model.md, decision 5): they need the controller's
+// key from a route the relay does not control, which is the PAKE
+// (barahn/chirp#21). A public relay turns them on, with RequireDataChannel.
+func newRunner(id string, permissions []string, ice webrtc.PeerConfig) *stream.Runner {
+	r := stream.New(stream.Config{ID: id, PeerConfig: &ice})
 	r.RequireScreenViewConsent(true)
-	r.Grant(s.Permissions...)
-	_ = r.Serve(ctx, s)
+	r.DisableRelayFallback(true)
+	r.Grant(permissions...)
+	return r
 }
 
 // iceConfig builds the STUN and TURN servers sessions use. It is always

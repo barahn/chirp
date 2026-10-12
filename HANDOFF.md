@@ -863,8 +863,8 @@ Still to decide or do, in order. Each step has an issue, and the
    socket, granted exactly what the owner allowed, with the ICE servers from
    `-ice`/`CHIRP_ICE` and never remotekit's default. The controller's half
    is in too: Help hands an allowed session to remotekit's `stream.Viewer`,
-   which takes the screen over WebRTC only (never the runner's JPEG frames
-   through the relay), decodes it with remotekit's pure-Go `vp8.Decoder`,
+   which takes the screen over WebRTC only (and the owner's runner refuses
+   its JPEG fallback through the relay, `DisableRelayFallback`), decodes it with remotekit's pure-Go `vp8.Decoder`,
    and sends mouse and keys back over the data channel; it opens in a window
    of its own (`ui.Remote`). The maintainer chose that over the JPEG
    fallback; remotekit built the viewer, the receive side and the decoder
