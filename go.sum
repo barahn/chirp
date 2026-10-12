@@ -6,8 +6,8 @@ github.com/BurntSushi/toml v1.6.0 h1:dRaEfpa2VI55EwlIW72hMRHdWouJeRF7TPYhI+AUQjk
 github.com/BurntSushi/toml v1.6.0/go.mod h1:ukJfTF/6rtPPRCnwkur4qwRxa8vTRFBF0uk2lLoLwho=
 github.com/anthonynsimon/bild v0.14.0 h1:IFRkmKdNdqmexXHfEU7rPlAmdUZ8BDZEGtGHDnGWync=
 github.com/anthonynsimon/bild v0.14.0/go.mod h1:hcvEAyBjTW69qkKJTfpcDQ83sSZHxwOunsseDfeQhUs=
-github.com/barahn/remotekit v0.4.0 h1:P2/x7bnotu4/jPICkQf66j2E9JSm60QdvJOeeQgn1Xk=
-github.com/barahn/remotekit v0.4.0/go.mod h1:6afaf7ATQjRt8MGwLNNdP15166v0psrlOZ93rKZeIp0=
+github.com/barahn/remotekit v0.4.1-0.20261011140308-1fa867b04915 h1:xw31RTCzwcEtLNUivFrr4lqh7nxp9T8PwJsWqALdnKA=
+github.com/barahn/remotekit v0.4.1-0.20261011140308-1fa867b04915/go.mod h1:6afaf7ATQjRt8MGwLNNdP15166v0psrlOZ93rKZeIp0=
 github.com/clipperhouse/uax29/v2 v2.2.0 h1:ChwIKnQN3kcZteTXMgb1wztSgaU+ZemkgWdohwgs8tY=
 github.com/clipperhouse/uax29/v2 v2.2.0/go.mod h1:EFJ2TJMRUaplDxHKj1qAEhCtQPW2tJSwu5BF98AuoVM=
 github.com/fsnotify/fsnotify v1.9.0 h1:2Ml+OJNzbYCTzsxtv8vKSFD9PbJjmhYF14k/jKC7S9k=

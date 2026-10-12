@@ -272,7 +272,7 @@ func TestAForgedLeaveNoticeDoesNotEndTheSession(t *testing.T) {
 // a controller sending large ones cannot make this machine hold more than
 // signalBudget of them.
 func TestQueuedSignalsAreBoundedInBytes(t *testing.T) {
-	conn := newSessionConn(nil, &ConsentRequest{SessionID: "s"})
+	conn := newSessionConn("s", nil, nil)
 	big := make([]byte, signalBudget/4)
 	for i := 0; i < 8; i++ {
 		conn.deliver(big)

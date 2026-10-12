@@ -6,7 +6,7 @@ require github.com/google/uuid v1.6.0
 
 require github.com/gorilla/websocket v1.5.3
 
-require github.com/barahn/remotekit v0.4.0
+require github.com/barahn/remotekit v0.4.1-0.20261011140308-1fa867b04915
 
 require (
 	github.com/jezek/xgb v1.3.1 // indirect

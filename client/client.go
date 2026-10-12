@@ -108,6 +108,13 @@ type Client struct {
 	// pollEvery is how often Help asks the relay how a session stands: the
 	// controller is not told on its socket when the owner decides.
 	pollEvery time.Duration
+
+	// View, when set, shows each session Help is let into until its
+	// SessionConn ends; cmd/chirp runs remotekit's stream.Viewer in it. It
+	// is called on a goroutine of its own, with Help's context, and the
+	// SessionConn is closed when the session ends or Help returns. Set it
+	// before the first Help.
+	View func(ctx context.Context, conn *SessionConn)
 }
 
 // New returns a client for the relay at addr, an http or https address.
