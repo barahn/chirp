@@ -260,7 +260,7 @@ func (o *Owner) listen(ctx context.Context, sock *Socket, shown *Peer) error {
 				default:
 				}
 				if o.active != nil {
-					o.active.deliver(m.Raw, ctx.Done())
+					o.active.deliver(m.Raw)
 				}
 				continue
 			}

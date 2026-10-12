@@ -127,3 +127,53 @@ func TestTheHelperSeesTheOwnersScreenThroughTheRelay(t *testing.T) {
 		t.Fatal("no frame reached the helper within 30s")
 	}
 }
+
+// What the owner's runner sends the moment it is allowed -- before the
+// helper's next poll learns of the decision -- reaches the helper's view
+// first, not the floor.
+func TestTheRunnersFirstSignalsReachTheView(t *testing.T) {
+	r := newRelay(t)
+	o, events, _, _ := runOwnerServing(t, newClient(t, r), func(ctx context.Context, conn *SessionConn) {
+		_ = conn.WriteMessage([]byte(`{"type":"agent_ready"}`))
+		<-conn.Done()
+	})
+	shown := await(t, events, "a code", ready).Peer
+
+	cc := newClient(t, r)
+	cc.pollEvery = 300 * time.Millisecond // the runner speaks well before the poll
+	viewed := make(chan *SessionConn, 1)
+	cc.View = func(_ context.Context, conn *SessionConn) {
+		viewed <- conn
+		<-conn.Done()
+	}
+	help(t, cc, shown)
+	asked := await(t, events, "the request", func(ev OwnerEvent) bool { return ev.Consent != nil }).Consent
+	if _, err := o.Answer(context.Background(), asked.SessionID, true); err != nil {
+		t.Fatal(err)
+	}
+	view := await(t, viewed, "the helper's session", func(*SessionConn) bool { return true })
+	if got := read(t, view); got != `{"type":"agent_ready"}` {
+		t.Fatalf("the view's first signal is %s, want the runner's agent_ready", got)
+	}
+}
+
+// When whatever shows the session returns -- the user ended it, or the viewer
+// failed -- Help ends too, and says so, instead of holding the session open.
+func TestHelpEndsWhenItsViewDoes(t *testing.T) {
+	r := newRelay(t)
+	serve, served := serving()
+	o, events, _, _ := runOwnerServing(t, newClient(t, r), serve)
+	shown := await(t, events, "a code", ready).Peer
+
+	cc := newClient(t, r)
+	cc.View = func(context.Context, *SessionConn) {} // fails at once
+	helped := help(t, cc, shown)
+	asked := await(t, events, "the request", func(ev OwnerEvent) bool { return ev.Consent != nil }).Consent
+	if _, err := o.Answer(context.Background(), asked.SessionID, true); err != nil {
+		t.Fatal(err)
+	}
+	await(t, helped, "Help to end", func(ev HelperEvent) bool { return ev.Phase == HelperEnded })
+	// The helper's socket is gone, so the owner's session ends with it.
+	owner := await(t, served, "the owner's session", func(*SessionConn) bool { return true })
+	ended(t, owner, "the helper's view ended")
+}

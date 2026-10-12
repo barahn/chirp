@@ -267,3 +267,31 @@ func TestAForgedLeaveNoticeDoesNotEndTheSession(t *testing.T) {
 		t.Errorf("after the forgery the owner read %s", got)
 	}
 }
+
+// A controller flooding the owner with signals its runner does not read
+// cannot keep the owner from ending the session.
+func TestAFloodOfSignalsDoesNotHoldTheSessionOpen(t *testing.T) {
+	r := newRelay(t)
+	c := newClient(t, r)
+	// A Serve that never reads, as a runner stuck on a slow negotiation.
+	served := make(chan *SessionConn, 1)
+	o, events, _, _ := runOwnerServing(t, c, func(ctx context.Context, conn *SessionConn) {
+		served <- conn
+		<-conn.Done()
+	})
+	shown := await(t, events, "a code", ready).Peer
+
+	_, ctrl := controller(t, c, shown)
+	asked := await(t, events, "the request", func(ev OwnerEvent) bool { return ev.Consent != nil }).Consent
+	if _, err := o.Answer(context.Background(), asked.SessionID, true); err != nil {
+		t.Fatal(err)
+	}
+	conn := await(t, served, "the allowed session", func(*SessionConn) bool { return true })
+	for i := 0; i < 4*signalQueue; i++ {
+		if err := ctrl.Send([]byte(`{"type":"candidate","candidate":"{}"}`)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	o.NewCode()
+	ended(t, conn, "the owner ended it under a flood")
+}

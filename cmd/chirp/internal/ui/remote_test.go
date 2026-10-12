@@ -7,6 +7,7 @@ import (
 	"image"
 	"math"
 	"testing"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/driver/desktop"
@@ -122,11 +123,9 @@ func TestCopyFrameIsIndependentOfItsSource(t *testing.T) {
 // onto the picture; End gives the session up.
 func TestTheRemoteScreenSendsInputAndEnds(t *testing.T) {
 	w := newWindow(t)
-	ended := false
-	w.OnCancel = func() { ended = true }
-	w.allowed = true
+	ends := 0
 	var sent []bark.InputEvent
-	r := w.OpenRemote(func(ev bark.InputEvent) { sent = append(sent, ev) })
+	r := w.OpenRemote(func(ev bark.InputEvent) { sent = append(sent, ev) }, func() { ends++ })
 	r.view.Resize(fyne.NewSize(400, 225))
 	r.view.setFrame(frame(1600, 900, 50))
 
@@ -151,8 +150,51 @@ func TestTheRemoteScreenSendsInputAndEnds(t *testing.T) {
 	}
 
 	test.Tap(r.stop)
-	if !ended {
-		t.Error("End did not give the session up")
+	test.Tap(r.stop)
+	if ends != 1 {
+		t.Errorf("End ended the session %d times, want once", ends)
 	}
 	r.Close()
+}
+
+// A button released off the picture, over the bands beside it, is still
+// released at the other end -- at the picture's edge -- so it is not left
+// held. Other events off the picture are not sent.
+func TestAReleaseOffThePictureStillReleases(t *testing.T) {
+	w := newWindow(t)
+	var sent []bark.InputEvent
+	r := w.OpenRemote(func(ev bark.InputEvent) { sent = append(sent, ev) }, func() {})
+	defer r.Close()
+	r.view.Resize(fyne.NewSize(400, 400)) // a 16:9 picture: bands above and below
+	r.view.setFrame(frame(1600, 900, 50))
+
+	off := &desktop.MouseEvent{PointEvent: fyne.PointEvent{Position: fyne.NewPos(200, 10)}}
+	r.view.MouseDown(off)
+	r.view.MouseUp(off)
+	if len(sent) != 1 || sent[0].Type != "mouse_up" || sent[0].Y != 0 || !near(sent[0].X, 0.5) {
+		t.Fatalf("off the picture sent %+v, want only the release, at the top edge", sent)
+	}
+}
+
+// A frame arriving clears a notice that said why there was none.
+func TestAFrameClearsTheNotice(t *testing.T) {
+	w := newWindow(t)
+	r := w.OpenRemote(func(bark.InputEvent) {}, func() {})
+	defer r.Close()
+	r.notice.SetText(remoteNotice("capture_unavailable"))
+	r.notice.Show()
+	r.Show(frame(64, 48, 10))
+	waitUntil(t, func() bool { return !r.notice.Visible() })
+}
+
+// waitUntil polls cond until it holds, failing the test after a few seconds.
+func waitUntil(t *testing.T, cond func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for !cond() {
+		if time.Now().After(deadline) {
+			t.Fatal("timed out")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
 }

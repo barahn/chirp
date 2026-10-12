@@ -177,7 +177,7 @@ func decidedNote(name string, granted bool) string {
 		who = "“" + c + "”"
 	}
 	if granted {
-		return "You let " + who + " in. Their view of your screen comes in a later version of Chirp (barahn/chirp#12). End the session when you're done."
+		return "You let " + who + " in. They can see your screen and use your computer until you end the session."
 	}
 	return "You declined " + who + ". Nobody got in."
 }
@@ -216,7 +216,7 @@ func helpProblem(err error) string {
 func outcome(p client.HelperPhase) (title, text, button string) {
 	switch p {
 	case client.HelperAllowed:
-		return "You're in", "Their screen comes in a later version of Chirp (barahn/chirp#12).", "End"
+		return "You're in", "Their screen is open in its own window. End the session there or here when you're done.", "End"
 	case client.HelperDeclined:
 		return "They declined", "Nothing was shared. If they meant to let you in, ask them for a new code.", "Try again"
 	case client.HelperExpired:

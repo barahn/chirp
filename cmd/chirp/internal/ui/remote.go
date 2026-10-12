@@ -33,20 +33,27 @@ type Remote struct {
 
 // OpenRemote opens the remote screen. input receives what the user does over
 // it, as remotekit input events, on Fyne's goroutine. End, or closing the
-// window, does what Cancel does in the main window: it gives the session up
-// and goes back to the form.
-func (w *Window) OpenRemote(input func(bark.InputEvent)) *Remote {
-	end := w.stopHelping
+// window, calls end once: it ends this session and no other, so a window
+// still closing from an earlier session cannot cancel a newer attempt.
+func (w *Window) OpenRemote(input func(bark.InputEvent), end func()) *Remote {
 	r := &Remote{win: w.app.NewWindow(remoteTitle)}
+	ended := false
+	finish := func() {
+		if ended {
+			return
+		}
+		ended = true
+		end()
+	}
 	r.view = newRemoteView(input)
 	r.notice = widget.NewLabel("")
 	r.notice.Wrapping = fyne.TextWrapWord
 	r.notice.Hide()
-	r.stop = widget.NewButton(remoteEnd, end)
+	r.stop = widget.NewButton(remoteEnd, finish)
 	r.stop.Importance = widget.DangerImportance
 	bar := container.NewBorder(nil, nil, nil, r.stop, r.notice)
 	r.win.SetContent(container.NewBorder(bar, nil, nil, nil, r.view))
-	r.win.SetCloseIntercept(end)
+	r.win.SetCloseIntercept(finish)
 	r.win.Resize(fyne.NewSize(1024, 640))
 	r.win.Show()
 	r.win.Canvas().Focus(r.view)
@@ -61,6 +68,12 @@ func (r *Remote) Show(img *image.YCbCr) {
 		fyne.Do(func() {
 			if f := r.frames.take(); f != nil && !r.closed {
 				r.view.setFrame(f)
+				// The picture arriving answers whatever was said
+				// instead of it.
+				if r.notice.Visible() {
+					r.notice.Hide()
+					r.win.Content().Refresh()
+				}
 			}
 		})
 	}
@@ -73,6 +86,7 @@ func (r *Remote) Notice(kind string) {
 		if text := remoteNotice(kind); text != "" && !r.closed {
 			r.notice.SetText(text)
 			r.notice.Show()
+			r.win.Content().Refresh()
 		}
 	})
 }
@@ -215,7 +229,12 @@ func (v *remoteView) send(ev bark.InputEvent) {
 func (v *remoteView) mouse(kind string, e *desktop.MouseEvent) {
 	x, y, ok := v.position(e.Position)
 	if !ok {
-		return
+		// A release off the picture still releases, at its edge: dropped,
+		// it would leave the button held at the other end.
+		if kind != "mouse_up" || v.size == (image.Point{}) {
+			return
+		}
+		x, y = max(0, min(1, x)), max(0, min(1, y))
 	}
 	v.send(bark.InputEvent{Type: kind, X: x, Y: y, Button: mouseButton(e.Button)})
 }

@@ -164,7 +164,9 @@ func viewSession(ctx context.Context, conn *client.SessionConn, ice webrtc.PeerC
 	v := stream.NewViewer(stream.ViewerConfig{ID: "chirp-controller", AgentID: conn.ID, PeerConfig: &ice})
 	opened := make(chan *ui.Remote, 1)
 	fyne.Do(func() {
-		opened <- w.OpenRemote(func(ev bark.InputEvent) { _ = v.SendInput(ev) })
+		// End closes this session's conn, which ends this Help and no
+		// other; the viewer failing does the same.
+		opened <- w.OpenRemote(func(ev bark.InputEvent) { _ = v.SendInput(ev) }, func() { _ = conn.Close() })
 	})
 	remote := <-opened
 	defer fyne.Do(remote.Close)

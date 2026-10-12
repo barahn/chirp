@@ -109,9 +109,15 @@ func (c *Client) follow(ctx context.Context, sock *Socket, sess Session, emit fu
 	allowed := false
 
 	// conn carries the session's signals once the owner lets this machine
-	// in; before that, what arrives is dropped. Whatever shows the session
-	// is waited for before Help returns.
+	// in. The owner's runner starts the moment it allows, a poll before this
+	// end learns of it, so what arrives meanwhile is kept, up to a queue's
+	// worth, and handed over in order. Whatever shows the session is waited
+	// for before Help returns, and its end -- the user ending it, or the
+	// viewer failing -- ends Help too: connDone is conn's Done once there is
+	// one, and nil (never ready) before.
 	var conn *SessionConn
+	var connDone <-chan struct{}
+	var early [][]byte
 	var viewing sync.WaitGroup
 	defer func() {
 		if conn != nil {
@@ -126,7 +132,11 @@ func (c *Client) follow(ctx context.Context, sock *Socket, sess Session, emit fu
 			return
 		}
 		cn := newSessionConn(s.ID, nil, sock.Send)
-		conn = cn
+		for _, m := range early {
+			cn.deliver(m)
+		}
+		early = nil
+		conn, connDone = cn, cn.Done()
 		viewing.Add(1)
 		go func() {
 			defer viewing.Done()
@@ -144,10 +154,18 @@ func (c *Client) follow(ctx context.Context, sock *Socket, sess Session, emit fu
 				emit(HelperEvent{Phase: HelperFailed, Session: sess, Err: ErrUnavailable})
 			}
 			return
+		case <-connDone:
+			if ctx.Err() == nil {
+				emit(HelperEvent{Phase: HelperEnded, Session: sess})
+			}
+			return
 		case m := <-msgs:
 			if !m.FromRelay() {
-				if conn != nil {
-					conn.deliver(m.Raw, ctx.Done())
+				switch {
+				case conn != nil:
+					conn.deliver(m.Raw)
+				case len(early) < signalQueue:
+					early = append(early, m.Raw)
 				}
 				continue
 			}
