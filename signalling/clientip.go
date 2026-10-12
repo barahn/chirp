@@ -20,10 +20,15 @@ import (
 // not itself trusted, which is the last hop a trusted proxy saw. Addresses
 // further left were written by the client and are ignored.
 //
+// A connection with no IP address is one over a Unix socket, which only the
+// processes its permissions admit can open: it is trusted like a listed
+// proxy. That is what makes a socket the tightest way to put a proxy in front
+// of the relay -- no other process on the machine can pose as it.
+//
 // An entry that does not parse stops the walk at the hop that wrote it, so a
 // misbehaving proxy costs its users a shared budget rather than giving anyone
-// a free one. With trusted empty this is the connection's address, as with a
-// nil ClientIP.
+// a free one. With trusted empty, a TCP connection's origin is its own
+// address, as with a nil ClientIP.
 func ForwardedFor(trusted []netip.Prefix) func(*http.Request) string {
 	isTrusted := func(a netip.Addr) bool {
 		for _, p := range trusted {
@@ -38,13 +43,13 @@ func ForwardedFor(trusted []netip.Prefix) func(*http.Request) string {
 		if err != nil {
 			host = r.RemoteAddr
 		}
-		peer, err := netip.ParseAddr(host)
-		if err != nil {
-			return host
-		}
-		peer = peer.Unmap()
-		if !isTrusted(peer) {
-			return peer.String()
+		origin := host
+		if peer, err := netip.ParseAddr(host); err == nil {
+			peer = peer.Unmap()
+			if !isTrusted(peer) {
+				return peer.String()
+			}
+			origin = peer.String()
 		}
 
 		// Several X-Forwarded-For headers are one list, in order.
@@ -52,7 +57,6 @@ func ForwardedFor(trusted []netip.Prefix) func(*http.Request) string {
 		for _, h := range r.Header.Values("X-Forwarded-For") {
 			hops = append(hops, strings.Split(h, ",")...)
 		}
-		origin := peer
 		for i := len(hops) - 1; i >= 0; i-- {
 			a, err := netip.ParseAddr(strings.TrimSpace(hops[i]))
 			if err != nil {
@@ -62,9 +66,9 @@ func ForwardedFor(trusted []netip.Prefix) func(*http.Request) string {
 			if !isTrusted(a) {
 				return a.String()
 			}
-			origin = a
+			origin = a.String()
 		}
-		return origin.String()
+		return origin
 	}
 }
 

@@ -5,10 +5,16 @@
 # Settings live in /etc/chirp-relay/relay.env (see relay.env next to this
 # file), not here, so an upgrade can replace this unit without losing them.
 #
-# The relay holds no files and needs no privilege, so it runs as a throwaway
-# user (DynamicUser) in a sandbox that allows little beyond TCP. In a Proxmox
-# LXC container the sandbox needs the container's "nesting" feature; without
-# it the service fails with status 226/NAMESPACE (docs/relay.md).
+# The relay holds no files and needs no privilege. It runs as its own system
+# user, chirp-relay, in a sandbox that allows little beyond networking, and
+# listens on a Unix socket in /run/chirp-relay/ that only that user's group
+# can open. deploy/install.sh adds Caddy to the group, which makes Caddy the
+# only process that can reach the relay. (A DynamicUser has no fixed group to
+# add Caddy to, which is why the user is a real one.)
+#
+# In a Proxmox LXC container the sandbox needs the container's "nesting"
+# feature; without it the service fails with status 226/NAMESPACE
+# (docs/relay.md).
 #
 # SPDX-License-Identifier: AGPL-3.0-only
 # Copyright (C) 2026 Fabrintek Engenharia Digital Ltda
@@ -27,7 +33,10 @@ Restart=on-failure
 RestartSec=2
 TimeoutStopSec=15
 
-DynamicUser=yes
+User=chirp-relay
+Group=chirp-relay
+RuntimeDirectory=chirp-relay
+RuntimeDirectoryMode=0750
 UMask=0077
 LimitNOFILE=65536
 

@@ -1,5 +1,6 @@
 # Caddy in front of the Chirp relay, through Podman Quadlet: TLS on 443 with a
-# certificate it obtains itself, proxying to the relay on 127.0.0.1:8080.
+# certificate it obtains itself, proxying to the relay over the Unix socket
+# that chirp-relay.container shares with it.
 #
 # Set your domain in CHIRP_RELAY_DOMAIN below before starting it. Its DNS
 # record must already point at this host, and ports 80 and 443 must reach it,
@@ -24,12 +25,15 @@ ContainerName=chirp-caddy
 Image=docker.io/library/caddy:2@sha256:f2a1290d0463aad60660d4ec134943f183ee2a5f6c3eb7bf32dd984f2f020772
 
 # The host's network, so Caddy sees each user's real address and the relay
-# throttles each user on their own (see chirp-relay.container). Caddy listens
-# on 80 (the ACME challenge, and the redirect to HTTPS) and 443 (TCP, and UDP
-# for HTTP/3).
+# throttles each user on their own. On a bridge network with published ports,
+# rootless Podman hands Caddy every connection from one internal address
+# (docs/relay.md). Caddy listens on 80 (the ACME challenge, and the redirect
+# to HTTPS) and 443 (TCP, and UDP for HTTP/3).
 Network=host
 Environment=CHIRP_RELAY_DOMAIN=relay.example.org
-Environment=CHIRP_RELAY_UPSTREAM=127.0.0.1:8080
+
+# The relay's socket (CHIRP_RELAY_UPSTREAM's default in the Caddyfile).
+Volume=chirp-relay-socket:/run/chirp-relay
 
 # Your copy of deploy/caddy/Caddyfile. %h is the home directory of the user
 # the unit runs as: /root for rootful Podman.

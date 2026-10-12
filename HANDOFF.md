@@ -238,7 +238,7 @@ cmd/chirp/internal/warm/ the Warm look (barahn/chirp#53): Fyne theme, tokens,
                         fonts (third-party, OFL; see fonts/README.md), the
                         bird's poses as SVG, the app icon
 cmd/chirp-relay/        serves signalling.Server, for a self-hosted relay, with
-                        /healthz, -healthcheck and -trusted-proxies
+                        a Unix socket, /healthz, -healthcheck, -trusted-proxies
 session/consent.go      ConsentDecision, DefaultPermissions
 session/lookup.go       Contact, SetContact, Lookup, LookupLink (the blind lookup, §4.6)
 session/session.go      Peer, Session, SessionState machine, SessionManager (in-memory),

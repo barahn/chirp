@@ -2,18 +2,37 @@
 # with certificates from Let's Encrypt or ZeroSSL obtained and renewed on its
 # own. Used as-is by both deployments in docs/relay.md:
 #
-#   - Proxmox LXC or any Debian/Ubuntu host (deploy/install.sh): Caddy and the
-#     relay share the machine, and the relay listens on 127.0.0.1:8080.
-#   - Podman (deploy/podman/): Caddy reaches the relay by its container name.
+#   - Proxmox LXC or any Debian/Ubuntu host (deploy/install.sh);
+#   - Podman (deploy/podman/).
+#
+# In both, the relay listens on a Unix socket that only Caddy can open, so no
+# other process can pose as Caddy and choose its own client address.
 #
 # Both values come from the environment, so this file is never edited per
 # deployment:
 #
 #   CHIRP_RELAY_DOMAIN    the relay's public name, e.g. relay.example.org
-#   CHIRP_RELAY_UPSTREAM  where the relay listens (default 127.0.0.1:8080)
+#   CHIRP_RELAY_UPSTREAM  where the relay listens
+#                         (default unix//run/chirp-relay/relay.sock)
 #
 # SPDX-License-Identifier: AGPL-3.0-only
 # Copyright (C) 2026 Fabrintek Engenharia Digital Ltda
+
+# BEGIN global options
+# Peer IDs, session IDs and link tokens travel in request paths and query
+# strings, and each is a credential. Caddy logs the request URI with every
+# error, whatever the site's own log says, so the default logger drops it too.
+{
+	log default {
+		output stderr
+		format filter {
+			wrap console
+			request>uri delete
+			request>headers delete
+		}
+	}
+}
+# END global options
 
 {$CHIRP_RELAY_DOMAIN} {
 	# Every request the relay takes is a small JSON body or a WebSocket
@@ -24,9 +43,9 @@
 
 	# Caddy overwrites X-Forwarded-For with the address it sees, ignoring one
 	# a client sends, unless that client is in its trusted_proxies (none by
-	# default). The relay trusts Caddy's header, and only Caddy's
-	# (-trusted-proxies), so each user is throttled on their own address.
-	reverse_proxy {$CHIRP_RELAY_UPSTREAM:127.0.0.1:8080} {
+	# default). The relay believes it because only Caddy can reach the
+	# socket.
+	reverse_proxy {$CHIRP_RELAY_UPSTREAM:unix//run/chirp-relay/relay.sock} {
 		# The owner's socket stays open for as long as Chirp runs. Never
 		# cut a WebSocket because the relay's configuration was reloaded.
 		stream_close_delay 1h
@@ -39,8 +58,15 @@
 		Referrer-Policy "no-referrer"
 	}
 
+	# One line per request, with the client's address, method, status and
+	# timing, and without the URI or headers that carry credentials.
 	log {
 		output stderr
-		format console
+		format filter {
+			wrap console
+			request>uri delete
+			request>headers delete
+			resp_headers delete
+		}
 	}
 }

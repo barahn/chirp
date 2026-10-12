@@ -55,6 +55,22 @@ func TestForwardedForWithNothingTrustedIsTheConnection(t *testing.T) {
 	}
 }
 
+func TestForwardedForTrustsAUnixSocket(t *testing.T) {
+	// net/http reports a Unix socket's client as "@" or "", never an IP.
+	for _, remote := range []string{"@", ""} {
+		r := httptest.NewRequest("GET", "/", nil)
+		r.RemoteAddr = remote
+		r.Header.Set("X-Forwarded-For", "1.2.3.4, 203.0.113.7")
+		if got := ForwardedFor(nil)(r); got != "203.0.113.7" {
+			t.Errorf("remote %q: got %q, want the proxy's last hop", remote, got)
+		}
+		r.Header.Del("X-Forwarded-For")
+		if got := ForwardedFor(nil)(r); got != remote {
+			t.Errorf("remote %q without the header: got %q, want one shared origin", remote, got)
+		}
+	}
+}
+
 func TestParsePrefixesRejectsGarbage(t *testing.T) {
 	for _, s := range []string{"10.0.0.0/33", "not-an-ip", "10.0.0.0/8,,x"} {
 		if _, err := ParsePrefixes(s); err == nil {

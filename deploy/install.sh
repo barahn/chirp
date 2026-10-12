@@ -6,12 +6,14 @@
 #
 # What it does:
 #
-#   - installs the binary as /usr/local/bin/chirp-relay;
+#   - installs the binary as /usr/local/bin/chirp-relay, and creates the
+#     chirp-relay system user it runs as;
 #   - installs deploy/systemd/chirp-relay.service, and writes
 #     /etc/chirp-relay/relay.env the first time only;
 #   - with --domain, installs Caddy from Caddy's own apt repository (the
-#     distributions ship 2.6, older than the Caddyfile needs) and points it
-#     at the relay, with a certificate for that domain;
+#     distributions ship 2.6, older than the Caddyfile needs), adds it to the
+#     chirp-relay group so it can open the relay's socket, and points it at
+#     the relay, with a certificate for that domain;
 #   - starts the relay, or restarts it on an upgrade, and checks it answers.
 #
 # Run it again with a new binary to upgrade; relay.env is kept.
@@ -64,6 +66,12 @@ fi
 log "Installing /usr/local/bin/chirp-relay"
 install -m 0755 "$BINARY" /usr/local/bin/chirp-relay.new
 mv -f /usr/local/bin/chirp-relay.new /usr/local/bin/chirp-relay
+
+if ! getent passwd chirp-relay >/dev/null; then
+	log "Creating the chirp-relay system user"
+	useradd --system --user-group --no-create-home --home-dir /nonexistent \
+		--shell /usr/sbin/nologin chirp-relay
+fi
 
 log "Installing chirp-relay.service"
 install -m 0644 "$HERE/systemd/chirp-relay.service" /etc/systemd/system/chirp-relay.service
@@ -126,16 +134,24 @@ if [ -n "$DOMAIN" ]; then
 		# Written by Chirp's deploy/install.sh.
 		[Service]
 		Environment=CHIRP_RELAY_DOMAIN=$DOMAIN
-		Environment=CHIRP_RELAY_UPSTREAM=127.0.0.1:8080
 	EOF
+
+	# The relay's socket is open to its group, and only Caddy joins it.
+	usermod -a -G chirp-relay caddy
 
 	if $caddy_was_installed && ! grep -q 'CHIRP_RELAY_DOMAIN' /etc/caddy/Caddyfile 2>/dev/null; then
 		# Caddy was here before us and serves something else: do not
-		# replace its configuration, add ours beside it.
-		install -m 0644 "$HERE/caddy/Caddyfile" /etc/caddy/chirp-relay.caddy
+		# replace its configuration, add our site beside it. Global options
+		# cannot be imported, so the logger that keeps credentials out of
+		# Caddy's error log is left to the operator.
+		sed '/^# BEGIN global options$/,/^# END global options$/d' "$HERE/caddy/Caddyfile" \
+			>/etc/caddy/chirp-relay.caddy
+		chmod 0644 /etc/caddy/chirp-relay.caddy
 		log "Caddy already has a configuration. Wrote /etc/caddy/chirp-relay.caddy;"
-		log "add this line to /etc/caddy/Caddyfile, then: systemctl reload caddy"
+		log "add this line to /etc/caddy/Caddyfile, then: systemctl restart caddy"
 		log "    import /etc/caddy/chirp-relay.caddy"
+		log "and copy the global 'log default' block from $HERE/caddy/Caddyfile into"
+		log "its global options, or Caddy's error log will record relay credentials."
 		systemctl daemon-reload
 	else
 		install -m 0644 "$HERE/caddy/Caddyfile" /etc/caddy/Caddyfile

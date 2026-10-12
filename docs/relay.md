@@ -40,13 +40,17 @@ Some properties shape how it is deployed:
   front provides HTTPS and WSS. Every deployment here uses Caddy, which also
   obtains and renews the certificate.
 - **It throttles code guesses per client address**, along with registrations
-  and open sessions (`HANDOFF.md` §4.2, §4.6). Behind a proxy it has to be told
-  which proxy to believe about that address, or every user shares one budget
-  ([Client addresses](#client-addresses-and-trusted-proxies)).
+  and open sessions (`HANDOFF.md` §4.2, §4.6). Behind a proxy it has to know
+  which proxy to believe about that address, and no other process may be able
+  to pose as that proxy. Otherwise every user shares one budget, or anyone can
+  escape it ([How the pieces connect](#how-the-pieces-connect)).
+- **Its URLs carry credentials.** Peer IDs, session IDs and link tokens travel
+  in request paths and query strings. Whatever logs requests must leave them
+  out, as the Caddyfile here does.
 
 ```
-                   HTTPS / WSS (443)               HTTP (127.0.0.1:8080)
-  Chirp (owner)  ────────────────────┐
+                   HTTPS / WSS (443)            HTTP over a Unix socket
+  Chirp (owner)  ────────────────────┐          (/run/chirp-relay/relay.sock)
                                      ├──▶  Caddy  ──────────────────▶  chirp-relay
   Chirp (helper) ────────────────────┘     TLS, certificates            codes, consent,
                                            X-Forwarded-For              signalling
@@ -65,7 +69,7 @@ You need:
   the machine. Caddy will not get a certificate until the record resolves.
 - **TCP 80 and 443 reaching the machine** from the internet, plus UDP 443 for
   HTTP/3, which is optional. Port 80 serves the ACME HTTP challenge and the
-  redirect to HTTPS. The relay's own port, 8080, is never exposed.
+  redirect to HTTPS. The relay itself listens on a Unix socket, not a port.
 - **Go 1.26** on the machine where you build. The relay needs no cgo, so it
   cross-compiles from any OS.
 
@@ -157,7 +161,7 @@ Run `./proxmox/create-ct.sh --help` for every option. The most useful are:
 
 | Option | Default | |
 | --- | --- | --- |
-| `--domain` | none | Installs Caddy for this name. Without it, the relay listens on loopback and you supply the proxy. |
+| `--domain` | none | Installs Caddy for this name. Without it, you supply the proxy ([Behind a proxy you already run](#behind-a-proxy-you-already-run)). |
 | `--ip`, `--gw` | `dhcp` | IPv4 for `eth0`. `--ip6 auto` adds SLAAC. |
 | `--bridge`, `--vlan` | `vmbr0` | Where `eth0` attaches. |
 | `--storage` | `local-lvm` | Storage for the root disk. |
@@ -230,16 +234,18 @@ relay. Rootless (units in `~/.config/containers/systemd/` of an ordinary user)
 keeps root out of it. The steps below show rootless and note where rootful
 differs.
 
-### Why the host network
+### How the containers connect
 
-Both containers use `Network=host`. The relay listens on `127.0.0.1:8080` and
-Caddy on 80 and 443. A private bridge network with published ports would look
-tidier, but rootless Podman then hands every incoming connection to Caddy from
-one internal address. Caddy would forward that address, and every user would
-share one throttle. With the host network, Caddy sees each user's real
-address under both rootful and rootless Podman. The relay still has no
-capabilities, a read-only root filesystem and no writable paths, and it
-listens only on loopback.
+- **The relay has no network** (`Network=none`). It listens on a Unix socket
+  in the `chirp-relay-socket` volume, which only the two containers mount.
+  Nothing else on the host can reach the relay or pose as Caddy. The relay
+  runs with no capabilities, a read-only root filesystem, and the volume as
+  its only writable path.
+- **Caddy uses the host's network** (`Network=host`), listening on 80 and
+  443. A bridge network with published ports would look tidier, but rootless
+  Podman then hands Caddy every connection from one internal address, so
+  every user would share one throttle. On the host network, Caddy sees each
+  user's real address under both rootful and rootless Podman.
 
 ### 1. Build or load the image
 
@@ -322,8 +328,8 @@ To try the image without installing anything:
 podman run --rm -p 127.0.0.1:8080:8080 localhost/chirp-relay
 ```
 
-Then point Chirp at `http://localhost:8080`. Leave the relay off the network
-like this. Anything beyond your own machine needs the proxy in front of it.
+Then point Chirp at `http://localhost:8080`. Keep it to your own machine like
+this. Anything beyond it needs the proxy in front.
 
 ## Any Linux host with systemd
 
@@ -339,20 +345,29 @@ The installer:
 - installs `/usr/local/bin/chirp-relay` and `chirp-relay.service`;
 - writes `/etc/chirp-relay/relay.env` the first time, and never overwrites
   it after that;
+- creates the `chirp-relay` system user the relay runs as;
 - with `--domain`, installs Caddy from Caddy's own apt repository and
   configures it. Debian 12 and 13 and Ubuntu 24.04 ship Caddy 2.6, which is
-  older than the Caddyfile needs;
+  older than the Caddyfile needs. It also adds the `caddy` user to the
+  `chirp-relay` group, which is the only group that can open the relay's
+  socket;
 - starts the relay and checks that it answers.
 
 If Caddy was already installed and serving other sites, the installer leaves
 `/etc/caddy/Caddyfile` alone. It writes `/etc/caddy/chirp-relay.caddy` and
-tells you which `import` line to add.
+tells you which `import` line to add. Global options cannot be imported, so
+also copy the `log default` block from `deploy/caddy/Caddyfile` into your
+global options. Without it, Caddy's error log records request URIs, and with
+them relay credentials.
 
 On other distributions, do by hand what the installer does. It is short and
 commented.
 
-The unit runs the relay as a throwaway user (`DynamicUser`) in a strict
-sandbox, which `systemd-analyze security chirp-relay` rates at 1.1, "OK".
+The unit runs the relay as the `chirp-relay` user in a strict sandbox, which
+`systemd-analyze security chirp-relay` rates at 1.1, "OK". The relay listens
+on `/run/chirp-relay/relay.sock`, which is mode `0660` in a `0750` directory,
+both owned by `chirp-relay`. Only that user and the members of its group
+(Caddy) can connect.
 
 ### Behind a proxy you already run
 
@@ -362,11 +377,15 @@ at the relay. Then:
 1. Make the relay reachable from the proxy. In `/etc/chirp-relay/relay.env`,
    set `CHIRP_RELAY_ADDR` to an address the proxy can reach, such as
    `10.10.10.20:8080`. Firewall that port so that only the proxy can connect.
-2. Trust that proxy, and nothing else, by setting
+   If the proxy runs on the same machine, keep the socket instead, and add the
+   proxy's user to the `chirp-relay` group.
+2. Over TCP, trust that proxy and nothing else by setting
    `CHIRP_RELAY_TRUSTED_PROXIES` to the proxy's address as the relay sees it.
 3. Make the proxy pass WebSocket upgrades, set `X-Forwarded-For`, and not
    time out idle connections quickly.
-4. Restart the relay with `systemctl restart chirp-relay`.
+4. Keep request URIs out of the proxy's logs. They carry peer IDs, session
+   IDs and link tokens.
+5. Restart the relay with `systemctl restart chirp-relay`.
 
 For nginx:
 
@@ -387,8 +406,9 @@ location / {
 
 | Flag | Environment | Default | |
 | --- | --- | --- | --- |
-| `-addr` | `CHIRP_RELAY_ADDR` | `localhost:8080` (`:8080` in the image) | Where to listen. |
-| `-trusted-proxies` | `CHIRP_RELAY_TRUSTED_PROXIES` | none | Comma-separated addresses or CIDRs whose `X-Forwarded-For` is believed. |
+| `-addr` | `CHIRP_RELAY_ADDR` | `localhost:8080` (`:8080` in the image) | Where to listen: `host:port`, or `unix:PATH` for a Unix socket. |
+| `-socket-mode` | `CHIRP_RELAY_SOCKET_MODE` | `0660` | Permissions of the Unix socket, in octal. |
+| `-trusted-proxies` | `CHIRP_RELAY_TRUSTED_PROXIES` | none | Over TCP: comma-separated addresses or CIDRs whose `X-Forwarded-For` is believed. |
 | `-healthcheck` | | | Ask the relay on `-addr` for `/healthz`, and exit 0 if it answers. Used by container health checks. |
 
 A flag on the command line overrides the environment. Code lifetimes,
@@ -397,27 +417,37 @@ throttles and caps are compiled in (`HANDOFF.md` §4.2, §4.6).
 `GET /healthz` returns `200 ok` while the process is serving. It reads no
 state and reveals nothing.
 
-### Client addresses and trusted proxies
+### How the pieces connect
 
 The relay counts code guesses, registrations and open sessions per client
-address. Behind a proxy, every connection comes from the proxy. Without
-`-trusted-proxies`, the relay counts them all as one client: five wrong codes
-from anyone lock everyone out for ten minutes, and the 31st Chirp to start
-gets `429`.
+address. Behind a proxy, every connection comes from the proxy, so the relay
+has to take the client's address from the proxy's `X-Forwarded-For` header.
+Two things can go wrong:
 
-With `-trusted-proxies`, a request from a listed address is attributed to the
-rightmost address in `X-Forwarded-For` that is not itself listed. That is the
-client as the outermost trusted proxy saw it. Addresses further left were
-written by the client and are ignored. A request from anywhere else is
-attributed to its own address, whatever its headers say. So:
+- **It believes nobody.** Then it counts every user as one client. Five
+  wrong codes from anyone lock everyone out for ten minutes, and the 31st
+  Chirp to start gets `429`.
+- **It believes someone other than the proxy.** Anything that can reach the
+  relay directly and gets believed can write its own header and pick a fresh
+  address for every guess, escaping the throttle. That includes any process
+  on the same machine when the relay listens on `127.0.0.1`.
 
-- **List exactly your proxies.** Listing a range that clients can connect
-  from lets them write their own header and pick a fresh address for every
-  guess.
-- **The proxy must overwrite a client's `X-Forwarded-For`, or append to it.**
-  Caddy does this by default.
-- All the deployments above set this already: `127.0.0.1,::1` with Caddy on
-  the same host.
+There are two ways to get this right:
+
+- **A Unix socket** (`-addr unix:PATH`), which every deployment here uses.
+  Only the processes that the socket's permissions admit can connect, and
+  those permissions admit only Caddy. Every request on the socket is from
+  the proxy, so its `X-Forwarded-For` is believed.
+- **TCP with `-trusted-proxies`**, when the proxy is on another machine. A
+  request from a listed address is attributed to the rightmost address in
+  `X-Forwarded-For` that is not itself listed, which is the client as the
+  outermost trusted proxy saw it. Addresses further left were written by the
+  client and are ignored. A request from anywhere else is attributed to its
+  own address, whatever its headers say. List exactly your proxies, and
+  firewall the port so that only they can reach it.
+
+Either way, the proxy must overwrite a client's `X-Forwarded-For` or append
+to it. Caddy does this by default.
 
 ## Pointing Chirp at the relay
 
@@ -459,7 +489,10 @@ journalctl -u caddy -f
 ```
 
 The relay logs only when it starts, stops and fails. Caddy logs every
-request, with the client address, to the journal.
+request to the journal: the client's address, the method, the status and the
+timing. It does not log the URI or the headers, because peer IDs, session
+IDs and link tokens travel there, and each one is a credential. If you change
+the Caddyfile's `log` blocks, keep them filtered.
 
 ### Restarts and upgrades
 
@@ -499,9 +532,12 @@ are lost, Caddy obtains them again, subject to Let's Encrypt's rate limits.
 
 ## Security checklist
 
-- [ ] Port 8080 is not reachable from outside: the relay listens on loopback,
-      or a firewall admits only the proxy.
-- [ ] `CHIRP_RELAY_TRUSTED_PROXIES` lists your proxies and nothing broader.
+- [ ] Only the proxy can reach the relay: over the Unix socket, or over TCP
+      with a firewall that admits only the proxy.
+- [ ] Over TCP, `CHIRP_RELAY_TRUSTED_PROXIES` lists your proxies and nothing
+      broader.
+- [ ] No log records request URIs: they carry peer IDs, session IDs and link
+      tokens.
 - [ ] The relay's DNS record is *DNS only* if the domain is on Cloudflare.
 - [ ] The container or VM receives security updates.
 - [ ] coturn, if it runs, has the `denied-peer-ip` list from
@@ -528,9 +564,15 @@ yet, port 80 is not forwarded, or a Cloudflare-proxied record is in the way.
 Caddy retries on its own, so once the cause is fixed, wait or restart it.
 
 **Every user gets `429 Too Many Requests` quickly.** The relay is counting
-everyone as one client. Check that `CHIRP_RELAY_TRUSTED_PROXIES` names the
-proxy as the relay sees it, and that the proxy keeps client addresses. With
-rootless Podman, both containers must use `Network=host`.
+everyone as one client. Over TCP, check that `CHIRP_RELAY_TRUSTED_PROXIES`
+names the proxy as the relay sees it. Either way, check that the proxy keeps
+client addresses. With rootless Podman, Caddy must use `Network=host`.
+
+**Caddy answers `502` and logs `permission denied` on the socket.** Caddy
+cannot open the relay's socket. On a systemd host, check that
+`id caddy` lists the `chirp-relay` group, then restart Caddy, because a new
+group membership needs a restart. With Podman, check that both containers
+mount the `chirp-relay-socket` volume.
 
 **Chirp keeps reconnecting.** Something between the client and the relay
 closes idle WebSockets: a Cloudflare-proxied record, or a proxy with a short

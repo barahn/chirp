@@ -21,16 +21,18 @@ Documentation=https://github.com/barahn/chirp/blob/develop/docs/relay.md
 ContainerName=chirp-relay
 Image=localhost/chirp-relay:latest
 
-# The host's network, listening on loopback only: Caddy, on the same host,
-# is the only way in. A bridge network with published ports would be tidier,
-# but rootless Podman then hands every connection to Caddy from one internal
-# address, so all users would share one throttle (docs/relay.md, "Why the
-# host network"). The host network keeps each user's real address, rootful
-# or rootless.
-Network=host
-Environment=CHIRP_RELAY_ADDR=127.0.0.1:8080
-# Believe the X-Forwarded-For that Caddy writes, and nobody else's.
-Environment=CHIRP_RELAY_TRUSTED_PROXIES=127.0.0.1,::1
+# No network at all. The relay listens on a Unix socket in a volume that only
+# this container and caddy.container mount, so Caddy is the only way in, and
+# nothing else on the host can pose as Caddy (docs/relay.md, "How the pieces
+# connect"). The relay believes the X-Forwarded-For on every request it
+# receives there.
+Network=none
+Volume=chirp-relay-socket:/run/chirp-relay:U
+Environment=CHIRP_RELAY_ADDR=unix:/run/chirp-relay/relay.sock
+# Caddy's container runs as a different user with every capability dropped,
+# so the socket is open to all. The volume is the boundary: it is reachable
+# only by the two containers and by whoever owns them.
+Environment=CHIRP_RELAY_SOCKET_MODE=0666
 
 # The image has no shell, so the check runs the binary directly (exec form).
 HealthCmd=["/usr/local/bin/chirp-relay","-healthcheck"]
