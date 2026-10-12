@@ -209,6 +209,25 @@ func helpWith(t *testing.T, c *Client, input, name string) <-chan HelperEvent {
 
 func asked(ev OwnerEvent) bool { return ev.Consent != nil }
 
+// askedAndReplaced waits for a request and for the code that replaced old,
+// in either order: the owner learns of the new code from its own poll as
+// well as from the request, and on a slow machine the poll comes first.
+func askedAndReplaced(t *testing.T, events <-chan OwnerEvent, old string) (*ConsentRequest, Peer) {
+	t.Helper()
+	var req *ConsentRequest
+	var next Peer
+	await(t, events, "the request and the next code", func(ev OwnerEvent) bool {
+		if ev.Consent != nil {
+			req = ev.Consent
+		}
+		if ev.Peer.Code != "" && ev.Peer.Code != old {
+			next = ev.Peer
+		}
+		return req != nil && next.Code != ""
+	})
+	return req, next
+}
+
 func fieldsOf(t *testing.T, msg string) map[string]any {
 	t.Helper()
 	var m map[string]any
@@ -235,7 +254,8 @@ func TestASessionIsSignalledOverNostr(t *testing.T) {
 	}
 	helped := helpWith(t, cc, shown.Formatted, "Ana")
 
-	req := await(t, events, "the request", asked).Consent
+	// The lookup spent the code, as a redemption does.
+	req, _ := askedAndReplaced(t, events, shown.Code)
 	if req.Name != "Ana" || req.NameVerified {
 		t.Errorf("the owner was asked by %q (verified %v), want an unverified Ana", req.Name, req.NameVerified)
 	}
@@ -243,8 +263,6 @@ func TestASessionIsSignalledOverNostr(t *testing.T) {
 		t.Errorf("the request asks for %v with %ds left", req.Permissions, req.ExpiresIn)
 	}
 	await(t, helped, "the helper to be asking", func(ev HelperEvent) bool { return ev.Phase == HelperAsking })
-	// The lookup spent the code, as a redemption does.
-	await(t, events, "a new code", func(ev OwnerEvent) bool { return ev.Replaced && ev.Peer.Code != shown.Code })
 
 	if _, err := o.Answer(context.Background(), req.SessionID, true); err != nil {
 		t.Fatal(err)
@@ -325,8 +343,7 @@ func TestASecondHelperOverNostrIsToldTheOwnerIsBusy(t *testing.T) {
 	shown := await(t, events, "a code", ready).Peer
 
 	helpWith(t, newNostrClient(t, r, nr), shown.Formatted, "Ana")
-	await(t, events, "the first request", asked)
-	next := await(t, events, "the next code", func(ev OwnerEvent) bool { return ev.Peer.Code != shown.Code && ev.Peer.Code != "" }).Peer
+	_, next := askedAndReplaced(t, events, shown.Code)
 
 	second := helpWith(t, newNostrClient(t, r, nr), next.Formatted, "Bruno")
 	ev := await(t, second, "the second helper's answer", func(ev HelperEvent) bool { return ev.Phase != HelperAsking })
@@ -347,8 +364,7 @@ func TestAHelperGivingUpOverNostrFreesTheOwner(t *testing.T) {
 		defer close(gone)
 		newNostrClient(t, r, nr).Help(ctx, shown.Formatted, "Ana", func(HelperEvent) {})
 	}()
-	first := await(t, events, "the first request", asked).Consent
-	next := await(t, events, "the next code", func(ev OwnerEvent) bool { return ev.Peer.Code != shown.Code && ev.Peer.Code != "" }).Peer
+	first, next := askedAndReplaced(t, events, shown.Code)
 	cancel()
 	<-gone
 
