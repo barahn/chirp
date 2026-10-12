@@ -173,9 +173,10 @@ written to make an unexpected request easy to decline. It is built in
   was let in can be ended there; since the relay ends a session only when its
   owner gives the registration up, ending one also replaces the code and link.
 - **The prompt answers the relay; it does not stream anything.** Making the
-  screen and input obey the answer is the session runner's job, with the
-  screen itself (barahn/chirp#12, barahn/remotekit#83). Until then a session
-  that is let in shows nothing.
+  screen and input obey the answer is the session runner's job: remotekit's
+  `stream.Runner`, granted what the owner allowed (barahn/chirp#12). The
+  controller's side does not show the screen yet, so a session that is let
+  in still shows nothing there.
 
 | | English | Português (Brasil) |
 | --- | --- | --- |

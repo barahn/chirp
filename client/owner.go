@@ -55,9 +55,25 @@ type Owner struct {
 	renew  chan struct{}
 
 	// peerID is the registration Answer speaks for. Run sets it; Answer,
-	// called from the window, reads it.
+	// called from the window, reads it. asked is the consent request shown
+	// last, and sock the owner socket while it is up.
 	mu     sync.Mutex
 	peerID string
+	asked  *ConsentRequest
+	sock   *Socket
+
+	// allowed carries the sessions Answer let in to Run's goroutine, which
+	// starts serving them. active is the session being served, and only
+	// Run's goroutine touches it; serving counts the Serve calls running.
+	allowed chan string
+	active  *SessionConn
+	serving sync.WaitGroup
+
+	// Serve, when set, serves each session the owner allows until its
+	// SessionConn ends; cmd/chirp runs remotekit's stream.Runner in it. It
+	// is called on a goroutine of its own, with Run's context, and the
+	// SessionConn is closed when it returns. Set it before Run.
+	Serve func(ctx context.Context, conn *SessionConn)
 
 	// Poll is how often the code shown is checked against the relay's.
 	Poll time.Duration
@@ -73,13 +89,14 @@ type Owner struct {
 // every change to emit. emit is called from Run's goroutine.
 func NewOwner(c *Client, name string, emit func(OwnerEvent)) *Owner {
 	return &Owner{
-		client: c,
-		name:   name,
-		emit:   emit,
-		renew:  make(chan struct{}, 1),
-		Poll:   15 * time.Second,
-		Grace:  2 * time.Minute,
-		Retry:  3 * time.Second,
+		client:  c,
+		name:    name,
+		emit:    emit,
+		renew:   make(chan struct{}, 1),
+		allowed: make(chan string, 1),
+		Poll:    15 * time.Second,
+		Grace:   2 * time.Minute,
+		Retry:   3 * time.Second,
 	}
 }
 
@@ -101,6 +118,10 @@ var (
 // releases the registration, so the code and link stop working at once rather
 // than after the relay's grace. It returns ctx's error.
 func (o *Owner) Run(ctx context.Context) error {
+	defer func() {
+		o.endSession()
+		o.serving.Wait()
+	}()
 	o.emit(OwnerEvent{Phase: OwnerStarting})
 	var shown Peer
 	for {
@@ -114,6 +135,8 @@ func (o *Owner) Run(ctx context.Context) error {
 		o.emit(OwnerEvent{Phase: OwnerReady, Peer: shown, Replaced: replaced})
 
 		err = o.serve(ctx, &shown)
+		// Giving the code up, or losing it, ends the session it opened.
+		o.endSession()
 		o.setPeerID("")
 		switch {
 		case errors.Is(err, errRenew):
@@ -177,7 +200,9 @@ func (o *Owner) serve(ctx context.Context, shown *Peer) error {
 		if down {
 			o.emit(OwnerEvent{Phase: OwnerReady, Peer: *shown})
 		}
+		o.setSocket(sock)
 		err = o.listen(ctx, sock, shown)
+		o.setSocket(nil)
 		_ = sock.Close()
 		if err != nil {
 			return err
@@ -221,10 +246,30 @@ func (o *Owner) listen(ctx context.Context, sock *Socket, shown *Peer) error {
 			return errRenew
 		case <-dropped:
 			return nil
+		case id := <-o.allowed:
+			o.startSession(ctx, id)
 		case m := <-msgs:
+			if !m.FromRelay() {
+				// A signal from the controller, for whatever serves the
+				// session. Before the owner allows one there is nothing to
+				// serve, and it is dropped unread. Answer may have let the
+				// session in an instant ago, so that is looked at first.
+				select {
+				case id := <-o.allowed:
+					o.startSession(ctx, id)
+				default:
+				}
+				if o.active != nil {
+					o.active.deliver(m.Raw)
+				}
+				continue
+			}
 			switch m.Type {
 			case TypeConsentRequest:
 				if m.Consent != nil {
+					// A new session displaces the one before.
+					o.endSession()
+					o.setAsked(m.Consent)
 					// The prompt counts down to the session's deadline,
 					// which only the session knows.
 					if s, err := o.client.Session(ctx, m.Consent.SessionID); err == nil {
@@ -237,6 +282,7 @@ func (o *Owner) listen(ctx context.Context, sock *Socket, shown *Peer) error {
 					return err
 				}
 			case TypePeerLeft:
+				o.endSession()
 				if err := o.refresh(ctx, shown); err != nil {
 					return err
 				}
@@ -285,7 +331,68 @@ func (o *Owner) Answer(ctx context.Context, sessionID string, granted bool) (Ses
 	if granted {
 		reason = "allowed by the owner"
 	}
-	return o.client.Consent(ctx, id, sessionID, granted, reason)
+	s, err := o.client.Consent(ctx, id, sessionID, granted, reason)
+	if err == nil && (s.State == StateConsentGranted || s.State == StateActive) {
+		select {
+		case o.allowed <- sessionID:
+		default:
+		}
+	}
+	return s, err
+}
+
+// startSession serves the session the owner has just allowed, if it is the
+// one they were asked about.
+func (o *Owner) startSession(ctx context.Context, sessionID string) {
+	o.mu.Lock()
+	req := o.asked
+	o.mu.Unlock()
+	if req == nil || req.SessionID != sessionID || o.Serve == nil {
+		return
+	}
+	if o.active != nil && o.active.ID == sessionID {
+		return
+	}
+	o.endSession()
+	conn := newSessionConn(o, req)
+	o.active = conn
+	o.serving.Add(1)
+	go func() {
+		defer o.serving.Done()
+		defer func() { _ = conn.Close() }()
+		o.Serve(ctx, conn)
+	}()
+}
+
+// endSession stops serving the active session, if there is one.
+func (o *Owner) endSession() {
+	if o.active != nil {
+		_ = o.active.Close()
+		o.active = nil
+	}
+}
+
+// send writes a signal to the controller through the owner socket.
+func (o *Owner) send(data []byte) error {
+	o.mu.Lock()
+	s := o.sock
+	o.mu.Unlock()
+	if s == nil {
+		return ErrUnavailable
+	}
+	return s.Send(data)
+}
+
+func (o *Owner) setSocket(s *Socket) {
+	o.mu.Lock()
+	o.sock = s
+	o.mu.Unlock()
+}
+
+func (o *Owner) setAsked(req *ConsentRequest) {
+	o.mu.Lock()
+	o.asked = req
+	o.mu.Unlock()
 }
 
 func (o *Owner) setPeerID(id string) {

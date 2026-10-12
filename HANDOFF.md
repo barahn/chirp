@@ -93,6 +93,8 @@ client/e2e_test.go
 client/flow_test.go
 client/helper.go
 client/owner.go
+client/session.go
+client/session_test.go
 client/socket.go
 client/target.go
 client/target_test.go
@@ -125,6 +127,7 @@ cmd/chirp/internal/warm/palette_test.go
 cmd/chirp/internal/warm/theme.go
 cmd/chirp/internal/warm/theme_test.go
 cmd/chirp/main.go
+cmd/chirp/main_test.go
 docs/branching.md
 docs/devsecops.md
 docs/images/chirp-dark.png
@@ -177,7 +180,7 @@ github.com/barahn/chirp/signalling
 
 ```
 ok  	github.com/barahn/chirp/client
-?   	github.com/barahn/chirp/cmd/chirp	[no test files]
+ok  	github.com/barahn/chirp/cmd/chirp
 ok  	github.com/barahn/chirp/cmd/chirp/internal/ui
 ok  	github.com/barahn/chirp/cmd/chirp/internal/warm
 ?   	github.com/barahn/chirp/cmd/chirp-relay	[no test files]
@@ -186,16 +189,20 @@ ok  	github.com/barahn/chirp/signalling
 ```
 <!-- END GENERATED: snapshot -->
 
-**The libraries, the relay's binary, and the first `cmd/chirp`: up to the
-consent request.** The prompt (barahn/chirp#11) and the screen
-(barahn/chirp#12) do not exist yet.
+**The libraries, the relay's binary, and `cmd/chirp`: the prompt, and the
+owner's half of the session.** A session the owner allows is served by
+remotekit's `stream.Runner` (barahn/chirp#12). The controller's half, which
+shows the screen and sends input, does not exist yet.
 
 ```
 client/                 the relay side of cmd/chirp: Client (every endpoint of
                         §4.5), Owner (register, hold the owner socket, follow
-                        the code, release on exit), Help (redeem a code or
-                        link, follow the session), ParseTarget. No Fyne, no cgo
-cmd/chirp/              the one binary: flags and wiring (-relay, CHIRP_RELAY)
+                        the code, release on exit, hand an allowed session to
+                        Serve as a SessionConn), Help (redeem a code or link,
+                        follow the session), ParseTarget. No Fyne, no cgo, and
+                        no remotekit stream: SessionConn only satisfies it
+cmd/chirp/              the one binary: flags and wiring (-relay, -ice and
+                        their CHIRP_* variables), serveSession (stream.Runner)
 cmd/chirp/internal/ui/  its Fyne window (docs/ux.md) and the consent prompt
                         (consent.go, barahn/chirp#11)
 cmd/chirp/internal/warm/ the Warm look (barahn/chirp#53): Fyne theme, tokens,
@@ -672,7 +679,12 @@ The plan, with what decision 5 settled:
    replay-checked with `NonceCache`.
 4. **Relay messages stay unauthenticated** — they come from the relay by
    definition — so an end must treat `chirp.*` messages as hints (presence,
-   errors) and never act on them for anything security-relevant.
+   errors) and never act on them for anything security-relevant. Clients tell
+   them from forwarded signals by the prefix alone, so the hub refuses to
+   forward any payload typed `chirp.*` (`ErrReservedType`): otherwise either
+   end could forge one, as a controller sending `chirp.peer_left` would stop
+   the owner's runner while staying connected (found in review of
+   barahn/chirp#60).
 
 This is why decision 5 cannot be met by adopting `signed.go` alone.
 
@@ -832,10 +844,16 @@ Still to decide or do, in order. Each step has an issue, and the
    macOS and with the system headers on Linux (§5.6). Fyne's embedded fonts
    are OFL 1.1 and Bitstream Vera, accepted by the maintainer and now gated
    font by font (barahn/chirp#54, §6). #11 is in too: the prompt, and the
-   owner's answer sent to the relay (`Owner.Answer`). Making the screen and
-   input obey that answer is the session runner's job, so it comes with #12,
-   which builds on remotekit's `stream` package, pinned at `v0.4.0`
-   (barahn/chirp#20, §5.5). It is the one
+   owner's answer sent to the relay (`Owner.Answer`). #12's owner half is in:
+   an allowed session is handed to remotekit's `stream.Runner` (pinned at
+   `v0.4.0`, barahn/chirp#20, §5.5) over a `client.SessionConn` on the owner
+   socket, granted exactly what the owner allowed, with the ICE servers from
+   `-ice`/`CHIRP_ICE` and never remotekit's default. What remains of #12 is
+   the controller's half: render the screen and send input. remotekit has
+   no Go viewer, and Go has no VP8 decoder for anything but key frames, so
+   it needs a decision first: the runner's JPEG frames over the trusted
+   relay (it already sends them to a viewer that has not confirmed WebRTC
+   video), or a receive side and a decoder in remotekit. It is the one
    binary: it registers, shows its code and link, holds the owner socket,
    shows the consent prompt with the controller's name as a claim, redeems
    other people's codes and pasted links (`docs/product-model.md`, decision

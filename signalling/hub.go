@@ -50,6 +50,9 @@ var (
 	ErrUnknownRole  = errors.New("chirp/signalling: unknown role")
 	ErrHubClosed    = errors.New("chirp/signalling: hub is closed")
 	ErrNotPermitted = errors.New("chirp/signalling: session does not permit signalling")
+	// ErrReservedType refuses a signal typed in the relay's own chirp.
+	// namespace: forwarded, it would pass for a notice from the relay.
+	ErrReservedType = errors.New("chirp/signalling: chirp.* message types are the relay's own")
 )
 
 // Conn is the transport a peer is reachable on. A WebSocket satisfies it; so
@@ -202,7 +205,16 @@ func (h *Hub) Leave(sessionID string, role Role) {
 // SDP and ICE candidates that mean something to the two WebRTC stacks and
 // nothing here, and a relay that parses what it forwards acquires opinions
 // about protocol versions it has no way to keep current.
+//
+// With one exception: a payload whose type is in the relay's chirp.
+// namespace is refused with ErrReservedType. A client tells the relay's
+// notices from the other end's signals by that prefix alone, so forwarding
+// one would let either end forge a notice -- a controller sending
+// chirp.peer_left would stop the owner's session while staying connected.
 func (h *Hub) Forward(sessionID string, from Role, data []byte) error {
+	if relayTyped(data) {
+		return ErrReservedType
+	}
 	h.mu.Lock()
 	if h.closed {
 		h.mu.Unlock()
