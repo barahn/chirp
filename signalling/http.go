@@ -58,6 +58,14 @@ type Server struct {
 	// is free for the next one. Zero means DefaultControllerGrace.
 	ControllerGrace time.Duration
 
+	// PingInterval is how often the relay pings each socket. A socket that
+	// answers none of the pings for two intervals is closed, so a peer that
+	// vanished without closing is noticed; and the pings keep the socket from
+	// looking idle to a reverse proxy that closes idle connections. Zero
+	// means DefaultPingInterval. It must stay well under client.PingWait, or
+	// a Chirp gives up on a relay that is still there.
+	PingInterval time.Duration
+
 	ownersMu sync.Mutex
 	owners   map[rendezvous.PeerID]*ownerConn
 
@@ -309,25 +317,77 @@ func (s *Server) submitConsent(w http.ResponseWriter, r *http.Request) {
 //
 // gorilla permits one concurrent writer, and the hub calls Send from the other
 // peer's goroutine, so writes are serialised here rather than left to chance.
+// Pings take the same lock: gorilla would allow them alongside a Send, but one
+// rule for every write is easier to keep than an exception.
 type wsConn struct {
 	conn *websocket.Conn
 	mu   chan struct{}
+
+	done      chan struct{}
+	closeOnce sync.Once
 }
 
 func newWSConn(c *websocket.Conn) *wsConn {
-	return &wsConn{conn: c, mu: make(chan struct{}, 1)}
+	return &wsConn{conn: c, mu: make(chan struct{}, 1), done: make(chan struct{})}
 }
+
+// writeWait bounds one write, so a peer that stopped reading cannot hold the
+// write lock.
+const writeWait = 10 * time.Second
 
 func (w *wsConn) Send(data []byte) error {
 	w.mu <- struct{}{}
 	defer func() { <-w.mu }()
-	if err := w.conn.SetWriteDeadline(time.Now().Add(10 * time.Second)); err != nil {
+	if err := w.conn.SetWriteDeadline(time.Now().Add(writeWait)); err != nil {
 		return err
 	}
 	return w.conn.WriteMessage(websocket.TextMessage, data)
 }
 
-func (w *wsConn) Close() error { return w.conn.Close() }
+func (w *wsConn) Close() error {
+	w.closeOnce.Do(func() { close(w.done) })
+	return w.conn.Close()
+}
+
+// keepAlive pings the socket every interval until it is closed, and closes it
+// when the other end stops answering: each pong pushes the read deadline two
+// intervals out, so a socket that answers none for that long fails its read,
+// and its handler cleans up as for any other departure.
+//
+// It is called before the socket's first read, from the goroutine that will
+// read it, since the pong handler runs inside reads.
+func (w *wsConn) keepAlive(interval time.Duration) {
+	wait := 2 * interval
+	_ = w.conn.SetReadDeadline(time.Now().Add(wait))
+	w.conn.SetPongHandler(func(string) error {
+		return w.conn.SetReadDeadline(time.Now().Add(wait))
+	})
+	go func() {
+		t := time.NewTicker(interval)
+		defer t.Stop()
+		for {
+			select {
+			case <-w.done:
+				return
+			case <-t.C:
+			}
+			if w.ping() != nil {
+				_ = w.Close()
+				return
+			}
+		}
+	}()
+}
+
+func (w *wsConn) ping() error {
+	select {
+	case w.mu <- struct{}{}:
+	case <-w.done:
+		return net.ErrClosed
+	}
+	defer func() { <-w.mu }()
+	return w.conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(writeWait))
+}
 
 // serveWS upgrades and dispatches by role.
 func (s *Server) serveWS(w http.ResponseWriter, r *http.Request) {
@@ -366,6 +426,7 @@ func (s *Server) serveOwner(w http.ResponseWriter, r *http.Request) {
 	}
 	conn.SetReadLimit(MaxMessageSize)
 	peer := newWSConn(conn)
+	peer.keepAlive(s.pingInterval())
 
 	s.ownersMu.Lock()
 	if _, taken := s.owners[id]; taken {
@@ -504,6 +565,7 @@ func (s *Server) serveController(w http.ResponseWriter, r *http.Request) {
 	}
 	conn.SetReadLimit(MaxMessageSize)
 	peer := newWSConn(conn)
+	peer.keepAlive(s.pingInterval())
 	if err := s.hub.Join(sess.ID, RoleController, peer); err != nil {
 		_ = peer.Send(encodeError(err))
 		_ = peer.Close()
@@ -539,6 +601,19 @@ const MaxMessageSize = 1 << 20
 
 // DefaultControllerGrace is ControllerGrace's default.
 const DefaultControllerGrace = 30 * time.Second
+
+// DefaultPingInterval is PingInterval's default. It is well under the idle
+// timeouts proxies are known for -- Cloudflare's is about 100 s -- and a
+// third of what a Chirp waits between pings before it gives up.
+const DefaultPingInterval = 30 * time.Second
+
+// pingInterval is PingInterval, or its default.
+func (s *Server) pingInterval() time.Duration {
+	if s.PingInterval > 0 {
+		return s.PingInterval
+	}
+	return DefaultPingInterval
+}
 
 // controllerGrace is ControllerGrace, or its default.
 func (s *Server) controllerGrace() time.Duration {
