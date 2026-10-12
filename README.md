@@ -102,7 +102,8 @@ Chirp is not yet a runnable product.
 - **The relay** — `cmd/chirp-relay`, for a relay you host yourself. It
   matches the two ends of a session and relays their WebRTC signalling.
   Written for Chirp — no multi-tenancy, no RBAC — rather than taken from the
-  proprietary Barahn control plane.
+  proprietary Barahn control plane. [docs/relay.md](docs/relay.md) runs it
+  behind TLS in a Proxmox LXC container, with Podman, or on any Linux host.
 - **The session layer** — codes, share links, the consent rules, and
   per-network limits on guessing codes. Codes, links and the throttle are
   remotekit's `rendezvous` package; the state machine, consent rules and

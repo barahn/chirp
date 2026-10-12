@@ -34,7 +34,7 @@ not CLA acceptance, and that external pull requests are not merged yet.
 
 | Workflow | Runs on | Gate |
 | --- | --- | --- |
-| `ci.yml` | push and PR to `develop`/`main`, tags | DCO, licence gate, build, vet, cross-compile, lint, `go test -race`, website check, `HANDOFF.md` snapshot, gosec, govulncheck |
+| `ci.yml` | push and PR to `develop`/`main`, tags | DCO, licence gate, build, vet, cross-compile, lint, `go test -race`, website check, `HANDOFF.md` snapshot, gosec, govulncheck; separately, the relay's container image, deploy scripts and Quadlet units |
 | `codeql.yml` | push and PR, weekly — **when `CODE_SCANNING` is set** | CodeQL `security-extended` for Go |
 | `secret-scan.yml` | push and PR, weekly | gitleaks over the PR commit range, or the tree and full history |
 | `dependency-review.yml` | PR — **when `CODE_SCANNING` is set** | what the PR adds: advisories at `low` and above, denied licences |
