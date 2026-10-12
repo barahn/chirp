@@ -162,12 +162,67 @@
     return "en";
   }
 
+  // A translation's markup is built into nodes here, from an allowlist,
+  // never handed to innerHTML: each page's Content-Security-Policy turns on
+  // Trusted Types with no policy, so the browser refuses every sink that
+  // would parse a string as HTML. A translation with markup outside the
+  // list, or unbalanced, keeps its English. Write characters, not entities.
+  var TAGS = { a: 1, b: 1, em: 1, h3: 1, li: 1, p: 1, span: 1, ul: 1 };
+  var TAG_ATTRS = { a: { href: /^https:\/\// }, span: { "class": /^chirp$/ } };
+  function build(src) {
+    var root = document.createDocumentFragment(), open = [root], m, a;
+    var token = /<(\/?)([a-z0-9]+)((?:\s+[a-z-]+="[^"<>]*")*)\s*>|[^<]+|</g;
+    while ((m = token.exec(src))) {
+      var top = open[open.length - 1];
+      if (m[2] === undefined) {
+        if (m[0] === "<") return null;
+        top.appendChild(document.createTextNode(m[0]));
+        continue;
+      }
+      if (!TAGS[m[2]]) return null;
+      if (m[1]) {
+        if (top === root || top.nodeName.toLowerCase() !== m[2]) return null;
+        open.pop();
+        continue;
+      }
+      var el = document.createElement(m[2]);
+      var attr = /([a-z-]+)="([^"]*)"/g;
+      while ((a = attr.exec(m[3]))) {
+        var allowed = TAG_ATTRS[m[2]] && TAG_ATTRS[m[2]][a[1]];
+        if (!allowed || !allowed.test(a[2])) return null;
+        el.setAttribute(a[1], a[2]);
+      }
+      top.appendChild(el);
+      open.push(el);
+    }
+    return open.length === 1 ? root : null;
+  }
+  var built = {};
+  function translated(k) {
+    if (!(k in built)) built[k] = PT[k] === undefined ? null : build(PT[k]);
+    return built[k];
+  }
+  function copyOf(el) {
+    var f = document.createDocumentFragment();
+    for (var n = el.firstChild; n; n = n.nextSibling) f.appendChild(n.cloneNode(true));
+    return f;
+  }
+  // Fills el with its key's text in the current language.
+  function fill(el) {
+    var nodes = (lang === "pt-BR" && translated(el.getAttribute("data-i18n"))) || el._en;
+    while (el.firstChild) el.removeChild(el.firstChild);
+    el.appendChild(nodes.cloneNode(true));
+  }
+
   var texts = Array.prototype.slice.call(document.querySelectorAll("[data-i18n]"));
-  texts.forEach(function (el) { el._en = el.innerHTML; });
+  texts.forEach(function (el) { el._en = copyOf(el); });
+  // Only attributes that are plain text are translated.
+  var TEXT_ATTRS = { alt: 1, "aria-label": 1, title: 1 };
   var attrs = [];
   document.querySelectorAll("[data-i18n-attr]").forEach(function (el) {
     el.getAttribute("data-i18n-attr").split(";").forEach(function (pair) {
       var p = pair.split(":");
+      if (!TEXT_ATTRS[p[0]]) return;
       attrs.push({ el: el, name: p[0], key: p[1], en: el.getAttribute(p[0]) });
     });
   });
@@ -175,10 +230,7 @@
   function setLang(l, remember) {
     lang = LANGS.indexOf(l) >= 0 ? l : "en";
     var pt = lang === "pt-BR";
-    texts.forEach(function (el) {
-      var k = el.getAttribute("data-i18n");
-      el.innerHTML = pt && PT[k] !== undefined ? PT[k] : el._en;
-    });
+    texts.forEach(fill);
     attrs.forEach(function (a) {
       a.el.setAttribute(a.name, pt && PT[a.key] !== undefined ? PT[a.key] : a.en);
     });
@@ -258,7 +310,7 @@
       var label = copyBtn.querySelector("[data-i18n]");
       function done() {
         label.textContent = JS[lang].copied;
-        setTimeout(function () { label.innerHTML = lang === "pt-BR" ? PT.copy : label._en; }, 2000);
+        setTimeout(function () { fill(label); }, 2000);
       }
       function fallback() {
         var r = document.createRange(); r.selectNodeContents(link);

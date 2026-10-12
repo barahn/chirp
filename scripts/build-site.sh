@@ -7,7 +7,9 @@
 #
 # The pages load nothing from another origin: their Content-Security-Policy
 # allows 'self' only, which keeps any script but the site's own off the link
-# page, where the token sits in the fragment.
+# page, where the token sits in the fragment. It also requires Trusted Types
+# and allows no policy, so even the site's own script cannot parse a string
+# as HTML: site.js builds its translations into nodes instead.
 #
 # Preview: scripts/build-site.sh && python3 -m http.server -d _site 8000
 #
