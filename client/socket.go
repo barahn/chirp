@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"sync"
 
 	"github.com/barahn/remotekit/bark"
 	"github.com/gorilla/websocket"
@@ -54,9 +55,11 @@ type ConsentRequest struct {
 }
 
 // Socket is one end's WebSocket to the relay. Next is for one reader at a
-// time; Close may be called from anywhere, and ends a Next in progress.
+// time; Send and Close may be called from anywhere, and Close ends a Next in
+// progress.
 type Socket struct {
 	conn *websocket.Conn
+	wmu  sync.Mutex
 }
 
 // DialOwner opens this machine's owner socket. Holding it open is how the
@@ -103,6 +106,13 @@ func (s *Socket) Next() (Message, error) {
 		return Message{}, err
 	}
 	return decode(data), nil
+}
+
+// Send writes one message, which the relay forwards to the other end unread.
+func (s *Socket) Send(data []byte) error {
+	s.wmu.Lock()
+	defer s.wmu.Unlock()
+	return s.conn.WriteMessage(websocket.TextMessage, data)
 }
 
 // Close ends the socket.

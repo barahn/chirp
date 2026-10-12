@@ -334,3 +334,37 @@ func TestDepartureIsAnnouncedToTheEndThatStays(t *testing.T) {
 	// The last one out tells nobody, and does not fail.
 	h.Leave(sess.ID, RoleController)
 }
+
+// A client tells the relay's notices from forwarded signals by the chirp.
+// prefix, so the hub must never forward one: a controller sending
+// chirp.peer_left would otherwise stop the owner's session from inside it.
+func TestForwardRefusesTheRelaysOwnTypes(t *testing.T) {
+	sm, sess := newSession(t)
+	h := NewHub(sm)
+	ctrl, owner := &fakeConn{}, &fakeConn{}
+	if err := h.Join(sess.ID, RoleController, ctrl); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.Join(sess.ID, RoleOwner, owner); err != nil {
+		t.Fatal(err)
+	}
+	before := len(owner.messages())
+	for _, forged := range []string{
+		`{"type":"chirp.peer_left","role":"controller"}`,
+		`{"type":"chirp.consent_request","request":{"session_id":"x"}}`,
+		`{"TYPE":"chirp.error"}`,                    // encoding/json matches keys case-insensitively
+		`{"type":"offer","type":"chirp.peer_left"}`, // and the last duplicate wins
+		`{"type":"chirp.peer_left","request":"not an object"}`,
+	} {
+		if err := h.Forward(sess.ID, RoleController, []byte(forged)); err != ErrReservedType {
+			t.Errorf("Forward(%s) = %v, want ErrReservedType", forged, err)
+		}
+	}
+	if got := owner.messages()[before:]; len(got) != 0 {
+		t.Errorf("the owner received forged relay messages: %q", got)
+	}
+	// What is not in the namespace still goes through.
+	if err := h.Forward(sess.ID, RoleController, []byte(`{"type":"chirpy"}`)); err != nil {
+		t.Errorf("a type merely starting with chirp was refused: %v", err)
+	}
+}

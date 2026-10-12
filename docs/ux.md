@@ -173,9 +173,9 @@ written to make an unexpected request easy to decline. It is built in
   was let in can be ended there; since the relay ends a session only when its
   owner gives the registration up, ending one also replaces the code and link.
 - **The prompt answers the relay; it does not stream anything.** Making the
-  screen and input obey the answer is the session runner's job, with the
-  screen itself (barahn/chirp#12, barahn/remotekit#83). Until then a session
-  that is let in shows nothing.
+  screen and input obey the answer is the session runner's job: remotekit's
+  `stream.Runner`, granted what the owner allowed (barahn/chirp#12). The
+  controller sees the screen in a window of its own (§ During a session).
 
 | | English | Português (Brasil) |
 | --- | --- | --- |
@@ -202,7 +202,11 @@ Fyne may not offer a portable always-on-top window; check before building the
 bar, and plan for a small platform-specific shim if it does not.
 
 **On the controller's machine,** the remote screen fills the window, with a
-toolbar for monitors, clipboard, files and *End*.
+toolbar for monitors, clipboard, files and *End*. So far the toolbar has
+*End*, and a line for what the other computer says instead of its picture.
+Closing the window ends the session too. The mouse and keyboard over the
+picture go to the other computer, keys as the physical keys they are, so its
+own layout decides what they type.
 
 ## The tray
 

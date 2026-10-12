@@ -47,10 +47,19 @@ webrtc.PeerConfig{
 }
 ```
 
-There is no `cmd/chirp` yet (barahn/chirp#10), so Chirp has no setting for this
-today. When the binary lands, its relay address and its ICE servers are
-configuration, never constants (barahn/chirp#10, #12). **Chirp passes its ICE
-servers explicitly and never relies on `webrtc.DefaultPeerConfig()`.** Today
+`cmd/chirp` takes them as configuration, never constants (barahn/chirp#12):
+the servers with `-ice` or in `CHIRP_ICE`, comma-separated, and a TURN
+credential only in `CHIRP_TURN_USERNAME` and `CHIRP_TURN_PASSWORD`, which
+other users cannot read off the command line:
+
+```sh
+CHIRP_ICE=stun:turn.example.org:3478,turn:turn.example.org:3478,turns:turn.example.org:5349 \
+CHIRP_TURN_USERNAME=... CHIRP_TURN_PASSWORD=... chirp -relay https://chirp.example.org
+```
+
+With none given, a session uses host candidates only, and reaches a controller
+on the same network and nothing further. **Chirp passes its ICE servers
+explicitly and never relies on `webrtc.DefaultPeerConfig()`.** Today
 that default points at Google's public STUN servers. Every session would then
 tell a third party that it exists and from which addresses, which does not fit
 "self-hostable with zero restrictions" (barahn/remotekit#63 removes the
