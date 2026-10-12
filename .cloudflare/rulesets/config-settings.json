@@ -1,0 +1,17 @@
+{
+  "description": "usechirp.app: Cloudflare features that rewrite the pages, kept off. Versioned in .cloudflare/rulesets/; see docs/devsecops.md.",
+  "rules": [
+    {
+      "ref": "usechirp_no_page_rewrites",
+      "description": "Serve usechirp.app as GitHub Pages sends it",
+      "expression": "(http.host in {\"usechirp.app\" \"www.usechirp.app\"})",
+      "action": "set_config",
+      "action_parameters": {
+        "email_obfuscation": false,
+        "rocket_loader": false,
+        "disable_rum": true,
+        "disable_zaraz": true
+      }
+    }
+  ]
+}

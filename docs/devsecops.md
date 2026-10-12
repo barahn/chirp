@@ -40,6 +40,7 @@ not CLA acceptance, and that external pull requests are not merged yet.
 | `dependency-review.yml` | PR — **when `CODE_SCANNING` is set** | what the PR adds: advisories at `low` and above, denied licences |
 | `sbom.yml` | release tags | SPDX SBOM attached to the release |
 | `pages.yml` | push to `develop` touching the site | website check, then publishes usechirp.app |
+| `site-live.yml` | after each deploy, weekly | usechirp.app serves the pages, scripts and headers the repository has |
 
 ### CodeQL and dependency review are gated on `CODE_SCANNING`
 
@@ -137,8 +138,7 @@ are the half of DevSecOps that a pull request cannot deliver:
    Pages cannot set. See [The website's headers](#the-websites-headers).
 
 The first five are applied as of 2026-10-10 (barahn/chirp#17), when the
-repository went public. The sixth is applied as of 2026-10-12 except for its
-last step, loading the header rules.
+repository went public. The sixth is applied as of 2026-10-12.
 
 ### The website's headers
 
@@ -179,23 +179,50 @@ As of 2026-10-12, set up as follows:
 | SSL/TLS | **Full (strict)**: Cloudflare checks GitHub's certificate, so the hop to GitHub is authenticated |
 | Edge certificate | Cloudflare's, for `usechirp.app` and `*.usechirp.app` |
 | DNSSEC | signed by Cloudflare; DS `2371 13 2 25CFA0663341592F9436373DCB5E87C3B16F0FE043C7169BB7C47D11F9B9AF23` at the registrar, and resolvers validate the chain |
-| Header rules | **not loaded yet** |
+| Header rules | loaded from `response-headers.json` |
+| Page rewrites | off: Email Address Obfuscation, Web Analytics (RUM), Bot Fight Mode; `config-settings.json` keeps the first two, Rocket Loader and Zaraz off |
 
-What is left is loading the rules, with an API token allowed to edit the
-zone's transform rules, from the repository root:
+The rules in [`.cloudflare/rulesets/`](../.cloudflare/rulesets/) are loaded
+with `scripts/apply-cloudflare.sh`, which asks for an API token allowed to
+edit the zone's transform rules and configuration rules, and puts each file
+into its phase. The token reaches `curl` on its standard input, not in its
+arguments, which other processes on the machine can read. A `PUT` replaces every rule in that phase, which is the point:
+the files are the reference, and a rule added in the dashboard that is not in
+them is drift. Run it again after any change to them.
 
-```sh
-curl -fsS -X PUT \
-  "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/rulesets/phases/http_response_headers_transform/entrypoint" \
-  -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-  -H "Content-Type: application/json" \
-  --data @.cloudflare/rulesets/response-headers.json
-```
+#### Cloudflare must not rewrite the pages
 
-A `PUT` replaces every rule in that phase, which is the point: the file is the
-reference, and a rule added in the dashboard that is not in it is drift. Run it
-again after any change to the file, and check with
-`curl -sI https://usechirp.app/` that the headers above come back.
+Several Cloudflare features edit the HTML on its way through, and on a site
+whose CSP allows only its own scripts each one is at best blocked and at worst
+breaks the page. On 2026-10-12 three did:
+
+- **Email Address Obfuscation** replaced the security contact in every page's
+  footer with a link reading `[email protected]`, plus a script to decode it,
+  which the CSP blocked: the page showed no way to report a vulnerability.
+- **Web Analytics** added a beacon from `static.cloudflareinsights.com`, a
+  third-party script on the link page.
+- **JavaScript Detections** added an inline script loading
+  `/cdn-cgi/challenge-platform/scripts/jsd/main.js`.
+
+The first two are off, in the dashboard and in `config-settings.json`, which
+also keeps Rocket Loader and Zaraz off. Bot Fight Mode is off too: it cannot
+be set by a rule, and it challenges visitors on its own judgement.
+
+JavaScript Detections cannot be turned off on the Free plan: it stays on with
+Bot Fight Mode off and its own toggle off, a limitation others report too. It
+is accepted. Its inline script carries parameters that change on every
+response, so no hash or nonce could allow it, and allowing it would take
+`'unsafe-inline'`, which would undo the policy. Blocked, it never runs; the
+cost is an error in the console. The Pro plan makes it optional.
+
+`scripts/check-live-site.sh`, run by `site-live.yml` after each deploy and
+weekly, fetches the pages and scripts from usechirp.app and fails unless they
+match the repository byte for byte, with that one snippet as the only
+exception, and unless every header in `response-headers.json` comes back. It
+also requires `www.usechirp.app` to answer every path with a 301 to the same
+path on `usechirp.app`, carrying the same headers, which is why both rules
+match both hosts: a page served on `www` would sit outside the check. A
+setting changed in the dashboard shows up there within a week.
 
 To move the domain again, the order matters, and some steps can take the site
 down if skipped. Two cases:
