@@ -147,8 +147,10 @@ deploy/systemd/chirp-relay.service
 deploy/systemd/relay.env
 docs/branching.md
 docs/devsecops.md
+docs/images/chirp-avatar.png
 docs/images/chirp-dark.png
 docs/images/chirp-light.png
+docs/images/chirp-social.png
 docs/product-model.md
 docs/relay.md
 docs/rendezvous-proposal.md
