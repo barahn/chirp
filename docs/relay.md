@@ -76,10 +76,8 @@ You need:
 **If the domain is on Cloudflare**, make the relay's record *DNS only* (grey
 cloud), not *Proxied*. A proxied record puts Cloudflare between the users and
 Caddy, so every request comes from a Cloudflare address unless you trust
-Cloudflare's ranges. Cloudflare also closes idle WebSockets, and a Chirp holds
-its owner socket open, mostly idle, for as long as it runs. The
-`usechirp.app` website being proxied does not change this: the relay is a
-different record.
+Cloudflare's ranges. The `usechirp.app` website being proxied does not change
+this: the relay is a different record.
 
 ## Building
 
@@ -578,9 +576,11 @@ group membership needs a restart. With Podman, check that both containers
 mount the `chirp-relay-socket` volume.
 
 **Chirp keeps reconnecting.** Something between the client and the relay
-closes idle WebSockets: a Cloudflare-proxied record, or a proxy with a short
-read timeout. The relay sends no keepalive pings. Give that hop a timeout of
-an hour or more.
+closes WebSockets that look idle. The relay pings every socket every 30
+seconds, which keeps a Cloudflare-proxied record (about 100 seconds) and most
+proxies from timing out. A hop that closes a socket sooner than that, or one
+that drops connections regardless of traffic, still breaks it: give that hop
+a read timeout of a minute or more.
 
 **`curl https://…/healthz` works but sessions never show a picture.** The
 relay did its job, and ICE found no path between the two ends. Configure
