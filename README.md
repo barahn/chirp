@@ -20,8 +20,9 @@ account, and nothing happens on your screen until you press *Allow*.
 </div>
 
 > [!IMPORTANT]
-> **Chirp is not ready to use yet.** Two Chirps already find each other and
-> the consent prompt works, but the screen is not shared yet and there is
+> **Chirp is not ready to use yet.** Two Chirps find each other, the consent
+> prompt works, and an allowed session shows the other screen and takes
+> input, but it has not been tried between two real machines yet and there is
 > nothing to download. [Status](#status) says exactly where it stands.
 
 <p align="center">
@@ -109,9 +110,10 @@ Chirp is not yet a runnable product.
 
 **Not here yet:**
 
-- **The screen.** A session can be allowed, but nothing is shared yet.
-  Sharing the screen through remotekit's `stream` package, which makes the
-  session obey the consent, is barahn/chirp#12.
+- **A session tried between two machines.** The screen and input go
+  through remotekit's `stream` package, and the tests show one Chirp's screen
+  decoded in another's through the relay, on one machine. Across two
+  machines, and with a Windows owner, is still to do (barahn/chirp#12).
 - **Downloads.** There are no builds to download; build from source below.
 - **A TURN relay.** Until Chirp ships one, self-hosting means bringing your
   own STUN/TURN (coturn works): see [docs/stun-turn.md](docs/stun-turn.md).

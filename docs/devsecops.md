@@ -110,8 +110,8 @@ are the half of DevSecOps that a pull request cannot deliver:
 2. **Branch protection on `develop` and `main`.** The rules live as code in
    [`.github/rulesets/`](../.github/rulesets/), and
    [branching.md](branching.md) explains each one — including why `main` has
-   neither linear history nor required signatures yet, and the decision to
-   take before importing them: a single maintainer cannot approve their own
+   neither linear history nor required signatures yet, and why `develop`
+   requires no approval: a single maintainer cannot approve their own
    pull requests. Import
    those files rather than configuring rules by hand: a hand-made rule that is
    not in the files is drift.
