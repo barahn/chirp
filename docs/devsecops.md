@@ -197,24 +197,50 @@ reference, and a rule added in the dashboard that is not in it is drift. Run it
 again after any change to the file, and check with
 `curl -sI https://usechirp.app/` that the headers above come back.
 
-To move the domain again (another registrar, another DNS provider), the order
-matters, and two steps can each take the site down:
+To move the domain again, the order matters, and some steps can take the site
+down if skipped. Two cases:
 
-1. **Turn DNSSEC off at the registrar first**, and wait until
-   `dig +short DS usechirp.app` is empty plus the DS's TTL (an hour). A new
-   provider's servers do not hold the old keys, so with the old DS still
-   published, every validating resolver refuses the domain.
-2. Create the records at the new provider, *DNS only*, then change the
-   nameservers.
-3. **Proxy only once the edge certificate is Active.** On 2026-10-12 the proxy
-   was on before Cloudflare had issued it, and for a while HTTPS through
-   Cloudflare failed its handshake. `.app` is HTTPS-only, so there was no
-   plain-HTTP fallback: the site and every link page were down for anyone
-   whose resolver had picked up the new nameservers.
-4. Set **Full (strict)**, then turn the proxy on.
-5. Turn DNSSEC on at the new provider and publish its DS at the registrar.
-   Check that `dig A usechirp.app @1.1.1.1 +dnssec` answers with the `ad`
-   flag.
+**Another registrar, Cloudflare still the DNS provider.** The nameservers and
+the keys do not change, so DNSSEC can stay on. Carry the nameservers and the
+DS `2371 13 2 25CF…AF23` over with the transfer, and afterwards check that the
+parent still publishes both (the commands in steps 1 and 5 below).
+
+**Another DNS provider.** The keys change, so the old DS has to be gone before
+the new provider answers:
+
+1. **DNSSEC off, measured, before the nameservers change.** Read the DS's TTL
+   from the parent itself, not from a resolver's cache, *before* removing it:
+   `dig DS usechirp.app @ns-tld1.charlestonroadregistry.com +norec`. Turn
+   DNSSEC off at the registrar. Wait until the parent no longer returns the
+   DS, and neither do several independent resolvers (`@1.1.1.1`, `@8.8.8.8`,
+   `@9.9.9.9`), then wait that TTL again from the parent's removal before
+   changing nameservers. Do not assume an hour: it was one on 2026-10-12, and
+   the parent sets it.
+2. Create every record at the new provider, then change the nameservers. The
+   parent's NS TTL (three hours on 2026-10-12) is how long resolvers keep
+   asking the old provider, so leave its records in place until then.
+3. **Anything in front of Pages that terminates TLS** (Cloudflare's proxy, or
+   another provider's equivalent) goes on only once its certificate for
+   `usechirp.app` is active, and checks GitHub's certificate on the way back
+   (on Cloudflare, **Full (strict)**). On 2026-10-12 Cloudflare's proxy was on
+   before its edge certificate was issued, and for a while HTTPS through it
+   failed its handshake. `.app` is HTTPS-only, so there was no plain-HTTP
+   fallback: the site and every link page were down for anyone whose resolver
+   had picked up the new nameservers. Test it before turning it on:
+   `curl -sI --resolve usechirp.app:443:<edge address> https://usechirp.app/`.
+4. **The headers belong to that layer.** A provider without one, or without
+   response-header rules, serves the pages with their `<meta>` policy only:
+   everything but `frame-ancestors` and the other headers above. Port
+   `.cloudflare/rulesets/response-headers.json` to the new provider, moving
+   the path `scripts/check-site.sh` reads with it, or record here that they
+   are gone.
+5. **DNSSEC on, keys first.** Turn signing on at the new provider and wait
+   until *every* one of its authoritative servers returns the DNSKEY whose
+   digest is the DS the provider gives: `dig DNSKEY usechirp.app @<server>`
+   for each, and compare the key tag and digest the KSK (flags 257) gives
+   with `dnssec-dsfromkey -2`, from BIND's tools. Only then publish the DS at the
+   registrar, check that the parent returns it, and that several independent
+   resolvers answer `dig A usechirp.app +dnssec` with the `ad` flag.
 
 GitHub renews its certificate through the proxy. If a renewal fails, Pages
 says so in its settings; switch the records to *DNS only* until it is renewed,
