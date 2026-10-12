@@ -38,13 +38,21 @@ func newSessionConn(o *Owner, req *ConsentRequest) *SessionConn {
 		ID:          req.SessionID,
 		Permissions: append([]string(nil), req.Permissions...),
 		owner:       o,
-		in:          make(chan []byte, 64),
+		in:          make(chan []byte, signalQueue),
 		done:        make(chan struct{}),
 	}
 }
 
 // ReadMessage blocks until the controller sends a signal, or the session ends.
+//
+// Once the session has ended it reports so, even with signals still queued:
+// a select between a full queue and a closed done picks either at random.
 func (s *SessionConn) ReadMessage() ([]byte, error) {
+	select {
+	case <-s.done:
+		return nil, ErrSessionOver
+	default:
+	}
 	select {
 	case m := <-s.in:
 		return m, nil
@@ -74,12 +82,19 @@ func (s *SessionConn) Close() error {
 // Done is closed when the session's signals have ended.
 func (s *SessionConn) Done() <-chan struct{} { return s.done }
 
-// deliver hands a signal from the controller to the reader, waiting while the
-// reader is busy. It gives up when the session or stop ends.
-func (s *SessionConn) deliver(data []byte, stop <-chan struct{}) {
+// signalQueue is how many signals wait for a busy reader. Negotiation is an
+// offer or answer and a few dozen candidates; input and files go over the data
+// channel, not here.
+const signalQueue = 256
+
+// deliver hands a signal from the other end to the reader, and drops it if
+// the reader is that far behind. It never waits: the socket loop calling it
+// is also what notices the session ending, a new code being asked for, or the
+// socket dropping, and the other end -- untrusted -- must not be able to
+// stall that by sending faster than the reader reads.
+func (s *SessionConn) deliver(data []byte) {
 	select {
 	case s.in <- data:
-	case <-s.done:
-	case <-stop:
+	default:
 	}
 }
