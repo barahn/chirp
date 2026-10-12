@@ -35,7 +35,7 @@ anything configured on GitHub that is not there is drift.
 | Direct push | blocked | blocked |
 | Force-push / deletion | blocked | blocked |
 | Pull request required | yes | yes |
-| Approvals | 1, from a code owner | 1 — the admin may bypass, via pull request only |
+| Approvals | 1, from a code owner | 0 — see below |
 | Approval dismissed on each push | yes | yes |
 | Last push needs another person's approval | yes | no |
 | Review threads resolved | yes | yes |
@@ -51,8 +51,8 @@ only while the `CODE_SCANNING` variable is set, as it is here — see
 [devsecops.md](devsecops.md). Where it is not set they are skipped, and a
 skipped required check counts as passing, so they enforce nothing there.
 
-On `main`, `bypass_actors` is empty on purpose: the rules bind administrators
-too. On `develop` the repository admin may bypass them — see below.
+`bypass_actors` is empty on both, on purpose: the rules bind administrators
+too.
 
 ### Why the rules differ between the branches
 
@@ -84,22 +84,27 @@ are worth keeping:
 **One maintainer cannot approve their own pull requests**, so both rulesets as
 first written would have blocked every merge. The maintainer's decision:
 
-- **`develop`: the repository admin may bypass, via pull request only.** In
-  `develop-protected.json` that is `bypass_actors` with `actor_type`
-  `RepositoryRole`, `actor_id` `5` and `bypass_mode` `pull_request`. The admin
-  can merge a pull request into `develop` without a second approval, but cannot
-  push to it directly. Role `5` is the repository admin role, as this file's
-  author first assumed. Confirmed on import (2026-10-10): the rulesets API
-  reports `current_user_can_bypass: pull_requests_only` on `develop` for the
-  repository admin.
+- **`develop`: no approval required, and no bypass.** A pull request is still
+  the only way in, and every other rule — the four checks, linear history,
+  up to date with `develop`, review threads resolved — binds the maintainer
+  like anyone else.
 - **`main`: no bypass.** A release still needs a second person with write
   access to approve it.
 
-What the bypass costs, stated so it is a known trade: GitHub's bypass lifts
-*every* rule in the ruleset for that actor, not only the approval. On `develop`
-the admin can therefore merge with a failing check too. The checks still run and
-still show red; merging past them is a choice the admin makes in the open, not
-one the rules make impossible.
+`develop` first did this the other way: one approval required, with the
+repository admin (`RepositoryRole` `5`, `bypass_mode` `pull_request`) allowed
+to bypass. That was dropped on 2026-10-11. GitHub's bypass lifts *every* rule
+in the ruleset for that actor, not only the approval, so the admin could merge
+into `develop` past a failing check. Requiring zero approvals removes the one
+rule a single maintainer cannot meet and keeps the rest enforced.
+
+Having pull requests opened by a bot so the maintainer can approve them was
+considered and rejected. The approval would record the author reviewing their
+own code as if it were a second pair of eyes; pull requests opened with
+`GITHUB_TOKEN` do not trigger the workflows behind the required checks; and it
+would not help `main`, where the last push must be approved by someone other
+than its pusher. When a second maintainer joins, raise the count on `develop`
+back to 1.
 
 Nothing else in the repository pushes to a protected branch. The `HANDOFF.md`
 snapshot used to be committed to `main` by a workflow; it is now checked in CI
@@ -129,6 +134,13 @@ gh api -X POST repos/barahn/chirp/rulesets --input .github/rulesets/release-tags
 All three are imported (barahn/chirp#17). Any ruleset on GitHub that is not one
 of these files is drift: compare with
 `gh api repos/barahn/chirp/rulesets --jq '.[].name'`.
+
+To push a changed file to a ruleset that already exists, `PUT` it by id —
+`gh api repos/barahn/chirp/rulesets --jq '.[] | "\(.id) \(.name)"'` lists them:
+
+```sh
+gh api -X PUT repos/barahn/chirp/rulesets/24844667 --input .github/rulesets/develop-protected.json
+```
 
 To make `develop` the default branch:
 
