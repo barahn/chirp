@@ -1,0 +1,28 @@
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        > [!WARNING]
+        > **Never post a Chirp code or link**, not even an expired one, and remove them from any log or screenshot you paste. Discussions are public.
+        >
+        > Anything that could weaken PIN generation or redemption, the consent prompt or the session lifecycle is security-sensitive even when it looks cosmetic. Email [security@fabrintek.com.br](mailto:security@fabrintek.com.br) instead of posting it here; see [SECURITY.md](https://github.com/barahn/chirp/blob/develop/SECURITY.md).
+  - type: textarea
+    id: question
+    attributes:
+      label: Your question
+      description: What are you trying to do, and where are you stuck? A bug with steps to reproduce belongs in an [issue](https://github.com/barahn/chirp/issues/new).
+    validations:
+      required: true
+  - type: textarea
+    id: tried
+    attributes:
+      label: What you tried
+      description: Commands, settings, and what happened. Remove codes, links and addresses you do not want public.
+      render: text
+  - type: input
+    id: environment
+    attributes:
+      label: Chirp version and platform
+      description: The commit or tag you built, and the operating system on each side.
+      placeholder: develop @ 7b7fa78; owner Windows 11, controller Ubuntu 24.04

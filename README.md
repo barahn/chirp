@@ -169,8 +169,10 @@ repository settings that back it, are in
 
 ## Contributing
 
-Issues and bug reports are welcome. Pull requests from outside Fabrintek will
-not be merged yet.
+Issues and bug reports are welcome, and questions, ideas and design discussion
+go in [Discussions](https://github.com/barahn/chirp/discussions) (never post a
+Chirp code or link there). Pull requests from outside Fabrintek will not be
+merged yet.
 
 This is deliberate and temporary. Chirp is dual-licensed (see
 [LICENSING.md](LICENSING.md)), which works only while Fabrintek holds the
