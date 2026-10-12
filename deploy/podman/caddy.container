@@ -1,0 +1,55 @@
+# Caddy in front of the Chirp relay, through Podman Quadlet: TLS on 443 with a
+# certificate it obtains itself, proxying to the relay over the Unix socket
+# that chirp-relay.container shares with it.
+#
+# Set your domain in CHIRP_RELAY_DOMAIN below before starting it. Its DNS
+# record must already point at this host, and ports 80 and 443 must reach it,
+# or the certificate cannot be issued (docs/relay.md).
+#
+# Rootless Podman cannot bind ports below 1024 unless the host allows it:
+#   echo 'net.ipv4.ip_unprivileged_port_start=80' | sudo tee /etc/sysctl.d/90-chirp.conf
+#   sudo sysctl --system
+# Rootful Podman (/etc/containers/systemd/) needs nothing.
+#
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Fabrintek Engenharia Digital Ltda
+
+[Unit]
+Description=Caddy for the Chirp relay
+Documentation=https://github.com/barahn/chirp/blob/develop/docs/relay.md
+Requires=chirp-relay.service
+After=chirp-relay.service
+
+[Container]
+ContainerName=chirp-caddy
+Image=docker.io/library/caddy:2@sha256:f2a1290d0463aad60660d4ec134943f183ee2a5f6c3eb7bf32dd984f2f020772
+
+# The host's network, so Caddy sees each user's real address and the relay
+# throttles each user on their own. On a bridge network with published ports,
+# rootless Podman hands Caddy every connection from one internal address
+# (docs/relay.md). Caddy listens on 80 (the ACME challenge, and the redirect
+# to HTTPS) and 443 (TCP, and UDP for HTTP/3).
+Network=host
+Environment=CHIRP_RELAY_DOMAIN=relay.example.org
+
+# The relay's socket (CHIRP_RELAY_UPSTREAM's default in the Caddyfile).
+Volume=chirp-relay-socket:/run/chirp-relay
+
+# Your copy of deploy/caddy/Caddyfile. %h is the home directory of the user
+# the unit runs as: /root for rootful Podman.
+Volume=%h/.config/chirp/Caddyfile:/etc/caddy/Caddyfile:ro,Z
+# Certificates and the ACME account. Losing them means asking Let's Encrypt
+# again, which is rate-limited: keep the volumes.
+Volume=chirp-caddy-data:/data
+Volume=chirp-caddy-config:/config
+
+DropCapability=ALL
+AddCapability=NET_BIND_SERVICE
+NoNewPrivileges=true
+
+[Service]
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=default.target

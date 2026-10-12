@@ -46,9 +46,11 @@ anything configured on GitHub that is not there is drift.
 
 Required checks, on both: `Build, Test & SAST` (build, vet, lint, `-race`
 tests, DCO, third-party licences, gosec, govulncheck), `gitleaks`,
-`Analyze (Go)` (CodeQL) and `Review dependency changes`. The last two run
-only while the `CODE_SCANNING` variable is set, as it is here — see
-[devsecops.md](devsecops.md). Where it is not set they are skipped, and a
+`Analyze (Go)` (CodeQL), `Review dependency changes`, and `Relay image &
+deploy files` (the relay's image builds and serves, its deploy scripts pass
+shellcheck, its Quadlet units generate; [relay.md](relay.md)). CodeQL and
+dependency review run only while the `CODE_SCANNING` variable is set, as it
+is here — see [devsecops.md](devsecops.md). Where it is not set they are skipped, and a
 skipped required check counts as passing, so they enforce nothing there.
 
 `bypass_actors` is empty on both, on purpose: the rules bind administrators

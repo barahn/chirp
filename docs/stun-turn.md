@@ -9,8 +9,8 @@ run coturn for Chirp, and what will change upstream.
 
 Chirp's own server (`signalling/`) carries **signalling only**: registration,
 codes and links, consent, and the offers, answers and ICE candidates the two
-ends exchange to set up a connection. The screen, input, clipboard and files
-do not pass through it. They travel over WebRTC (remotekit's
+ends exchange to set up a connection; [docs/relay.md](relay.md) runs it. The
+screen, input, clipboard and files do not pass through it. They travel over WebRTC (remotekit's
 `webrtc.PeerSession`), directly between the two Chirps whenever the network
 allows it.
 

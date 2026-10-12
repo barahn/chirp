@@ -41,3 +41,24 @@ updates:
     groups:
       actions-all:
         patterns: [ "*" ]
+
+  # The relay's container image (deploy/container/Containerfile). Its base
+  # images are pinned by digest for the same reason the actions are pinned by
+  # SHA, and need the same rewriting. The Caddy image in
+  # deploy/podman/caddy.container is a Quadlet unit Dependabot cannot read;
+  # docs/relay.md says how to update it.
+  - package-ecosystem: docker
+    directory: /deploy/container
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:59"
+    open-pull-requests-limit: 5
+    target-branch: develop
+    commit-message:
+      prefix: "build(deps)"
+      include: scope
+    labels: [ dependencies, docker ]
+    groups:
+      images-all:
+        patterns: [ "*" ]

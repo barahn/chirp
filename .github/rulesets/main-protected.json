@@ -31,7 +31,8 @@
           { "context": "Build, Test & SAST" },
           { "context": "gitleaks" },
           { "context": "Analyze (Go)" },
-          { "context": "Review dependency changes" }
+          { "context": "Review dependency changes" },
+          { "context": "Relay image & deploy files" }
         ]
       }
     }
