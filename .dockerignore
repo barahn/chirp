@@ -1,0 +1,11 @@
+# Build context for deploy/container/Containerfile, which is built from the
+# repository root. Podman and Docker both read this file. Everything is left
+# out except what the relay is built from, so a build never ships the site,
+# the images or a local bin/ into the context.
+*
+!go.mod
+!go.sum
+!cmd/chirp-relay/
+!session/
+!signalling/
+**/*_test.go

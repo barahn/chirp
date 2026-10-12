@@ -1,0 +1,63 @@
+# The Chirp relay as a native systemd service: a Proxmox LXC container, a VM,
+# or any Linux host with systemd. deploy/install.sh installs it; docs/relay.md
+# explains it.
+#
+# Settings live in /etc/chirp-relay/relay.env (see relay.env next to this
+# file), not here, so an upgrade can replace this unit without losing them.
+#
+# The relay holds no files and needs no privilege, so it runs as a throwaway
+# user (DynamicUser) in a sandbox that allows little beyond TCP. In a Proxmox
+# LXC container the sandbox needs the container's "nesting" feature; without
+# it the service fails with status 226/NAMESPACE (docs/relay.md).
+#
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Fabrintek Engenharia Digital Ltda
+
+[Unit]
+Description=Chirp relay
+Documentation=https://github.com/barahn/chirp/blob/develop/docs/relay.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+EnvironmentFile=/etc/chirp-relay/relay.env
+ExecStart=/usr/local/bin/chirp-relay
+Restart=on-failure
+RestartSec=2
+TimeoutStopSec=15
+
+DynamicUser=yes
+UMask=0077
+LimitNOFILE=65536
+
+CapabilityBoundingSet=
+AmbientCapabilities=
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+PrivateUsers=yes
+ProtectProc=invisible
+ProcSubset=pid
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RemoveIPC=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources
+SystemCallErrorNumber=EPERM
+
+[Install]
+WantedBy=multi-user.target

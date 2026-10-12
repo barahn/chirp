@@ -1,0 +1,55 @@
+# The Chirp relay as a systemd service, through Podman Quadlet.
+#
+# Install (docs/relay.md, "Podman"), together with caddy.container:
+#
+#   rootful:   /etc/containers/systemd/
+#   rootless:  ~/.config/containers/systemd/
+#
+# then `systemctl [--user] daemon-reload && systemctl [--user] start caddy`.
+#
+# The image is built locally from deploy/container/Containerfile and tagged
+# localhost/chirp-relay:latest; Chirp publishes no image of its own yet.
+#
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Fabrintek Engenharia Digital Ltda
+
+[Unit]
+Description=Chirp relay
+Documentation=https://github.com/barahn/chirp/blob/develop/docs/relay.md
+
+[Container]
+ContainerName=chirp-relay
+Image=localhost/chirp-relay:latest
+
+# The host's network, listening on loopback only: Caddy, on the same host,
+# is the only way in. A bridge network with published ports would be tidier,
+# but rootless Podman then hands every connection to Caddy from one internal
+# address, so all users would share one throttle (docs/relay.md, "Why the
+# host network"). The host network keeps each user's real address, rootful
+# or rootless.
+Network=host
+Environment=CHIRP_RELAY_ADDR=127.0.0.1:8080
+# Believe the X-Forwarded-For that Caddy writes, and nobody else's.
+Environment=CHIRP_RELAY_TRUSTED_PROXIES=127.0.0.1,::1
+
+# The image has no shell, so the check runs the binary directly (exec form).
+HealthCmd=["/usr/local/bin/chirp-relay","-healthcheck"]
+HealthInterval=30s
+HealthTimeout=5s
+HealthRetries=3
+HealthOnFailure=kill
+
+# The relay keeps all its state in memory and writes nothing.
+ReadOnly=true
+DropCapability=ALL
+NoNewPrivileges=true
+User=65532
+Group=65532
+
+[Service]
+Restart=always
+RestartSec=2
+TimeoutStopSec=15
+
+[Install]
+WantedBy=default.target

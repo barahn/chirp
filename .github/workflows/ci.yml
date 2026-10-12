@@ -192,3 +192,43 @@ jobs:
         env:
           CGO_ENABLED: 1
         run: go build -o chirp-bin ./cmd/chirp
+
+  # What docs/relay.md tells people to run on a server: the container image,
+  # the install scripts and the Quadlet units. None of it is Go, so nothing
+  # above would notice it breaking. The Proxmox script needs a Proxmox node
+  # and is only linted here.
+  relay-deploy:
+    name: Relay image & deploy files
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Lint the deploy scripts
+        run: shellcheck -x deploy/install.sh deploy/proxmox/create-ct.sh scripts/build-relay.sh
+
+      - name: Build the relay image
+        run: podman build -f deploy/container/Containerfile -t localhost/chirp-relay:ci .
+
+      # The image as the Quadlet unit runs it: read-only, no capabilities,
+      # health checked by the binary itself, since the image has no shell.
+      - name: The image serves and passes its health check
+        run: |
+          podman run -d --name relay --read-only --cap-drop all -p 127.0.0.1:8080:8080 \
+            --health-cmd '["/usr/local/bin/chirp-relay","-healthcheck"]' localhost/chirp-relay:ci
+          for _ in $(seq 1 20); do
+            curl -fsS http://127.0.0.1:8080/healthz && break
+            sleep 0.5
+          done
+          podman healthcheck run relay
+          curl -fsS -X POST -d '{"name":"ci"}' http://127.0.0.1:8080/api/peers | grep -q '"peer_id"'
+
+      - name: The Quadlet units generate
+        run: |
+          dir="$(mktemp -d)"
+          cp deploy/podman/*.container "$dir/"
+          QUADLET_UNIT_DIRS="$dir" /usr/libexec/podman/quadlet -dryrun -user > "$dir/out"
+          grep -q '^ExecStart=.*chirp-relay' "$dir/out"
+          grep -q '^ExecStart=.*caddy' "$dir/out"
