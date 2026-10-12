@@ -4,7 +4,7 @@ body:
     attributes:
       value: |
         > [!WARNING]
-        > **Never post a Chirp code or link**, not even an expired one, and remove them from any log or screenshot you paste. Discussions are public.
+        > **Never post a Chirp code or link**, not even an expired one, or a password, token or TURN credential. Remove them from any log, setting or screenshot you paste. Discussions are public.
         >
         > Anything that could weaken PIN generation or redemption, the consent prompt or the session lifecycle is security-sensitive even when it looks cosmetic. Email [security@fabrintek.com.br](mailto:security@fabrintek.com.br) instead of posting it here; see [SECURITY.md](https://github.com/barahn/chirp/blob/develop/SECURITY.md).
   - type: textarea
@@ -18,7 +18,7 @@ body:
     id: tried
     attributes:
       label: What you tried
-      description: Commands, settings, and what happened. Remove codes, links and addresses you do not want public.
+      description: Commands, settings, and what happened. Remove codes, links, passwords, tokens, TURN credentials and any other secret, and addresses you do not want public.
       render: text
   - type: input
     id: environment

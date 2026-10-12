@@ -9,6 +9,11 @@ require github.com/gorilla/websocket v1.5.3
 require github.com/barahn/remotekit v0.4.1-0.20261011140308-1fa867b04915
 
 require (
+	github.com/barahn/remotekit/signal/nostr v0.0.0-20261009195026-df877a789195 // indirect
+	github.com/btcsuite/btcd/btcec/v2 v2.5.0 // indirect
+	github.com/btcsuite/btcd/chainhash/v2 v2.0.0 // indirect
+	github.com/decred/dcrd/crypto/blake256 v1.1.0 // indirect
+	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 // indirect
 	github.com/jezek/xgb v1.3.1 // indirect
 	github.com/pion/datachannel v1.6.3 // indirect
 	github.com/pion/dtls/v3 v3.1.9 // indirect
