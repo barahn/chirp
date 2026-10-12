@@ -30,7 +30,7 @@ jobs:
       # blocking it. Read the egress report on a few green runs, then turn this
       # to `block` with an allowlist -- flipping it blind breaks the module
       # proxy, the linter and the action downloads all at once.
-      - uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+      - uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
         # An observer must not be able to fail the build it observes. In audit
         # mode this step blocks nothing, so if the agent cannot start -- as on a
         # private repository its tier does not cover -- the job goes on without
@@ -51,7 +51,7 @@ jobs:
       - name: Populate the module graph
         run: go mod download
 
-      - uses: anchore/sbom-action@006b7ce8314066bdf1765b4500370d40fa6917a3 # v0.24.2
+      - uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
         with:
           path: .
           format: spdx-json
