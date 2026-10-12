@@ -100,7 +100,7 @@ spdx_of() {
 	*"GNU LESSER GENERAL PUBLIC LICENSE"*) echo "LGPL" ;;
 	*"GNU AFFERO GENERAL PUBLIC LICENSE"*) echo "AGPL" ;;
 	*"GNU GENERAL PUBLIC LICENSE"*) echo "GPL" ;;
-	*"Permission to use, copy, modify, and/or distribute this software"*) echo "ISC" ;;
+	*"Permission to use, copy, modify, and/or distribute this software"* | *"Permission to use, copy, modify, and distribute this software"*) echo "ISC" ;;
 	*"zlib License"* | *"altered source versions must be plainly marked"*) echo "Zlib" ;;
 	*"Redistribution and use in source and binary forms"*)
 		case "$text" in
