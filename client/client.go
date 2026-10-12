@@ -115,6 +115,10 @@ type Client struct {
 	// SessionConn is closed when the session ends or Help returns. Set it
 	// before the first Help.
 	View func(ctx context.Context, conn *SessionConn)
+
+	// Nostr, when set, carries sessions over Nostr relays and leaves the
+	// relay only the lookup (nostr.go). Set it before Run or Help.
+	Nostr *NostrConfig
 }
 
 // New returns a client for the relay at addr, an http or https address.
