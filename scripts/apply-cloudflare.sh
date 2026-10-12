@@ -46,11 +46,14 @@ token="$(printf '%s' "$token" | tr -d '[:space:][:cntrl:]')"
 fail=0
 for f in .cloudflare/rulesets/*.json; do
 	p="${phase[$(basename "$f")]}"
+	# The token goes in on curl's standard input, never in its arguments,
+	# which any process on the machine can read.
 	resp="$(curl -sS -X PUT \
 		"https://api.cloudflare.com/client/v4/zones/$zone/rulesets/phases/$p/entrypoint" \
-		-H "Authorization: Bearer $token" \
+		-H @- \
 		-H "Content-Type: application/json" \
-		--data-binary "@$f")"
+		--data-binary "@$f" \
+		<<<"Authorization: Bearer $token")"
 	if [ "$(jq -r '.success' <<<"$resp")" = "true" ]; then
 		echo "$f → $p: $(jq -r '[.result.rules[].ref] | join(", ")' <<<"$resp")"
 	else

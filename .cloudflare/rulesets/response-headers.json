@@ -4,7 +4,7 @@
     {
       "ref": "usechirp_security_headers",
       "description": "Security headers for usechirp.app",
-      "expression": "(http.host eq \"usechirp.app\")",
+      "expression": "(http.host in {\"usechirp.app\" \"www.usechirp.app\"})",
       "action": "rewrite",
       "action_parameters": {
         "headers": {

@@ -185,7 +185,8 @@ As of 2026-10-12, set up as follows:
 The rules in [`.cloudflare/rulesets/`](../.cloudflare/rulesets/) are loaded
 with `scripts/apply-cloudflare.sh`, which asks for an API token allowed to
 edit the zone's transform rules and configuration rules, and puts each file
-into its phase. A `PUT` replaces every rule in that phase, which is the point:
+into its phase. The token reaches `curl` on its standard input, not in its
+arguments, which other processes on the machine can read. A `PUT` replaces every rule in that phase, which is the point:
 the files are the reference, and a rule added in the dashboard that is not in
 them is drift. Run it again after any change to them.
 
@@ -217,7 +218,10 @@ cost is an error in the console. The Pro plan makes it optional.
 `scripts/check-live-site.sh`, run by `site-live.yml` after each deploy and
 weekly, fetches the pages and scripts from usechirp.app and fails unless they
 match the repository byte for byte, with that one snippet as the only
-exception, and unless every header in `response-headers.json` comes back. A
+exception, and unless every header in `response-headers.json` comes back. It
+also requires `www.usechirp.app` to answer every path with a 301 to the same
+path on `usechirp.app`, carrying the same headers, which is why both rules
+match both hosts: a page served on `www` would sit outside the check. A
 setting changed in the dashboard shows up there within a week.
 
 To move the domain again, the order matters, and some steps can take the site

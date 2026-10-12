@@ -7,6 +7,9 @@
 # sends, so a dashboard setting that starts rewriting the pages (email
 # obfuscation did, on 2026-10-12, and broke the security contact) fails here.
 #
+# www.usechirp.app must redirect every path to the same path on usechirp.app,
+# with the same headers: a page served there would sit outside this check.
+#
 # One rewrite is allowed, exactly: the inline script Cloudflare's JavaScript
 # Detections inserts before </body>. On the Free plan it cannot be turned off,
 # and the pages' CSP blocks it, so it never runs. Its r and t parameters change
@@ -35,9 +38,24 @@ jsd="<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
+# check_headers <label> <headers-file> prints each ruleset header that is
+# missing or different, and returns non-zero if any is.
+check_headers() {
+	local label="$1" file="$2" fail=0 name want have
+	while IFS=$'\t' read -r name want; do
+		have="$(grep -i "^$name:" "$file" | head -1 | sed 's/^[^:]*:[[:space:]]*//' | tr -d '\r')"
+		if [ "$have" != "$want" ]; then
+			echo "$label: $name is \"$have\", want \"$want\""
+			fail=1
+		fi
+	done < <(jq -r '.rules[0].action_parameters.headers | to_entries[] | "\(.key)\t\(.value.value)"' \
+		"$root/.cloudflare/rulesets/response-headers.json")
+	return "$fail"
+}
+
 # check_once prints what differs and returns non-zero if anything does.
 check_once() {
-	local fail=0 path src got name want have html
+	local fail=0 path src got html www status location
 	for path in "" "l/" "assets/site.js" "assets/site.css"; do
 		src="$root/site/${path:-index.html}"
 		[ "${path%/}" != "$path" ] && src="$root/site/${path}index.html"
@@ -62,14 +80,24 @@ check_once() {
 			fail=1
 		fi
 		# Every header the ruleset sets, on every response.
-		while IFS=$'\t' read -r name want; do
-			have="$(grep -i "^$name:" "$work/headers" | head -1 | sed 's/^[^:]*:[[:space:]]*//' | tr -d '\r')"
-			if [ "$have" != "$want" ]; then
-				echo "/$path: $name is \"$have\", want \"$want\""
+		check_headers "/$path" "$work/headers" || fail=1
+
+		# The same path on www: a redirect here, with the same headers.
+		www="${base/:\/\//://www.}"
+		if [ "$www" != "$base" ]; then
+			if ! curl -sS --max-time 20 -D "$work/headers" -o /dev/null "$www/$path"; then
+				echo "www /$path: request failed"
+				fail=1
+				continue
+			fi
+			status="$(head -1 "$work/headers" | awk '{print $2}')"
+			location="$(grep -i '^location:' "$work/headers" | sed 's/^[^:]*:[[:space:]]*//' | tr -d '\r')"
+			if [ "$status" != "301" ] || [ "$location" != "$base/$path" ]; then
+				echo "www /$path: $status to \"$location\", want 301 to $base/$path"
 				fail=1
 			fi
-		done < <(jq -r '.rules[0].action_parameters.headers | to_entries[] | "\(.key)\t\(.value.value)"' \
-			"$root/.cloudflare/rulesets/response-headers.json")
+			check_headers "www /$path" "$work/headers" || fail=1
+		fi
 	done
 	return "$fail"
 }
