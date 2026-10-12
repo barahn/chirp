@@ -44,6 +44,19 @@ type OwnerEvent struct {
 	// Consent is set when a controller has typed this machine's code and is
 	// asking to be let in.
 	Consent *ConsentRequest
+
+	// Started is set when a session the owner allowed starts being served,
+	// and Ended when it stops, whichever end stopped it. Such an event
+	// carries nothing else: the phase and the code are unchanged.
+	Started *ActiveSession
+	Ended   bool
+}
+
+// ActiveSession is a session the owner allowed, while it is being served.
+type ActiveSession struct {
+	ID string
+	// Name is what the controller typed: a claim, as in the prompt.
+	Name string
 }
 
 // Owner keeps this machine registered and reachable, reports what to show,
@@ -119,7 +132,8 @@ var (
 // than after the relay's grace. It returns ctx's error.
 func (o *Owner) Run(ctx context.Context) error {
 	defer func() {
-		o.endSession()
+		// Chirp is stopping: there is no window left to tell.
+		o.stopServing()
 		o.serving.Wait()
 	}()
 	o.emit(OwnerEvent{Phase: OwnerStarting})
@@ -356,6 +370,7 @@ func (o *Owner) startSession(ctx context.Context, sessionID string) {
 	o.endSession()
 	conn := newSessionConn(req.SessionID, req.Permissions, o.send)
 	o.active = conn
+	o.emit(OwnerEvent{Started: &ActiveSession{ID: req.SessionID, Name: req.Name}})
 	o.serving.Add(1)
 	go func() {
 		defer o.serving.Done()
@@ -364,12 +379,23 @@ func (o *Owner) startSession(ctx context.Context, sessionID string) {
 	}()
 }
 
-// endSession stops serving the active session, if there is one.
+// endSession stops serving the active session, if there is one, and says
+// so.
 func (o *Owner) endSession() {
-	if o.active != nil {
-		_ = o.active.Close()
-		o.active = nil
+	if o.stopServing() {
+		o.emit(OwnerEvent{Ended: true})
 	}
+}
+
+// stopServing stops serving the active session, and reports whether there
+// was one.
+func (o *Owner) stopServing() bool {
+	if o.active == nil {
+		return false
+	}
+	_ = o.active.Close()
+	o.active = nil
+	return true
 }
 
 // send writes a signal to the controller through the owner socket.

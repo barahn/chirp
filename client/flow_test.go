@@ -264,3 +264,31 @@ func TestCancellingHelpReportsNothing(t *testing.T) {
 		}
 	}
 }
+
+func TestTheOwnerIsToldWhenASessionStartsAndEnds(t *testing.T) {
+	r := newRelay(t)
+	c := newClient(t, r)
+	serve := func(ctx context.Context, conn *SessionConn) {
+		for {
+			if _, err := conn.ReadMessage(); err != nil {
+				return
+			}
+		}
+	}
+	o, events, _, _ := runOwnerServing(t, c, serve)
+	shown := await(t, events, "a code", ready).Peer
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go c.Help(ctx, shown.Code, "Ana", func(HelperEvent) {})
+	asked := await(t, events, "the request", func(ev OwnerEvent) bool { return ev.Consent != nil }).Consent
+	if _, err := o.Answer(context.Background(), asked.SessionID, true); err != nil {
+		t.Fatal(err)
+	}
+	started := await(t, events, "the session starting", func(ev OwnerEvent) bool { return ev.Started != nil }).Started
+	if started.ID != asked.SessionID || started.Name != "Ana" {
+		t.Errorf("started = %+v", started)
+	}
+	o.NewCode()
+	await(t, events, "the session ending", func(ev OwnerEvent) bool { return ev.Ended })
+}

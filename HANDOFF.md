@@ -111,6 +111,8 @@ cmd/chirp/internal/ui/keys.go
 cmd/chirp/internal/ui/messages.go
 cmd/chirp/internal/ui/remote.go
 cmd/chirp/internal/ui/remote_test.go
+cmd/chirp/internal/ui/sessionbar.go
+cmd/chirp/internal/ui/sessionbar_test.go
 cmd/chirp/internal/ui/window.go
 cmd/chirp/internal/ui/window_test.go
 cmd/chirp/internal/warm/bird.go
