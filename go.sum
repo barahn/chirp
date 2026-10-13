@@ -8,8 +8,8 @@ github.com/BurntSushi/toml v1.6.0 h1:dRaEfpa2VI55EwlIW72hMRHdWouJeRF7TPYhI+AUQjk
 github.com/BurntSushi/toml v1.6.0/go.mod h1:ukJfTF/6rtPPRCnwkur4qwRxa8vTRFBF0uk2lLoLwho=
 github.com/anthonynsimon/bild v0.14.0 h1:IFRkmKdNdqmexXHfEU7rPlAmdUZ8BDZEGtGHDnGWync=
 github.com/anthonynsimon/bild v0.14.0/go.mod h1:hcvEAyBjTW69qkKJTfpcDQ83sSZHxwOunsseDfeQhUs=
-github.com/barahn/remotekit v0.5.1-0.20261013074155-4aec42dfa260 h1:xpxvSCBtEVtDY+iYcA66CUQpPGdjPG3P2G8Ml/BokvQ=
-github.com/barahn/remotekit v0.5.1-0.20261013074155-4aec42dfa260/go.mod h1:nnObw/O3FDUEYAS1f9Gy15buf+gP5YH3sBiEunIOATQ=
+github.com/barahn/remotekit v0.6.1-0.20261013080612-20e7c3cf88d0 h1:6T0kIJmpJJ7OksHr9Ab0lbYNcDV3Kv32Vbc4BRD+jkw=
+github.com/barahn/remotekit v0.6.1-0.20261013080612-20e7c3cf88d0/go.mod h1:nnObw/O3FDUEYAS1f9Gy15buf+gP5YH3sBiEunIOATQ=
 github.com/barahn/remotekit/signal/nostr v0.0.0-20261009195026-df877a789195 h1:acYpeJ7dasE+u7Zv0Su3dt0evuGDI7sbrRP+cGZmd54=
 github.com/barahn/remotekit/signal/nostr v0.0.0-20261009195026-df877a789195/go.mod h1:VN63p3+W2JuFP818vEM7AS2d0vJI4E7fBgcC9laLhlw=
 github.com/btcsuite/btcd/btcec/v2 v2.5.0 h1:KioMXOWa76b86sTZZOmbzv/ldaQCmB8KFAyn5PbB8E8=

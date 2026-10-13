@@ -7,7 +7,7 @@ require github.com/google/uuid v1.6.0
 require github.com/gorilla/websocket v1.5.3
 
 require (
-	github.com/barahn/remotekit v0.5.1-0.20261013074155-4aec42dfa260
+	github.com/barahn/remotekit v0.6.1-0.20261013080612-20e7c3cf88d0
 	github.com/barahn/remotekit/signal/nostr v0.0.0-20261009195026-df877a789195
 )
 
