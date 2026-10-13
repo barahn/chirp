@@ -12,6 +12,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -808,5 +809,116 @@ func TestTheLaterControllerGraceWins(t *testing.T) {
 	srv.graceMu.Unlock()
 	if !due.Equal(late.Add(time.Minute)) {
 		t.Fatalf("pending end due %v, want the later one", due)
+	}
+}
+
+// An idle socket that answers pings stays open, however long it is idle.
+func TestTheRelayPingsAnIdleSocket(t *testing.T) {
+	const interval = 20 * time.Millisecond
+	srv, ts := newServer(t)
+	srv.PingInterval = interval
+	owner := register(t, ts, "Ana")
+	ownerWS := dialOwner(t, ts, owner.PeerID)
+
+	var pings atomic.Int32
+	ownerWS.SetPingHandler(func(data string) error {
+		pings.Add(1)
+		return ownerWS.WriteControl(websocket.PongMessage, []byte(data), time.Now().Add(time.Second))
+	})
+	closed := make(chan error, 1)
+	go func() {
+		for {
+			if _, _, err := ownerWS.ReadMessage(); err != nil {
+				closed <- err
+				return
+			}
+		}
+	}()
+
+	waitFor(t, "ten pings", func() bool { return pings.Load() >= 10 })
+	select {
+	case err := <-closed:
+		t.Fatalf("the relay closed a socket that answered its pings: %v", err)
+	default:
+	}
+	srv.ownersMu.Lock()
+	_, held := srv.owners[rendezvous.PeerID(owner.PeerID)]
+	srv.ownersMu.Unlock()
+	if !held {
+		t.Fatal("the relay let go of an owner that answered its pings")
+	}
+}
+
+// A peer that stops answering pings is taken for gone: its socket is closed
+// and it leaves, as if it had closed the socket itself.
+func TestASocketThatStopsAnsweringPingsIsClosed(t *testing.T) {
+	const interval = 20 * time.Millisecond
+	srv, ts := newServer(t)
+	srv.PingInterval = interval
+	owner := register(t, ts, "Ana")
+	ownerWS := dialOwner(t, ts, owner.PeerID)
+	sess, _ := redeem(t, ts, owner.Code, "Bruno")
+	ctrl := dialController(t, ts, sess.SessionID)
+	// The controller reads throughout, so it answers its pings and stays.
+	left := make(chan struct{})
+	go func() {
+		for {
+			_, data, err := ctrl.ReadMessage()
+			if err != nil {
+				return
+			}
+			var m map[string]any
+			if json.Unmarshal(data, &m) == nil && m["type"] == PeerLeftType {
+				close(left)
+				return
+			}
+		}
+	}()
+
+	// The owner reads, so pings arrive, but never answers them.
+	ownerWS.SetPingHandler(func(string) error { return nil })
+	closed := make(chan struct{})
+	go func() {
+		defer close(closed)
+		for {
+			if _, _, err := ownerWS.ReadMessage(); err != nil {
+				return
+			}
+		}
+	}()
+
+	select {
+	case <-closed:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the relay kept a socket that stopped answering its pings")
+	}
+	waitFor(t, "the owner to be let go", func() bool {
+		srv.ownersMu.Lock()
+		defer srv.ownersMu.Unlock()
+		_, held := srv.owners[rendezvous.PeerID(owner.PeerID)]
+		return !held
+	})
+	select {
+	case <-left:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the controller was not told the owner left")
+	}
+}
+
+// A ping interval a Chirp would time out on is capped, and the default fills
+// in for none.
+func TestThePingIntervalIsCapped(t *testing.T) {
+	for set, want := range map[time.Duration]time.Duration{
+		0:                      DefaultPingInterval,
+		-time.Second:           DefaultPingInterval,
+		time.Second:            time.Second,
+		MaxPingInterval:        MaxPingInterval,
+		time.Hour:              MaxPingInterval,
+		time.Duration(1 << 62): MaxPingInterval,
+	} {
+		s := &Server{PingInterval: set}
+		if got := s.pingInterval(); got != want {
+			t.Errorf("PingInterval %v gives %v, want %v", set, got, want)
+		}
 	}
 }

@@ -1,0 +1,31 @@
+body:
+  - type: markdown
+    attributes:
+      value: |
+        > [!WARNING]
+        > **Never post a Chirp code or link**, not even an expired one, or a password, token or TURN credential. Remove them from any log, setting or screenshot you paste. Discussions are public.
+        >
+        > Anything that could weaken PIN generation or redemption, the consent prompt or the session lifecycle is security-sensitive even when it looks cosmetic. Email [security@fabrintek.com.br](mailto:security@fabrintek.com.br) instead of posting it here; see [SECURITY.md](https://github.com/barahn/chirp/blob/develop/SECURITY.md).
+  - type: markdown
+    attributes:
+      value: |
+        Design discussion is wanted even while code contributions are closed ([CONTRIBUTING.md](https://github.com/barahn/chirp/blob/develop/CONTRIBUTING.md)). [How Chirp works](https://github.com/barahn/chirp/blob/develop/docs/product-model.md) records the decisions made so far; if you are questioning one, say which.
+  - type: textarea
+    id: topic
+    attributes:
+      label: What should change, or be decided
+      description: The behaviour, flow or architecture in question, and the problem with how it is now (or with it being undecided).
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: What you would do instead, and what it costs. Consent, what each side sees, and what the network can learn are the parts Chirp cannot get wrong; say how your proposal affects them.
+    validations:
+      required: true
+  - type: input
+    id: decision
+    attributes:
+      label: Related decision or issue
+      placeholder: decision 5, barahn/chirp#12

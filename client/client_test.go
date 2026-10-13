@@ -24,11 +24,16 @@ type relay struct {
 	ln *cuttable
 }
 
-func newRelay(t *testing.T) *relay {
+// configure, if given, sets the relay up before it starts.
+func newRelay(t *testing.T, configure ...func(*signalling.Server)) *relay {
 	t.Helper()
 	sm := session.NewSessionManager(10 * time.Minute)
 	t.Cleanup(sm.Close)
-	ts := httptest.NewUnstartedServer(signalling.NewServer(sm).Handler())
+	srv := signalling.NewServer(sm)
+	for _, f := range configure {
+		f(srv)
+	}
+	ts := httptest.NewUnstartedServer(srv.Handler())
 	ln := &cuttable{Listener: ts.Listener}
 	ts.Listener = ln
 	ts.Start()
@@ -105,6 +110,14 @@ func TestRelayMessageTypesMatchTheRelay(t *testing.T) {
 	}
 }
 
+// However the relay is configured, a socket waits long enough for two of its
+// pings to go missing.
+func TestPingWaitOutlastsTheRelaysPings(t *testing.T) {
+	if PingWait <= 2*signalling.MaxPingInterval {
+		t.Fatalf("PingWait %v does not outlast two pings at the relay's slowest, %v", PingWait, signalling.MaxPingInterval)
+	}
+}
+
 func TestNewRefusesWhatIsNotAnHTTPAddress(t *testing.T) {
 	for _, addr := range []string{"", "localhost:8080", "ftp://relay.example", "https://", "wss://relay.example"} {
 		if _, err := New(addr); err == nil {
@@ -154,6 +167,58 @@ func TestACodeReachesTheOwnerAsAConsentRequest(t *testing.T) {
 	}
 	if req.SessionID != sess.ID || req.Name != "Ana" || req.NameVerified || len(req.Permissions) == 0 {
 		t.Fatalf("consent request = %+v", req)
+	}
+}
+
+// The relay closes a socket that stops answering its pings, so an idle owner
+// socket that outlives many ping intervals is one that answered them.
+func TestAnIdleOwnerSocketAnswersTheRelaysPings(t *testing.T) {
+	const interval = 20 * time.Millisecond
+	r := newRelay(t, func(s *signalling.Server) { s.PingInterval = interval })
+	c := newClient(t, r)
+	ctx := context.Background()
+
+	owner, err := c.Register(ctx, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ownerSock, err := c.DialOwner(ctx, owner.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = ownerSock.Close() }()
+	got := make(chan Message, 8)
+	go func() {
+		defer close(got)
+		for {
+			m, err := ownerSock.Next()
+			if err != nil {
+				return
+			}
+			got <- m
+		}
+	}()
+
+	time.Sleep(20 * interval)
+	sess, err := c.Redeem(ctx, owner.Formatted, "Ana")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctrl, err := c.DialController(ctx, sess.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = ctrl.Close() }()
+	select {
+	case m, ok := <-got:
+		if !ok {
+			t.Fatal("the relay closed an owner socket that should have answered its pings")
+		}
+		if !m.FromRelay() {
+			t.Fatalf("owner got %+v, want a relay message", m)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("no message on the owner socket")
 	}
 }
 
