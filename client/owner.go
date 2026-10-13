@@ -44,6 +44,19 @@ type OwnerEvent struct {
 	// Consent is set when a controller has typed this machine's code and is
 	// asking to be let in.
 	Consent *ConsentRequest
+
+	// Started is set when a session the owner allowed starts being served,
+	// and Ended when it stops, whichever end stopped it. Such an event
+	// carries nothing else: the phase and the code are unchanged.
+	Started *ActiveSession
+	Ended   bool
+}
+
+// ActiveSession is a session the owner allowed, while it is being served.
+type ActiveSession struct {
+	ID string
+	// Name is what the controller typed: a claim, as in the prompt.
+	Name string
 }
 
 // Owner keeps this machine registered and reachable, reports what to show,
@@ -123,7 +136,10 @@ var (
 // than after the relay's grace. It returns ctx's error.
 func (o *Owner) Run(ctx context.Context) error {
 	defer func() {
-		o.endSession()
+		// Chirp is stopping: there is no window left to tell, but a
+		// controller over Nostr is still told.
+		o.closeActive()
+		o.endNostr()
 		o.serving.Wait()
 	}()
 	o.emit(OwnerEvent{Phase: OwnerStarting})
@@ -311,9 +327,7 @@ func (o *Owner) listen(ctx context.Context, sock *Socket, shown *Peer, nmsgs <-c
 			case TypePeerLeft:
 				// The relay's session is over; one over Nostr is not the
 				// relay's to end.
-				if o.active != nil && !o.active.Nostr {
-					o.closeActive()
-				}
+				o.endRelaySession()
 				if err := o.refresh(ctx, shown); err != nil {
 					return err
 				}
@@ -384,6 +398,27 @@ func (o *Owner) startSession(ctx context.Context, sessionID string) {
 	if req == nil || req.SessionID != sessionID || o.Serve == nil {
 		return
 	}
+	// An approval can sit queued while the controller leaves or the code is
+	// replaced, so the session is served only once the relay confirms it is
+	// allowed. A definitive answer otherwise drops it. A lookup that fails
+	// decides nothing: the approval is handed back to Run after a pause and
+	// looked up again, for as long as this is still the request answered
+	// (endSession forgets it, and stops the retries).
+	//
+	// A session over Nostr is not the relay's: the relay never holds it, and
+	// its controller's own messages say when it is over (onNostr).
+	if o.nostrSender(sessionID) == nil {
+		st, err := o.client.Session(ctx, sessionID)
+		switch {
+		case ctx.Err() != nil, errors.Is(err, ErrNotFound):
+			return
+		case err != nil:
+			time.AfterFunc(o.Retry, func() { o.retryApproval(sessionID) })
+			return
+		case st.State != StateConsentGranted && st.State != StateActive:
+			return
+		}
+	}
 	if o.active != nil && o.active.ID == sessionID {
 		return
 	}
@@ -396,6 +431,7 @@ func (o *Owner) startSession(ctx context.Context, sessionID string) {
 	conn := newSessionConn(req.SessionID, req.Permissions, send)
 	conn.Nostr = viaNostr
 	o.active = conn
+	o.emit(OwnerEvent{Started: &ActiveSession{ID: req.SessionID, Name: req.Name}})
 	o.serving.Add(1)
 	go func() {
 		defer o.serving.Done()
@@ -404,19 +440,64 @@ func (o *Owner) startSession(ctx context.Context, sessionID string) {
 	}()
 }
 
-// endSession stops serving the active session, if there is one, and ends a
-// request or session that came over Nostr.
-func (o *Owner) endSession() {
-	o.closeActive()
-	o.endNostr()
+// retryApproval hands an approval back to Run, if it is still for the
+// request answered last.
+func (o *Owner) retryApproval(sessionID string) {
+	o.mu.Lock()
+	current := o.asked != nil && o.asked.SessionID == sessionID
+	o.mu.Unlock()
+	if !current {
+		return
+	}
+	select {
+	case o.allowed <- sessionID:
+	default:
+	}
 }
 
-// closeActive stops serving the active session, if there is one.
-func (o *Owner) closeActive() {
-	if o.active != nil {
-		_ = o.active.Close()
-		o.active = nil
+// endSession ends the session: it stops serving the active one, if there is
+// one, and says so; ends a request or session that came over Nostr; and
+// forgets the request it answered and any approval still queued for it, so a
+// session that ended before it was served is never started.
+func (o *Owner) endSession() {
+	o.forgetRequest()
+	had := o.closeActive()
+	o.endNostr()
+	if had {
+		o.emit(OwnerEvent{Ended: true})
 	}
+}
+
+// endRelaySession ends a session the relay has ended, without touching one
+// over Nostr, which is not the relay's to end.
+func (o *Owner) endRelaySession() {
+	if o.active == nil || o.active.Nostr {
+		return
+	}
+	o.forgetRequest()
+	o.closeActive()
+	o.emit(OwnerEvent{Ended: true})
+}
+
+// forgetRequest drops the request answered last and any approval still
+// queued for it.
+func (o *Owner) forgetRequest() {
+	o.setAsked(nil)
+	select {
+	case <-o.allowed:
+	default:
+	}
+}
+
+// closeActive stops serving the active session, if there is one, without
+// saying so, and reports whether there was one.
+func (o *Owner) closeActive() bool {
+	if o.active == nil {
+		return false
+	}
+	_ = o.active.Close()
+	o.active = nil
+	return true
 }
 
 // send writes a signal to the controller through the owner socket.
