@@ -424,7 +424,7 @@ func (o *Owner) startSession(ctx context.Context, sessionID string) {
 	//
 	// A session over Nostr is not the relay's: the relay never holds it, and
 	// its controller's own messages say when it is over (onNostr).
-	if o.nostrSender(sessionID) == nil {
+	if s, _ := o.nostrSender(sessionID); s == nil {
 		st, err := o.client.Session(ctx, sessionID)
 		switch {
 		case ctx.Err() != nil, errors.Is(err, ErrNotFound):

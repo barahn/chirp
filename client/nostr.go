@@ -353,7 +353,12 @@ func (o *Owner) onNostr(ctx context.Context, m nostrMsg, shown *Peer) error {
 		if ask != nil {
 			o.endSession()
 		}
-		clear(o.pakes)
+		for viewer, p := range o.pakes {
+			delete(o.pakes, viewer)
+			if err := o.pakeFailed(ctx, p.via, shown); err != nil {
+				return err
+			}
+		}
 		clear(o.verified)
 		return nil
 	}
@@ -457,6 +462,18 @@ func (o *Owner) onPakeStart(ctx context.Context, m nostrMsg, shown *Peer) error 
 	var secret, routing string
 	switch m.head.Via {
 	case viaCode:
+		if m.head.Code == shown.Code {
+			if err := o.refresh(ctx, shown); err != nil {
+				return err
+			}
+			if m.head.Code == shown.Code {
+				// The code is still displayed and has not been redeemed on
+				// the server. A lookup is required to reach the owner over
+				// Nostr; an unredeemed code cannot start a PAKE.
+				_ = n.send(m.viewer, knock{Type: TypeConsentAnswer, Reason: reasonAuth}.encode())
+				return nil
+			}
+		}
 		secret, ok = o.secrets.take(m.head.Code)
 		routing = m.head.Code
 	case viaLink:

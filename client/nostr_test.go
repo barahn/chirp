@@ -17,6 +17,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/barahn/remotekit/pake"
+	"github.com/barahn/remotekit/signal/nostr"
 	"github.com/barahn/remotekit/stream"
 	"github.com/barahn/remotekit/webrtc"
 	"github.com/gorilla/websocket"
@@ -641,4 +643,108 @@ func TestTheRelayPathTakesTheWholeCode(t *testing.T) {
 	shown := await(t, events, "a code", ready).Peer
 	helpWith(t, newClient(t, r), shown.Spoken(), "Ana")
 	await(t, events, "the request", asked)
+}
+
+// A holder of the link cannot burn the displayed code's secret by sending a
+// forged pake.start claiming viaCode for the displayed code.
+func TestLinkHolderCannotBurnDisplayedCodeSecret(t *testing.T) {
+	r, nr := newRelay(t), newNostrRelay(t)
+	_, events, _, _ := runOwner(t, newNostrClient(t, r, nr))
+	shown := await(t, events, "a code", ready).Peer
+
+	c := newNostrClient(t, r, nr)
+	ct, err := c.LookupLink(context.Background(), shown.Link)
+	if err != nil {
+		t.Fatalf("LookupLink failed: %v", err)
+	}
+
+	conn, err := nostr.Dial(context.Background(), nostr.Config{Relays: ct.Relays, Dialer: c.dialer}, ct.Key)
+	if err != nil {
+		t.Fatalf("Dial failed: %v", err)
+	}
+	defer conn.Close()
+
+	signKey := newSigningKey()
+	_, start, err := pake.NewInitiator(pake.Config{
+		Secret:    []byte("9999"),
+		Context:   pakeContext(viaCode, shown.Code),
+		SessionID: pakeSessionID(ct.Key, conn.PublicKey()),
+		Key:       signKey,
+	})
+	if err != nil {
+		t.Fatalf("NewInitiator: %v", err)
+	}
+	pakeStart := knock{Type: TypePakeStart, Msg: encodePake(start), Via: viaCode, Code: shown.Code}
+	if err := conn.WriteMessage(pakeStart.encode()); err != nil {
+		t.Fatalf("WriteMessage: %v", err)
+	}
+
+	msg, err := conn.ReadMessage()
+	if err != nil {
+		t.Fatalf("ReadMessage: %v", err)
+	}
+	var head knock
+	if err := json.Unmarshal(msg, &head); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+	if head.Type != TypeConsentAnswer || head.Reason != reasonAuth {
+		t.Fatalf("got answer %+v, want reasonAuth", head)
+	}
+
+	// The legitimate helper uses shown.Spoken(), which spends shown.Code.
+	helpWith(t, newNostrClient(t, r, nr), shown.Spoken(), "Ana")
+	if req, _ := askedAndReplaced(t, events, shown.Code); req == nil {
+		t.Fatal("the displayed code was burned by the link holder's forged PAKE start")
+	}
+}
+
+// A Nostr relay reset fails any pending unconfirmed PAKE, so guessing the
+// link secret across disconnects cannot bypass maxLinkFailures.
+func TestNostrResetCountsPendingLinkPakeFailure(t *testing.T) {
+	r, nr := newRelay(t), newNostrRelay(t)
+	owner, events, _, _ := runOwner(t, newNostrClient(t, r, nr))
+	shown := await(t, events, "a code", ready).Peer
+
+	c := newNostrClient(t, r, nr)
+	ct, err := c.LookupLink(context.Background(), shown.Link)
+	if err != nil {
+		t.Fatalf("LookupLink failed: %v", err)
+	}
+
+	for i := 0; i < maxLinkFailures; i++ {
+		conn, err := nostr.Dial(context.Background(), nostr.Config{Relays: ct.Relays, Dialer: c.dialer}, ct.Key)
+		if err != nil {
+			t.Fatalf("Dial: %v", err)
+		}
+		signKey := newSigningKey()
+		_, start, err := pake.NewInitiator(pake.Config{
+			Secret:    []byte("0000"),
+			Context:   pakeContext(viaLink, shown.Link),
+			SessionID: pakeSessionID(ct.Key, conn.PublicKey()),
+			Key:       signKey,
+		})
+		if err != nil {
+			t.Fatalf("NewInitiator: %v", err)
+		}
+		pakeStart := knock{Type: TypePakeStart, Msg: encodePake(start), Via: viaLink}
+		if err := conn.WriteMessage(pakeStart.encode()); err != nil {
+			t.Fatalf("WriteMessage: %v", err)
+		}
+		_, err = conn.ReadMessage()
+		if err != nil {
+			t.Fatalf("ReadMessage reply: %v", err)
+		}
+		_ = conn.Close()
+
+		// A reset of the Nostr relays drops in-flight PAKEs and counts each as failed.
+		owner.nostrOwner().msgs <- nostrMsg{reset: true}
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	next := await(t, events, "a new link", func(ev OwnerEvent) bool {
+		return ev.Phase == OwnerReady && ev.Peer.Link != "" && ev.Peer.Link != shown.Link
+	}).Peer
+	if next.Link == "" || next.Link == shown.Link {
+		t.Fatal("the link was not renewed after resets")
+	}
 }
