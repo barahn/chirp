@@ -128,3 +128,9 @@ targets and disclosure terms are in [SECURITY.md](SECURITY.md).
 Chirp hands a remote technician control of someone else's desktop. A defect in
 PIN generation, PIN redemption, the session lifecycle or the consent flow is
 security-sensitive even when it looks cosmetic.
+
+## Code of conduct
+
+Participation in this project is governed by the [Code of Conduct](CODE_OF_CONDUCT.md).
+Instances of abusive, harassing, or otherwise unacceptable behavior may be
+reported to [security@fabrintek.com.br](mailto:security@fabrintek.com.br).

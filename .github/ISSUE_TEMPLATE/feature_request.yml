@@ -1,0 +1,44 @@
+name: Feature request
+description: Suggest an enhancement or new capability for Chirp
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        > [!WARNING]
+        > **Never post an active or historical Chirp code or link**, password, session token, or TURN credential. Redact them from any log, configuration, or screenshot you attach. Issues are public.
+        >
+        > Anything that could weaken code generation or redemption, the consent prompt, or the session lifecycle is security-sensitive even when it looks cosmetic. Email [security@fabrintek.com.br](mailto:security@fabrintek.com.br) instead of opening a public issue; see [SECURITY.md](https://github.com/barahn/chirp/blob/develop/SECURITY.md).
+  - type: markdown
+    attributes:
+      value: |
+        > [!NOTE]
+        > Exploratory ideas, high-level user stories, and architectural debates are best started in [Discussions](https://github.com/barahn/chirp/discussions). Use this form to track concrete, actionable feature requests.
+        >
+        > Chirp's core commitments: **No feature gates**, **explicit consent**, and **unrestricted self-hosting**. Chirp never installs itself or starts automatically with the OS.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem statement
+      description: Is this feature related to a specific problem or friction you encountered?
+      placeholder: "I find it frustrating when..."
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: Describe what you would like Chirp to do.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Have you considered any alternative solutions or workarounds?
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Any screenshots, use-case examples, or other context that helps clarify the request (ensure all codes, links, and sensitive tokens are redacted).
