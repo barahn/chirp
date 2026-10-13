@@ -662,7 +662,7 @@ func TestLinkHolderCannotBurnDisplayedCodeSecret(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Dial failed: %v", err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	signKey := newSigningKey()
 	_, start, err := pake.NewInitiator(pake.Config{
