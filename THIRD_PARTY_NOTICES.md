@@ -67,7 +67,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### fyne.io/fyne/v2
 
-- Version: `v2.8.1`
+- Version: `v2.8.2`
 - License: BSD-3-Clause
 - Homepage: https://fyne.io/fyne/v2
 
@@ -375,7 +375,7 @@ SOFTWARE.
 
 ### github.com/barahn/remotekit/signal/nostr
 
-- Version: `v0.0.0-20261009195026-df877a789195`
+- Version: `v0.1.0`
 - License: Apache-2.0
 - Homepage: https://github.com/barahn/remotekit/signal/nostr
 
@@ -1001,7 +1001,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### github.com/fyne-io/oksvg
 
-- Version: `v0.2.0`
+- Version: `v0.2.1-0.20260918172519-a9af55fa95d9`
 - License: BSD-3-Clause
 - Homepage: https://github.com/fyne-io/oksvg
 
@@ -1039,7 +1039,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### github.com/go-gl/glfw/v3.4/glfw
 
-- Version: `v0.1.0-pre.1.0.20260707082822-2a407d02d01a`
+- Version: `v0.1.0-pre.2`
 - License: BSD-3-Clause
 - Homepage: https://github.com/go-gl/glfw/v3.4/glfw
 
@@ -1168,7 +1168,7 @@ For more information, please refer to <https://unlicense.org/>
 
 ### github.com/go-text/typesetting
 
-- Version: `v0.3.4`
+- Version: `v0.3.5`
 - License: BSD-3-Clause
 - Homepage: https://github.com/go-text/typesetting
 
@@ -2960,7 +2960,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 
 ### Noto Sans
 
-- Embedded by: `fyne.io/fyne/v2` `v2.8.1`
+- Embedded by: `fyne.io/fyne/v2` `v2.8.2`
 - Files: `NotoSans-Bold.ttf` `NotoSans-BoldItalic.ttf` `NotoSans-Italic.ttf` `NotoSans-Regular.ttf`
 - License: OFL-1.1
 
@@ -3006,7 +3006,7 @@ THE FONT SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS
 
 ### Inter Symbols
 
-- Embedded by: `fyne.io/fyne/v2` `v2.8.1`
+- Embedded by: `fyne.io/fyne/v2` `v2.8.2`
 - Files: `InterSymbols-Regular.ttf`
 - License: OFL-1.1
 
@@ -3109,7 +3109,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 
 ### DejaVu Sans Mono
 
-- Embedded by: `fyne.io/fyne/v2` `v2.8.1`
+- Embedded by: `fyne.io/fyne/v2` `v2.8.2`
 - Files: `DejaVuSansMono-Powerline.ttf`
 - License: Bitstream-Vera
 
@@ -3214,7 +3214,7 @@ from Tavmjong Bah. For further information, contact: tavmjong @ free
 
 ### EmojiOne Color
 
-- Embedded by: `fyne.io/fyne/v2` `v2.8.1`
+- Embedded by: `fyne.io/fyne/v2` `v2.8.2`
 - Files: `EmojiOneColor.otf`
 - License: MIT
 

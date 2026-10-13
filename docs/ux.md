@@ -8,10 +8,12 @@ below. [product-model.md](product-model.md) is the authority on what Chirp
 does; where this page disagrees with it, this page is wrong.
 
 **Status: proposal, partly built.** The open decisions are listed at the end.
-`cmd/chirp` has the main window, the helper's flow (barahn/chirp#10) and the
-consent prompt (barahn/chirp#11), in the Warm look (§ Visual direction); the
-session bar, the tray and the sound are not built yet. Mockups of the
-possible looks are linked from § Visual direction.
+`cmd/chirp` has the main window, the helper's flow (barahn/chirp#10), the
+consent prompt (barahn/chirp#11), the controller's view of the other screen
+(barahn/chirp#12) and the owner's session bar (barahn/chirp#77), in the Warm
+look (§ Visual direction). Not built yet: keeping the prompt and the bar on
+top, the controller's toolbar beyond *End*, the tray and the sound; each has
+an issue. Mockups of the possible looks are linked from § Visual direction.
 
 ## The name is the metaphor
 
@@ -200,8 +202,12 @@ changes shape as well as colour, so the state does not depend on telling
 colours apart. When the session ends the bar goes, and the main window says
 the code has been replaced.
 
-Fyne may not offer a portable always-on-top window; check before building the
-bar, and plan for a small platform-specific shim if it does not.
+The bar is built (`cmd/chirp/internal/ui/sessionbar.go`, barahn/chirp#77):
+it opens as its own window when a session the owner allowed starts being
+served and closes when it ends, whichever end ended it. The name is cleaned
+as in the prompt. Closing the bar ends the session, like *End*. What is
+missing is staying above every other window: Fyne has no portable way, so
+that waits on a small per-OS shim, which the consent prompt needs too.
 
 **On the controller's machine,** the remote screen fills the window, with a
 toolbar for monitors, clipboard, files and *End*. So far the toolbar has
