@@ -52,6 +52,7 @@ type Window struct {
 	pose      warm.Pose
 	mark      *canvas.Text
 	animating bool
+	bar       *sessionBar
 
 	// This machine's code.
 	status     *widget.Label
@@ -229,6 +230,14 @@ func (w *Window) helpArea() fyne.CanvasObject {
 // ApplyOwner shows a change in this machine's standing with the relay.
 func (w *Window) ApplyOwner(ev client.OwnerEvent) {
 	defer w.relayout()
+	switch {
+	case ev.Started != nil:
+		w.showSessionBar(*ev.Started)
+		return
+	case ev.Ended:
+		w.sessionEnded()
+		return
+	}
 	w.status.SetText(statusText(ev.Phase))
 	switch ev.Phase {
 	case client.OwnerReady:
@@ -295,6 +304,18 @@ func (w *Window) AnswerFailed(granted bool) {
 	w.request.SetText(answerProblem(granted))
 	w.request.Show()
 	w.endSession.Hide()
+}
+
+// sessionEnded closes the bar and says the session is over, whichever end
+// ended it.
+func (w *Window) sessionEnded() {
+	if w.bar != nil {
+		w.bar.dismiss()
+	}
+	w.endSession.Hide()
+	w.request.Importance = widget.MediumImportance
+	w.request.SetText(sessionOverNote)
+	w.request.Show()
 }
 
 func (w *Window) endTheSession() {

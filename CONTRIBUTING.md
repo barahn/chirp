@@ -6,7 +6,10 @@ Pull requests from outside Fabrintek will not be merged until the Contributor
 License Agreement below is enforced automatically in this repository.
 
 Issues, bug reports, reproduction cases and design discussion are welcome and
-wanted. It is only code that has to wait.
+wanted. It is only code that has to wait. Bugs go in
+[issues](https://github.com/barahn/chirp/issues); questions, ideas and design
+go in [Discussions](https://github.com/barahn/chirp/discussions), where
+*Design* is the place to argue with a decision before anyone writes code.
 
 **Why.** Chirp is dual-licensed: AGPL-3.0-only to the public, and separately to
 Fabrintek for use in its proprietary platform. That arrangement works because
