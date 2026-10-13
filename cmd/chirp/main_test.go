@@ -73,7 +73,7 @@ func (p *pipe) Close() error { p.once.Do(func() { close(p.done) }); return nil }
 // than sent the screen through the relay.
 func TestTheRunnerNeverSendsTheScreenThroughTheRelay(t *testing.T) {
 	agent, viewer := newPipe()
-	r := newRunner("session", []string{stream.PermissionScreenView}, webrtc.PeerConfig{})
+	r := newRunner("session", []string{stream.PermissionScreenView}, false, webrtc.PeerConfig{})
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
 	go func() { _ = r.Serve(ctx, agent); close(done) }()
@@ -104,5 +104,47 @@ func TestTheRunnerNeverSendsTheScreenThroughTheRelay(t *testing.T) {
 		case "capture_unavailable":
 			t.Skip("no screen to capture here")
 		}
+	}
+}
+
+// A session signalled over Nostr refuses input sent beside its signals: it
+// must come over the data channel, and never through the relays.
+func TestASessionOverNostrTakesInputOnlyOnTheDataChannel(t *testing.T) {
+	agent, viewer := newPipe()
+	r := newRunner("session", []string{stream.PermissionScreenView, stream.PermissionRemoteControl}, true, webrtc.PeerConfig{})
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { _ = r.Serve(ctx, agent); close(done) }()
+	defer func() { cancel(); <-done }()
+
+	if err := viewer.WriteMessage([]byte(`{"type":"input","viewer_id":"v","payload":{"type":"mouse_move","x":0.5,"y":0.5}}`)); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.After(10 * time.Second)
+	for {
+		var m []byte
+		select {
+		case m = <-viewer.in:
+		case <-deadline:
+			t.Fatal("the input was not refused")
+		}
+		var head struct {
+			Type    string `json:"type"`
+			MsgType string `json:"message_type"`
+		}
+		_ = json.Unmarshal(m, &head)
+		if head.Type == "data_channel_required" && head.MsgType == "input" {
+			return
+		}
+	}
+}
+
+func TestNostrIsOnlyWhenRelaysAreGiven(t *testing.T) {
+	if c := nostrConfig(" , "); c != nil {
+		t.Errorf("nostrConfig of no relays = %+v, want nil", c)
+	}
+	c := nostrConfig("wss://a.example.org, wss://b.example.org")
+	if c == nil || len(c.Relays) != 2 || c.Relays[1] != "wss://b.example.org" {
+		t.Errorf("nostrConfig = %+v", c)
 	}
 }

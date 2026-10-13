@@ -193,6 +193,8 @@ func TestHelpProblemNamesEveryRelayRefusal(t *testing.T) {
 		{&client.RelayError{Status: http.StatusTooManyRequests}, "Too many tries from this network. Try again in a few minutes."},
 		{&client.RelayError{Status: http.StatusServiceUnavailable}, "Chirp's server is busy. Try again shortly."},
 		{client.ErrUnavailable, "Can't reach the Chirp server. Check your connection and try again."},
+		{client.ErrNoNostr, "Their Chirp isn't set up for Nostr relays. Ask them for a new code, and use the same setup as they do."},
+		{client.ErrBadContact, "Chirp's server gave an address that can't be used. Nothing was connected."},
 		{errors.New("anything else"), "Something went wrong. Try again."},
 	} {
 		if got := helpProblem(tc.err); got != tc.want {

@@ -6,10 +6,13 @@ package client
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net"
 	"net/url"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/barahn/remotekit/bark"
 	"github.com/gorilla/websocket"
@@ -96,7 +99,35 @@ func (c *Client) dial(ctx context.Context, q url.Values) (*Socket, error) {
 		return nil, fmt.Errorf("%w: %v", ErrUnavailable, err)
 	}
 	conn.SetReadLimit(1 << 20)
+	conn.SetPingHandler(func(data string) error { return pong(conn, data) })
 	return &Socket{conn: conn}, nil
+}
+
+// PingWait is how long a socket waits for the relay's next ping before it
+// gives the relay up for gone, and Next fails so the caller can dial again.
+// The relay pings every 30 seconds by default, and never less often than
+// every 40 (signalling.DefaultPingInterval, signalling.MaxPingInterval), so
+// this allows two to go missing.
+//
+// The wait starts at the first ping, not at the dial: a relay that sends none
+// leaves the socket without a deadline, as it was before relays pinged.
+const PingWait = 90 * time.Second
+
+// pong answers a ping, as gorilla's default handler does, and pushes the read
+// deadline out to the next one. gorilla runs it inside a read, and lets it
+// write alongside Send.
+func pong(conn *websocket.Conn, data string) error {
+	if err := conn.SetReadDeadline(time.Now().Add(PingWait)); err != nil {
+		return err
+	}
+	err := conn.WriteControl(websocket.PongMessage, []byte(data), time.Now().Add(10*time.Second))
+	var ne net.Error
+	if errors.Is(err, websocket.ErrCloseSent) || errors.As(err, &ne) {
+		// As gorilla's default: a pong that cannot be written is not
+		// worth failing the read over; the next read will fail on its own.
+		return nil
+	}
+	return err
 }
 
 // Next blocks until a message arrives, or the socket ends.

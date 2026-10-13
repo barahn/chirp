@@ -28,6 +28,11 @@ type SessionConn struct {
 	// remotekit spells them (session.DefaultPermissions). The controller's
 	// side is not told them, and leaves this empty.
 	Permissions []string
+	// Nostr says the session's signals travel over Nostr relays rather
+	// than the relay's sockets (nostr.go). Each message must then fit a
+	// gift wrap, so the runner keeps everything but negotiation on the
+	// data channel.
+	Nostr bool
 
 	send func([]byte) error
 	in   chan []byte
