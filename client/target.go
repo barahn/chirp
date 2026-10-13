@@ -17,19 +17,33 @@ import (
 var ErrNotATarget = errors.New("client: not a code or a link")
 
 // Target is what someone typed or pasted into "Help someone": exactly one of
-// a code or a link's token.
+// a code or a link's token, and the secret part that came with it, if any.
 type Target struct {
-	Code  string // six digits, normalised
+	Code  string // six digits, normalised: the routing part
 	Token string // a link's token
+	// Secret is the four digits that follow the routing part of a code
+	// ("482-913-5071"), or a link's token (".5071"). The server never sees
+	// them: they are the password of the PAKE that binds the two Chirps
+	// (docs/product-model.md, decision 5).
+	Secret string
 }
+
+// SecretLength is how many digits the secret part of a code has.
+const SecretLength = 4
 
 // ParseTarget reads a code as people say it ("482 913", "482-913"), a link as
 // the page shows it (its token in the fragment, after "#", where the browser
 // never sends it), or a link's bare token.
+//
+// A code has six digits, or ten: six that route and four that are secret,
+// read as "482-913-5071". A link's token may carry the secret after a dot.
 func ParseTarget(s string) (Target, error) {
 	s = strings.TrimSpace(s)
 	if c, err := rendezvous.Normalize(s); err == nil {
 		return Target{Code: string(c)}, nil
+	}
+	if digits, ok := codeDigits(s); ok && len(digits) == rendezvous.CodeLength+SecretLength {
+		return Target{Code: digits[:rendezvous.CodeLength], Secret: digits[rendezvous.CodeLength:]}, nil
 	}
 	if strings.Contains(s, "://") {
 		u, err := url.Parse(s)
@@ -38,10 +52,42 @@ func ParseTarget(s string) (Target, error) {
 		}
 		s = u.Fragment
 	}
-	if isToken(s) {
-		return Target{Token: s}, nil
+	token, secret, withSecret := strings.Cut(s, ".")
+	if !isToken(token) {
+		return Target{}, ErrNotATarget
 	}
-	return Target{}, ErrNotATarget
+	if withSecret && !isSecret(secret) {
+		return Target{}, ErrNotATarget
+	}
+	return Target{Token: token, Secret: secret}, nil
+}
+
+// codeDigits reads s as rendezvous.Normalize does -- digits, with spaces,
+// dashes and dots between them -- whatever its length.
+func codeDigits(s string) (string, bool) {
+	var b strings.Builder
+	for _, r := range s {
+		switch {
+		case r == ' ' || r == '\t' || r == '-' || r == '.':
+		case r >= '0' && r <= '9':
+			b.WriteRune(r)
+		default:
+			return "", false
+		}
+	}
+	return b.String(), true
+}
+
+func isSecret(s string) bool {
+	if len(s) != SecretLength {
+		return false
+	}
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 // isToken reports whether s has a link token's form: 32 random bytes in

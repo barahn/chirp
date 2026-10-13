@@ -22,6 +22,11 @@ func TestParseTarget(t *testing.T) {
 		{token, Target{Token: token}},
 		{"https://chirp.example/l#" + token, Target{Token: token}},
 		{"  https://chirp.example/#" + token + "\n", Target{Token: token}},
+		{"482-913-5071", Target{Code: "482913", Secret: "5071"}},
+		{"482 913 5071", Target{Code: "482913", Secret: "5071"}},
+		{"4829135071", Target{Code: "482913", Secret: "5071"}},
+		{token + ".0042", Target{Token: token, Secret: "0042"}},
+		{"https://chirp.example/l#" + token + ".5071", Target{Token: token, Secret: "5071"}},
 	} {
 		got, err := ParseTarget(tc.in)
 		if err != nil || got != tc.want {
@@ -39,6 +44,12 @@ func TestParseTarget(t *testing.T) {
 		"https://chirp.example/l/" + token, // the token outside the fragment
 		"https://chirp.example/l#",
 		"hello",
+		"482-913-507",   // nine digits
+		"482-913-50712", // eleven
+		token + ".507",  // a short secret
+		token + ".50a1", // a letter in it
+		token + ".",     // a dot and nothing
+		"https://chirp.example/l#" + token + ".12345",
 	} {
 		if _, err := ParseTarget(in); !errors.Is(err, ErrNotATarget) {
 			t.Errorf("ParseTarget(%q) = %v, want ErrNotATarget", in, err)

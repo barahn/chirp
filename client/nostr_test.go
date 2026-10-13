@@ -5,6 +5,7 @@ package client
 
 import (
 	"context"
+	"crypto/ed25519"
 	"encoding/json"
 	"errors"
 	"image"
@@ -252,7 +253,7 @@ func TestASessionIsSignalledOverNostr(t *testing.T) {
 		viewed <- conn
 		<-conn.Done()
 	}
-	helped := helpWith(t, cc, shown.Formatted, "Ana")
+	helped := helpWith(t, cc, shown.Spoken(), "Ana")
 
 	// The lookup spent the code, as a redemption does.
 	req, _ := askedAndReplaced(t, events, shown.Code)
@@ -313,7 +314,7 @@ func TestADeclineOverNostrReachesTheHelper(t *testing.T) {
 	o, events, _, _ := runOwnerServing(t, newNostrClient(t, r, nr), serve)
 	shown := await(t, events, "a code", ready).Peer
 
-	helped := helpWith(t, newNostrClient(t, r, nr), shown.Link, "Ana")
+	helped := helpWith(t, newNostrClient(t, r, nr), shown.LinkFragment(), "Ana")
 	req := await(t, events, "the request", asked).Consent
 	s, err := o.Answer(context.Background(), req.SessionID, false)
 	if err != nil || s.State != StateConsentDenied {
@@ -342,10 +343,10 @@ func TestASecondHelperOverNostrIsToldTheOwnerIsBusy(t *testing.T) {
 	_, events, _, _ := runOwner(t, newNostrClient(t, r, nr))
 	shown := await(t, events, "a code", ready).Peer
 
-	helpWith(t, newNostrClient(t, r, nr), shown.Formatted, "Ana")
+	helpWith(t, newNostrClient(t, r, nr), shown.Spoken(), "Ana")
 	_, next := askedAndReplaced(t, events, shown.Code)
 
-	second := helpWith(t, newNostrClient(t, r, nr), next.Formatted, "Bruno")
+	second := helpWith(t, newNostrClient(t, r, nr), next.Spoken(), "Bruno")
 	ev := await(t, second, "the second helper's answer", func(ev HelperEvent) bool { return ev.Phase != HelperAsking })
 	if ev.Phase != HelperFailed || !errors.Is(ev.Err, ErrBusy) {
 		t.Fatalf("the second helper got %+v, want busy", ev)
@@ -362,7 +363,7 @@ func TestAHelperGivingUpOverNostrFreesTheOwner(t *testing.T) {
 	gone := make(chan struct{})
 	go func() {
 		defer close(gone)
-		newNostrClient(t, r, nr).Help(ctx, shown.Formatted, "Ana", func(HelperEvent) {})
+		newNostrClient(t, r, nr).Help(ctx, shown.Spoken(), "Ana", func(HelperEvent) {})
 	}()
 	first, next := askedAndReplaced(t, events, shown.Code)
 	cancel()
@@ -370,7 +371,7 @@ func TestAHelperGivingUpOverNostrFreesTheOwner(t *testing.T) {
 
 	// The owner hears the helper leave, then a new one may ask.
 	time.Sleep(300 * time.Millisecond)
-	helpWith(t, newNostrClient(t, r, nr), next.Formatted, "Bruno")
+	helpWith(t, newNostrClient(t, r, nr), next.Spoken(), "Bruno")
 	second := await(t, events, "the second request", asked).Consent
 	if second.Name != "Bruno" || second.SessionID == first.SessionID {
 		t.Fatalf("the second request is %+v", second)
@@ -384,7 +385,7 @@ func TestAnOwnerWithoutNostrCannotBeReachedOverIt(t *testing.T) {
 	_, events, _, _ := runOwner(t, newClient(t, r))
 	shown := await(t, events, "a code", ready).Peer
 
-	helped := helpWith(t, newNostrClient(t, r, nr), shown.Formatted, "Ana")
+	helped := helpWith(t, newNostrClient(t, r, nr), shown.Formatted+"-0000", "Ana")
 	ev := await(t, helped, "the failure", func(ev HelperEvent) bool { return ev.Phase == HelperFailed })
 	if !errors.Is(ev.Err, ErrNoNostr) {
 		t.Fatalf("Help failed with %v, want ErrNoNostr", ev.Err)
@@ -398,7 +399,7 @@ func TestAnOwnerOnNostrCanStillBeHelpedThroughTheRelay(t *testing.T) {
 	o, events, _, _ := runOwner(t, newNostrClient(t, r, nr))
 	shown := await(t, events, "a code", ready).Peer
 
-	helped := helpWith(t, newClient(t, r), shown.Formatted, "Ana")
+	helped := helpWith(t, newClient(t, r), shown.Spoken(), "Ana")
 	req := await(t, events, "the request", asked).Consent
 	if _, err := o.Answer(context.Background(), req.SessionID, true); err != nil {
 		t.Fatal(err)
@@ -432,7 +433,9 @@ func TestALookupRefusesAnUnusableContact(t *testing.T) {
 func TestTheHelperSeesTheOwnersScreenOverNostr(t *testing.T) {
 	r, nr := newRelay(t), newNostrRelay(t)
 	o, events, _, _ := runOwnerServing(t, newNostrClient(t, r, nr), func(ctx context.Context, conn *SessionConn) {
-		runner := stream.New(stream.Config{ID: conn.ID, PeerConfig: &webrtc.PeerConfig{}})
+		// As cmd/chirp serves it: signed with the keys the PAKE proved.
+		runner := stream.New(stream.Config{ID: conn.ID, PeerConfig: &webrtc.PeerConfig{}, SigningKey: conn.SigningKey})
+		runner.RequireSignedViewers(func(k ed25519.PublicKey) bool { return k.Equal(conn.PeerKey) })
 		runner.RequireScreenViewConsent(true)
 		runner.DisableRelayFallback(true)
 		runner.RequireDataChannel(conn.Nostr)
@@ -447,7 +450,10 @@ func TestTheHelperSeesTheOwnersScreenOverNostr(t *testing.T) {
 	notices := make(chan stream.Notice, 8)
 	cc := newNostrClient(t, r, nr)
 	cc.View = func(ctx context.Context, conn *SessionConn) {
-		v := stream.NewViewer(stream.ViewerConfig{ID: "helper", AgentID: conn.ID, PeerConfig: &webrtc.PeerConfig{}})
+		v := stream.NewViewer(stream.ViewerConfig{
+			ID: conn.ViewerID, AgentID: conn.ID, PeerConfig: &webrtc.PeerConfig{},
+			SigningKey: conn.SigningKey, AgentKey: conn.PeerKey,
+		})
 		v.OnFrame(func(img *image.YCbCr) {
 			select {
 			case frames <- img.Rect:
@@ -457,7 +463,7 @@ func TestTheHelperSeesTheOwnersScreenOverNostr(t *testing.T) {
 		v.OnNotice(func(n stream.Notice) { notices <- n })
 		_ = v.Serve(ctx, conn)
 	}
-	helpWith(t, cc, shown.Formatted, "Ana")
+	helpWith(t, cc, shown.Spoken(), "Ana")
 
 	req := await(t, events, "the request", asked).Consent
 	if _, err := o.Answer(context.Background(), req.SessionID, true); err != nil {
@@ -481,4 +487,158 @@ func TestTheHelperSeesTheOwnersScreenOverNostr(t *testing.T) {
 			t.Fatalf("the Nostr relay saw an event of kind %d; want only gift wraps", k)
 		}
 	}
+}
+
+// barahn/chirp#21: the two Chirps prove each other's keys with the PAKE over
+// the code's secret part, and the session carries exactly those keys.
+func TestThePAKEProvesTheKeysTheSessionUses(t *testing.T) {
+	r, nr := newRelay(t), newNostrRelay(t)
+	serve, served := serving()
+	o, events, _, _ := runOwnerServing(t, newNostrClient(t, r, nr), serve)
+	shown := await(t, events, "a code", ready).Peer
+	if len(shown.Secret) != SecretLength || len(shown.LinkSecret) != SecretLength {
+		t.Fatalf("the owner shows %q with link secret %q", shown.Spoken(), shown.LinkSecret)
+	}
+
+	cc := newNostrClient(t, r, nr)
+	viewed := make(chan *SessionConn, 1)
+	cc.View = func(_ context.Context, conn *SessionConn) {
+		viewed <- conn
+		<-conn.Done()
+	}
+	helpWith(t, cc, shown.Spoken(), "Ana")
+	req, _ := askedAndReplaced(t, events, shown.Code)
+	if _, err := o.Answer(context.Background(), req.SessionID, true); err != nil {
+		t.Fatal(err)
+	}
+	owner := await(t, served, "the owner's session", func(*SessionConn) bool { return true })
+	view := await(t, viewed, "the helper's session", func(*SessionConn) bool { return true })
+	if owner.SigningKey == nil || view.SigningKey == nil || view.ViewerID == "" {
+		t.Fatal("a session over Nostr has no keys")
+	}
+	ownerPub := owner.SigningKey.Public().(ed25519.PublicKey)
+	viewPub := view.SigningKey.Public().(ed25519.PublicKey)
+	if !view.PeerKey.Equal(ownerPub) || !owner.PeerKey.Equal(viewPub) {
+		t.Error("the keys each end pins are not the other's")
+	}
+}
+
+// A wrong secret is caught by the PAKE: the owner is never asked, and the
+// helper is told the code is wrong.
+func TestAWrongSecretIsRefusedBeforeAnyPrompt(t *testing.T) {
+	r, nr := newRelay(t), newNostrRelay(t)
+	_, events, _, _ := runOwner(t, newNostrClient(t, r, nr))
+	shown := await(t, events, "a code", ready).Peer
+
+	wrong := "0000"
+	if shown.Secret == wrong {
+		wrong = "1111"
+	}
+	helped := helpWith(t, newNostrClient(t, r, nr), shown.Formatted+"-"+wrong, "Mallory")
+	ev := await(t, helped, "the refusal", func(ev HelperEvent) bool { return ev.Phase != HelperAsking })
+	if ev.Phase != HelperFailed || !errors.Is(ev.Err, ErrWrongCode) {
+		t.Fatalf("the helper got %+v, want ErrWrongCode", ev)
+	}
+	// The owner is told too, and shows the code that replaced the spent one.
+	told := await(t, events, "the owner to be told", func(ev OwnerEvent) bool { return ev.WrongCode || ev.Consent != nil })
+	if told.Consent != nil {
+		t.Fatal("the owner was asked about a helper with the wrong code")
+	}
+	if told.Peer.Code == shown.Code {
+		t.Error("the owner still shows the code the attempt spent")
+	}
+	deadline := time.After(300 * time.Millisecond)
+	for {
+		select {
+		case ev := <-events:
+			if ev.Consent != nil {
+				t.Fatal("the owner was asked about a helper with the wrong code")
+			}
+		case <-deadline:
+			return
+		}
+	}
+}
+
+// Without its secret part a code is refused before the lookup, which would
+// spend it.
+func TestACodeWithoutItsSecretSpendsNothing(t *testing.T) {
+	r, nr := newRelay(t), newNostrRelay(t)
+	_, events, _, _ := runOwner(t, newNostrClient(t, r, nr))
+	shown := await(t, events, "a code", ready).Peer
+
+	for _, input := range []string{shown.Formatted, shown.Link} {
+		helped := helpWith(t, newNostrClient(t, r, nr), input, "Ana")
+		ev := await(t, helped, "the refusal", func(HelperEvent) bool { return true })
+		if ev.Phase != HelperFailed || !errors.Is(ev.Err, ErrIncompleteCode) {
+			t.Fatalf("Help(%q) = %+v, want ErrIncompleteCode", input, ev)
+		}
+	}
+	helpWith(t, newNostrClient(t, r, nr), shown.Spoken(), "Ana")
+	if req, _ := askedAndReplaced(t, events, shown.Code); req == nil {
+		t.Fatal("the code no longer worked")
+	}
+}
+
+// Each code's secret is good for one attempt: a lookup spends the routing
+// part, and the owner forgets the secret once a PAKE has used it.
+func TestACodeIsGoodForOneAttempt(t *testing.T) {
+	r, nr := newRelay(t), newNostrRelay(t)
+	_, events, _, _ := runOwner(t, newNostrClient(t, r, nr))
+	shown := await(t, events, "a code", ready).Peer
+
+	wrong := "0000"
+	if shown.Secret == wrong {
+		wrong = "1111"
+	}
+	first := helpWith(t, newNostrClient(t, r, nr), shown.Formatted+"-"+wrong, "Mallory")
+	await(t, first, "the refusal", func(ev HelperEvent) bool { return ev.Phase == HelperFailed })
+	again := helpWith(t, newNostrClient(t, r, nr), shown.Spoken(), "Mallory")
+	ev := await(t, again, "the second attempt", func(ev HelperEvent) bool { return ev.Phase != HelperAsking })
+	if ev.Phase != HelperFailed || !errors.Is(ev.Err, ErrNotFound) {
+		t.Fatalf("a spent code got %+v, want ErrNotFound", ev)
+	}
+}
+
+// The link mints a code per use, so its secret could otherwise be guessed one
+// attempt at a time: after three wrong ones the owner gives it up, with the
+// code, and shows new ones.
+func TestTheLinkIsGivenUpAfterThreeWrongSecrets(t *testing.T) {
+	r, nr := newRelay(t), newNostrRelay(t)
+	_, events, _, _ := runOwner(t, newNostrClient(t, r, nr))
+	shown := await(t, events, "a code", ready).Peer
+
+	wrong := "0000"
+	if shown.LinkSecret == wrong {
+		wrong = "1111"
+	}
+	for i := 0; i < maxLinkFailures; i++ {
+		helped := helpWith(t, newNostrClient(t, r, nr), shown.Link+"."+wrong, "Mallory")
+		ev := await(t, helped, "a refusal", func(ev HelperEvent) bool { return ev.Phase != HelperAsking })
+		if !errors.Is(ev.Err, ErrWrongCode) {
+			t.Fatalf("attempt %d got %+v, want ErrWrongCode", i+1, ev)
+		}
+	}
+	next := await(t, events, "a new link", func(ev OwnerEvent) bool {
+		return ev.Phase == OwnerReady && ev.Peer.Link != "" && ev.Peer.Link != shown.Link
+	}).Peer
+	if next.LinkSecret == "" {
+		t.Error("the new link has no secret")
+	}
+	helped := helpWith(t, newNostrClient(t, r, nr), shown.LinkFragment(), "Ana")
+	ev := await(t, helped, "the old link", func(ev HelperEvent) bool { return ev.Phase != HelperAsking })
+	if ev.Phase != HelperFailed || !errors.Is(ev.Err, ErrNotFound) {
+		t.Fatalf("the given-up link got %+v, want ErrNotFound", ev)
+	}
+}
+
+// A Chirp that does not use Nostr helps through the relay with a code as a
+// Nostr owner shows it: the secret part is for the PAKE, and the relay path
+// has none.
+func TestTheRelayPathTakesTheWholeCode(t *testing.T) {
+	r, nr := newRelay(t), newNostrRelay(t)
+	_, events, _, _ := runOwner(t, newNostrClient(t, r, nr))
+	shown := await(t, events, "a code", ready).Peer
+	helpWith(t, newClient(t, r), shown.Spoken(), "Ana")
+	await(t, events, "the request", asked)
 }
