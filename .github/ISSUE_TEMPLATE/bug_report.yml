@@ -1,0 +1,72 @@
+name: Bug report
+description: Report a defect or unexpected behaviour in Chirp
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        > [!WARNING]
+        > **Never post an active or historical Chirp code or link**, password, session token, or TURN credential. Redact them from any log, configuration, or screenshot you attach. Issues are public.
+        >
+        > Anything that could weaken code generation or redemption, the consent prompt, or the session lifecycle is security-sensitive even when it looks cosmetic. Email [security@fabrintek.com.br](mailto:security@fabrintek.com.br) instead of opening a public issue; see [SECURITY.md](https://github.com/barahn/chirp/blob/develop/SECURITY.md).
+  - type: markdown
+    attributes:
+      value: |
+        Chirp is the user-facing remote-support application. Capture, encoding, input injection, and WebRTC transport live in [remotekit](https://github.com/barahn/remotekit). See [ECOSYSTEM.md](https://github.com/barahn/chirp/blob/develop/ECOSYSTEM.md) to confirm which repository a bug belongs in.
+  - type: dropdown
+    id: component
+    attributes:
+      label: Affected Component
+      description: Which part of Chirp is exhibiting the defect?
+      options:
+        - "cmd/chirp (GUI application / consent window)"
+        - "Signalling / rendezvous connection"
+        - "Session lifecycle & state machine"
+        - "Relay / Nest infrastructure"
+        - "Build / CLI tooling"
+        - "Other / Not sure"
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: A clear and concise description of the bug.
+      placeholder: "When opening Chirp and attempting to enter a code..."
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: How can the maintainers reproduce this behaviour?
+      placeholder: |
+        1. Run `cmd/chirp`
+        2. Generate a code
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+      description: What did you expect to happen instead?
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment & Version
+      description: Operating system, display server (Wayland, X11, Windows, macOS), and Chirp version or commit.
+      placeholder: |
+        - OS: [e.g. Ubuntu 24.04 (Wayland), Windows 11 23H2, macOS 14.5]
+        - Chirp commit / version: [e.g. develop @ c5a79c5]
+        - Go version (if building from source): [e.g. go1.24.0]
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs or screenshots
+      description: Paste any sanitized log output or attach screenshots (ensure all codes, links, and sensitive tokens are redacted).
