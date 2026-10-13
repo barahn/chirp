@@ -4,6 +4,7 @@
 package client
 
 import (
+	"crypto/ed25519"
 	"errors"
 	"sync"
 )
@@ -33,6 +34,14 @@ type SessionConn struct {
 	// gift wrap, so the runner keeps everything but negotiation on the
 	// data channel.
 	Nostr bool
+	// SigningKey and PeerKey are set when the two ends proved each other's
+	// key with the PAKE (pake.go): this end signs its signals with
+	// SigningKey, and accepts only those PeerKey signed. ViewerID is the
+	// name the owner's runner knows the controller by, which a signed
+	// answer is addressed to; it is set on the controller's side.
+	SigningKey ed25519.PrivateKey
+	PeerKey    ed25519.PublicKey
+	ViewerID   string
 
 	send func([]byte) error
 	in   chan []byte

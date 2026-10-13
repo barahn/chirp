@@ -5,6 +5,7 @@ package client
 
 import (
 	"context"
+	"crypto/ed25519"
 	"errors"
 	"sync"
 	"time"
@@ -44,6 +45,9 @@ type OwnerEvent struct {
 	// Consent is set when a controller has typed this machine's code and is
 	// asking to be let in.
 	Consent *ConsentRequest
+	// WrongCode is set when someone used this machine's code or link with
+	// the wrong secret part: the PAKE failed, and nobody was asked about.
+	WrongCode bool
 
 	// Started is set when a session the owner allowed starts being served,
 	// and Ended when it stops, whichever end stopped it. Such an event
@@ -78,6 +82,16 @@ type Owner struct {
 	// Nostr set, and nostrAsk the request that came over it (nostr.go).
 	nostr    *nostrOwner
 	nostrAsk *nostrAsk
+
+	// secrets, signKey, pakes and verified belong to the registration over
+	// Nostr, and only Run's goroutine touches them (pake.go): the secret
+	// parts shown with the code and link, this machine's signing key, the
+	// PAKEs answered and not yet confirmed, and the controllers that proved
+	// they hold the code, by Nostr key.
+	secrets  *secretBook
+	signKey  ed25519.PrivateKey
+	pakes    map[string]*pending
+	verified map[string]ed25519.PublicKey
 
 	// allowed carries the sessions Answer let in to Run's goroutine, which
 	// starts serving them. active is the session being served, and only
@@ -150,6 +164,8 @@ func (o *Owner) Run(ctx context.Context) error {
 			return err
 		}
 		replaced := shown.Code != "" && peer.Code != shown.Code
+		o.startSecrets()
+		o.decorate(&peer)
 		shown = peer
 		o.setPeerID(peer.ID)
 		nctx, stopNostr := context.WithCancel(ctx)
@@ -321,19 +337,19 @@ func (o *Owner) listen(ctx context.Context, sock *Socket, shown *Peer, nmsgs <-c
 					o.emit(OwnerEvent{Phase: OwnerReady, Peer: *shown, Consent: m.Consent})
 				}
 				// The session that asked spent the start code.
-				if err := o.refresh(ctx, shown); err != nil {
+				if err := o.refresh(ctx, shown); errors.Is(err, errLost) {
 					return err
 				}
 			case TypePeerLeft:
 				// The relay's session is over; one over Nostr is not the
 				// relay's to end.
 				o.endRelaySession()
-				if err := o.refresh(ctx, shown); err != nil {
+				if err := o.refresh(ctx, shown); errors.Is(err, errLost) {
 					return err
 				}
 			}
 		case <-poll.C:
-			if err := o.refresh(ctx, shown); err != nil {
+			if err := o.refresh(ctx, shown); errors.Is(err, errLost) {
 				return err
 			}
 		}
@@ -348,9 +364,10 @@ func (o *Owner) refresh(ctx context.Context, shown *Peer) error {
 	case errors.Is(err, ErrNotFound):
 		return errLost
 	case err != nil:
-		return ctx.Err()
+		return err
 	}
 	if p.Code != shown.Code || p.Link != shown.Link {
+		o.decorate(&p)
 		*shown = p
 		o.emit(OwnerEvent{Phase: OwnerReady, Peer: p, Replaced: true})
 	}
@@ -407,7 +424,7 @@ func (o *Owner) startSession(ctx context.Context, sessionID string) {
 	//
 	// A session over Nostr is not the relay's: the relay never holds it, and
 	// its controller's own messages say when it is over (onNostr).
-	if o.nostrSender(sessionID) == nil {
+	if s, _ := o.nostrSender(sessionID); s == nil {
 		st, err := o.client.Session(ctx, sessionID)
 		switch {
 		case ctx.Err() != nil, errors.Is(err, ErrNotFound):
@@ -425,11 +442,15 @@ func (o *Owner) startSession(ctx context.Context, sessionID string) {
 	o.closeActive()
 	send := o.send
 	viaNostr := false
-	if s := o.nostrSender(sessionID); s != nil {
-		send, viaNostr = s, true
+	var peerKey ed25519.PublicKey
+	if s, key := o.nostrSender(sessionID); s != nil {
+		send, viaNostr, peerKey = s, true, key
 	}
 	conn := newSessionConn(req.SessionID, req.Permissions, send)
 	conn.Nostr = viaNostr
+	if peerKey != nil {
+		conn.SigningKey, conn.PeerKey = o.signKey, peerKey
+	}
 	o.active = conn
 	o.emit(OwnerEvent{Started: &ActiveSession{ID: req.SessionID, Name: req.Name}})
 	o.serving.Add(1)
@@ -538,6 +559,29 @@ func (o *Owner) release(id string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	_ = o.client.Release(ctx, id)
+}
+
+// startSecrets makes this registration's secrets and signing key, when
+// sessions are signalled over Nostr. A new registration -- a new code and
+// link asked for, or the old ones lost -- gets new ones.
+func (o *Owner) startSecrets() {
+	o.secrets, o.signKey, o.pakes, o.verified = nil, nil, nil, nil
+	if o.client.Nostr == nil {
+		return
+	}
+	o.secrets = newSecretBook()
+	o.signKey = newSigningKey()
+	o.pakes = map[string]*pending{}
+	o.verified = map[string]ed25519.PublicKey{}
+}
+
+// decorate adds the secret parts to a code and link from the relay.
+func (o *Owner) decorate(p *Peer) {
+	if o.secrets == nil {
+		return
+	}
+	p.Secret = o.secrets.forCode(p.Code)
+	p.LinkSecret = o.secrets.link
 }
 
 // sleep waits for d, or until ctx ends.

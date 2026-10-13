@@ -33,6 +33,7 @@ package main
 
 import (
 	"context"
+	"crypto/ed25519"
 	"flag"
 	"os"
 	"strings"
@@ -129,7 +130,7 @@ func main() {
 
 // serveSession serves a session its owner has allowed, until it ends.
 func serveSession(ctx context.Context, s *client.SessionConn, ice webrtc.PeerConfig) {
-	_ = newRunner(s.ID, s.Permissions, s.Nostr, ice).Serve(ctx, s)
+	_ = newRunner(s, ice).Serve(ctx, s)
 }
 
 // newRunner builds the runner for a session its owner has allowed.
@@ -138,20 +139,26 @@ func serveSession(ctx context.Context, s *client.SessionConn, ice webrtc.PeerCon
 // exactly what the owner allowed in the prompt, and withholds the screen until
 // then. The screen goes over WebRTC only: the JPEG fallback through the relay
 // is refused, since Chirp's viewer never uses it and the relay could see every
-// frame. Signed viewers stay off for the trusted relay the first runnable Chirp
-// ships with (docs/product-model.md, decision 5): they need the controller's
-// key from a route the relay does not control, which is the PAKE
-// (barahn/chirp#21). A public relay turns them on.
+// frame.
 //
 // A session signalled over Nostr keeps input, clipboard and files on the data
 // channel: every signal must fit a gift wrap, and the relays have no business
-// carrying them even encrypted.
-func newRunner(id string, permissions []string, overNostr bool, ice webrtc.PeerConfig) *stream.Runner {
-	r := stream.New(stream.Config{ID: id, PeerConfig: &ice})
+// carrying them even encrypted. It is also signed, with the keys the two
+// Chirps proved to each other with the PAKE over the code's secret part
+// (barahn/chirp#21): the runner signs its answers, and acts only on offers
+// and candidates the controller signed. Neither the server nor the relays
+// can then take part in the session. Through the trusted relay there is no
+// PAKE, and so no keys: signed viewers stay off there (docs/product-model.md,
+// decision 5).
+func newRunner(s *client.SessionConn, ice webrtc.PeerConfig) *stream.Runner {
+	r := stream.New(stream.Config{ID: s.ID, PeerConfig: &ice, SigningKey: s.SigningKey})
 	r.RequireScreenViewConsent(true)
 	r.DisableRelayFallback(true)
-	r.RequireDataChannel(overNostr)
-	r.Grant(permissions...)
+	r.RequireDataChannel(s.Nostr)
+	if peer := s.PeerKey; peer != nil {
+		r.RequireSignedViewers(func(k ed25519.PublicKey) bool { return k.Equal(peer) })
+	}
+	r.Grant(s.Permissions...)
 	return r
 }
 
@@ -183,12 +190,24 @@ func splitList(list string) []string {
 	return items
 }
 
+// viewerConfig is how this machine views a session it was let into. Over
+// Nostr the viewer signs its offers with the key the PAKE proved, and accepts
+// answers only from the owner's (barahn/chirp#21); it goes by the name the
+// owner's runner addresses it by, which its signed answers carry.
+func viewerConfig(conn *client.SessionConn, ice webrtc.PeerConfig) stream.ViewerConfig {
+	cfg := stream.ViewerConfig{ID: "chirp-controller", AgentID: conn.ID, PeerConfig: &ice}
+	if conn.PeerKey != nil {
+		cfg.ID, cfg.SigningKey, cfg.AgentKey = conn.ViewerID, conn.SigningKey, conn.PeerKey
+	}
+	return cfg
+}
+
 // viewSession shows a session this machine was let into, until it ends: the
 // other computer's screen through remotekit's viewer, and the user's mouse and
 // keyboard sent back over it. Whether input is applied is the other side's
 // runner's decision, from what its user allowed.
 func viewSession(ctx context.Context, conn *client.SessionConn, ice webrtc.PeerConfig, w *ui.Window) {
-	v := stream.NewViewer(stream.ViewerConfig{ID: "chirp-controller", AgentID: conn.ID, PeerConfig: &ice})
+	v := stream.NewViewer(viewerConfig(conn, ice))
 	opened := make(chan *ui.Remote, 1)
 	fyne.Do(func() {
 		// End closes this session's conn, which ends this Help and no

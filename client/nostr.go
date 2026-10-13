@@ -5,6 +5,7 @@ package client
 
 import (
 	"context"
+	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -14,6 +15,7 @@ import (
 	"time"
 
 	"github.com/barahn/chirp/session"
+	"github.com/barahn/remotekit/pake"
 	"github.com/barahn/remotekit/signal/nostr"
 )
 
@@ -70,6 +72,10 @@ const (
 	reasonBusy     = "busy"
 )
 
+// nostrPakeFor is how long a controller waits for the owner's half of the
+// PAKE, which its Chirp answers without asking anyone.
+const nostrPakeFor = 20 * time.Second
+
 // nostrAskFor is how long an owner keeps a request over Nostr open. The
 // prompt counts it down and declines by itself at the end.
 const nostrAskFor = 2 * time.Minute
@@ -96,6 +102,11 @@ type knock struct {
 	Reason    string `json:"reason,omitempty"`
 	SessionID string `json:"session_id,omitempty"`
 	ExpiresIn int    `json:"expires_in_seconds,omitempty"`
+	// The PAKE's (pake.go): its message, how the controller came, and the
+	// routing part of the code it used.
+	Msg  string `json:"msg,omitempty"`
+	Via  string `json:"via,omitempty"`
+	Code string `json:"code,omitempty"`
 }
 
 func (k knock) encode() []byte {
@@ -304,6 +315,16 @@ func (n *nostrOwner) awaitListening(ctx context.Context) {
 	}
 }
 
+// key is the Nostr key this end listens under now, or "" between conns.
+func (n *nostrOwner) key() string {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	if n.conn == nil {
+		return ""
+	}
+	return n.conn.PublicKey()
+}
+
 // wait waits for run to return; its context must be done.
 func (n *nostrOwner) wait() {
 	if n != nil {
@@ -318,6 +339,8 @@ type nostrAsk struct {
 	sessionID string
 	until     time.Time
 	allowed   bool
+	// peerKey is the controller's ed25519 key, proved by the PAKE.
+	peerKey ed25519.PublicKey
 }
 
 // onNostr handles one message from a controller, on Run's goroutine.
@@ -330,6 +353,13 @@ func (o *Owner) onNostr(ctx context.Context, m nostrMsg, shown *Peer) error {
 		if ask != nil {
 			o.endSession()
 		}
+		for viewer, p := range o.pakes {
+			delete(o.pakes, viewer)
+			if err := o.pakeFailed(ctx, p.via, shown); err != nil {
+				return err
+			}
+		}
+		clear(o.verified)
 		return nil
 	}
 	if ask != nil && m.viewer == ask.viewer {
@@ -337,7 +367,10 @@ func (o *Owner) onNostr(ctx context.Context, m nostrMsg, shown *Peer) error {
 		case typeClose:
 			// The controller gave up, or ended the session.
 			o.endSession()
-			return o.refresh(ctx, shown)
+			if err := o.refresh(ctx, shown); errors.Is(err, errLost) {
+				return err
+			}
+			return nil
 		case TypeAskConsent, TypeConsentAnswer:
 			return nil // asked already; not for remotekit
 		}
@@ -353,15 +386,36 @@ func (o *Owner) onNostr(ctx context.Context, m nostrMsg, shown *Peer) error {
 		}
 		return nil
 	}
-	if m.head.Type != TypeAskConsent {
+	switch m.head.Type {
+	case TypePakeStart:
+		return o.onPakeStart(ctx, m, shown)
+	case TypePakeConfirm:
+		return o.onPakeConfirm(ctx, m, shown)
+	case typeClose:
+		delete(o.verified, m.viewer)
+		if p := o.pakes[m.viewer]; p != nil {
+			// Gone before confirming: most likely it found the code wrong.
+			delete(o.pakes, m.viewer)
+			return o.pakeFailed(ctx, p.via, shown)
+		}
+		return nil
+	case TypeAskConsent:
+	default:
 		return nil
 	}
 	n := o.nostrOwner()
-	if o.active != nil || ask != nil && (ask.allowed || time.Now().Before(ask.until)) {
+	if o.busy(ask) {
 		// One controller at a time, as over the relay.
 		_ = n.send(m.viewer, knock{Type: TypeConsentAnswer, Reason: reasonBusy}.encode())
 		return nil
 	}
+	// Nobody is shown a prompt who has not proved they hold the code.
+	peerKey, proved := o.verified[m.viewer]
+	if !proved {
+		_ = n.send(m.viewer, knock{Type: TypeConsentAnswer, Reason: reasonAuth}.encode())
+		return nil
+	}
+	delete(o.verified, m.viewer)
 	o.endSession()
 	name := m.head.Name
 	if len(name) > maxNostrName {
@@ -375,11 +429,161 @@ func (o *Owner) onNostr(ctx context.Context, m nostrMsg, shown *Peer) error {
 	}
 	o.mu.Lock()
 	o.asked = req
-	o.nostrAsk = &nostrAsk{viewer: m.viewer, sessionID: req.SessionID, until: time.Now().Add(nostrAskFor)}
+	o.nostrAsk = &nostrAsk{viewer: m.viewer, sessionID: req.SessionID, until: time.Now().Add(nostrAskFor), peerKey: peerKey}
 	o.mu.Unlock()
 	o.emit(OwnerEvent{Phase: OwnerReady, Peer: *shown, Consent: req})
 	// The lookup that led here spent the start code.
-	return o.refresh(ctx, shown)
+	if err := o.refresh(ctx, shown); errors.Is(err, errLost) {
+		return err
+	}
+	return nil
+}
+
+// busy reports whether a controller is already let in, or being asked about.
+func (o *Owner) busy(ask *nostrAsk) bool {
+	return o.active != nil || ask != nil && (ask.allowed || time.Now().Before(ask.until))
+}
+
+// onPakeStart answers a controller's PAKE under the secret of the code it
+// names, which is then spent, or of the link.
+func (o *Owner) onPakeStart(ctx context.Context, m nostrMsg, shown *Peer) error {
+	n := o.nostrOwner()
+	o.mu.Lock()
+	ask := o.nostrAsk
+	o.mu.Unlock()
+	if o.busy(ask) {
+		_ = n.send(m.viewer, knock{Type: TypeConsentAnswer, Reason: reasonBusy}.encode())
+		return nil
+	}
+	if err := o.expirePakes(ctx, shown); err != nil {
+		return err
+	}
+	if _, dup := o.pakes[m.viewer]; dup || len(o.pakes) >= maxPending || o.secrets == nil {
+		return nil
+	}
+	start, ok := decodePake(m.head.Msg)
+	if !ok {
+		return nil
+	}
+	var secret, routing string
+	switch m.head.Via {
+	case viaCode:
+		if m.head.Code == shown.Code {
+			var rerr error
+			for retry := 0; retry < 3; retry++ {
+				rerr = o.refresh(ctx, shown)
+				if rerr == nil || errors.Is(rerr, errLost) {
+					break
+				}
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case <-time.After(20 * time.Millisecond):
+				}
+			}
+			if rerr != nil {
+				if errors.Is(rerr, errLost) {
+					return errLost
+				}
+				// The peer state could not be confirmed due to a transient
+				// error. Tell the controller to try again (busy) rather than
+				// sending an authentication failure for a potentially valid code.
+				_ = n.send(m.viewer, knock{Type: TypeConsentAnswer, Reason: reasonBusy}.encode())
+				return nil
+			}
+			if m.head.Code == shown.Code {
+				// The code is still displayed and has not been redeemed on
+				// the server. A lookup is required to reach the owner over
+				// Nostr; an unredeemed code cannot start a PAKE.
+				_ = n.send(m.viewer, knock{Type: TypeConsentAnswer, Reason: reasonAuth}.encode())
+				return nil
+			}
+		}
+		secret, ok = o.secrets.take(m.head.Code)
+		routing = m.head.Code
+	case viaLink:
+		secret, ok, routing = o.secrets.link, true, shown.Link
+	default:
+		ok = false
+	}
+	if !ok {
+		_ = n.send(m.viewer, knock{Type: TypeConsentAnswer, Reason: reasonAuth}.encode())
+		return nil
+	}
+	resp, reply, err := pake.NewResponder(pake.Config{
+		Secret:    []byte(secret),
+		Context:   pakeContext(m.head.Via, routing),
+		SessionID: pakeSessionID(n.key(), m.viewer),
+		Key:       o.signKey,
+	}, start)
+	if err != nil {
+		_ = n.send(m.viewer, knock{Type: TypeConsentAnswer, Reason: reasonAuth}.encode())
+		return o.pakeFailed(ctx, m.head.Via, shown)
+	}
+	o.pakes[m.viewer] = &pending{resp: resp, via: m.head.Via, until: time.Now().Add(nostrPakeFor)}
+	_ = n.send(m.viewer, knock{Type: TypePakeReply, Msg: encodePake(reply)}.encode())
+	return nil
+}
+
+// onPakeConfirm checks a controller's proof that it holds the code. One that
+// passes may ask to be let in; one that fails is told so and forgotten.
+func (o *Owner) onPakeConfirm(ctx context.Context, m nostrMsg, shown *Peer) error {
+	p := o.pakes[m.viewer]
+	if p == nil {
+		return nil
+	}
+	delete(o.pakes, m.viewer)
+	n := o.nostrOwner()
+	confirm, ok := decodePake(m.head.Msg)
+	var res pake.Result
+	var err error
+	if ok {
+		res, err = p.resp.Finish(confirm)
+	}
+	if !ok || err != nil {
+		_ = n.send(m.viewer, knock{Type: TypeConsentAnswer, Reason: reasonAuth}.encode())
+		return o.pakeFailed(ctx, p.via, shown)
+	}
+	if len(o.verified) >= maxPending {
+		clear(o.verified)
+	}
+	o.verified[m.viewer] = res.PeerKey
+	return nil
+}
+
+// expirePakes forgets PAKEs never confirmed in time, counting each as failed,
+// so that abandoned ones cannot hold every place.
+func (o *Owner) expirePakes(ctx context.Context, shown *Peer) error {
+	now := time.Now()
+	for v, p := range o.pakes {
+		if now.After(p.until) {
+			delete(o.pakes, v)
+			if err := o.pakeFailed(ctx, p.via, shown); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// pakeFailed says a PAKE failed, at this end as at the other (docs/ux.md,
+// Messages), and shows the code that replaced the one it spent. Through the
+// link it also counts, and gives the link up -- with the code, as asking for
+// a new code does -- after maxLinkFailures. A code's secret is used once
+// whatever happens, so failures through codes need no count.
+func (o *Owner) pakeFailed(ctx context.Context, via string, shown *Peer) error {
+	if via == viaLink && o.secrets != nil {
+		o.secrets.linkFailures++
+		if o.secrets.linkFailures >= maxLinkFailures {
+			return errRenew
+		}
+	}
+	err := o.refresh(ctx, shown)
+	o.emit(OwnerEvent{Phase: OwnerReady, Peer: *shown, WrongCode: true})
+	if errors.Is(err, errLost) {
+		return err
+	}
+	return nil
 }
 
 // answerNostr gives the owner's answer to a request that came over Nostr. It
@@ -445,15 +649,16 @@ func (o *Owner) nostrOwner() *nostrOwner {
 }
 
 // nostrSender returns how the allowed session sessionID writes to its
-// controller over Nostr, or nil if it did not come over Nostr.
-func (o *Owner) nostrSender(sessionID string) func([]byte) error {
+// controller over Nostr, and the controller's proved key, or nil if it did
+// not come over Nostr.
+func (o *Owner) nostrSender(sessionID string) (func([]byte) error, ed25519.PublicKey) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	ask, n := o.nostrAsk, o.nostr
 	if ask == nil || ask.sessionID != sessionID || n == nil {
-		return nil
+		return nil, nil
 	}
-	return func(data []byte) error { return n.send(ask.viewer, data) }
+	return func(data []byte) error { return n.send(ask.viewer, data) }, ask.peerKey
 }
 
 // The controller's side.
@@ -461,6 +666,11 @@ func (o *Owner) nostrSender(sessionID string) func([]byte) error {
 // helpOverNostr is Help for a Client with Nostr set: it looks the target up,
 // dials the owner's contact, asks to be let in, and follows the answer.
 func (c *Client) helpOverNostr(ctx context.Context, t Target, name string, emit func(HelperEvent), fail func(error)) {
+	// Checked before the lookup, which would spend the code.
+	if t.Secret == "" {
+		fail(ErrIncompleteCode)
+		return
+	}
 	var ct session.Contact
 	var err error
 	if t.Code != "" {
@@ -489,10 +699,33 @@ func (c *Client) helpOverNostr(ctx context.Context, t Target, name string, emit 
 	if len(name) > maxNostrName {
 		name = name[:maxNostrName]
 	}
-	if err := send(knock{Type: TypeAskConsent, Name: name}.encode()); err != nil {
+
+	// First prove this end holds the code, and learn the owner's key
+	// (pake.go). The prompt is asked for only once both ends are proved.
+	via, routing := viaCode, t.Code
+	if t.Code == "" {
+		via, routing = viaLink, t.Token
+	}
+	signKey := newSigningKey()
+	ini, start, err := pake.NewInitiator(pake.Config{
+		Secret:    []byte(t.Secret),
+		Context:   pakeContext(via, routing),
+		SessionID: pakeSessionID(ct.Key, conn.PublicKey()),
+		Key:       signKey,
+	})
+	if err != nil {
+		fail(err)
+		return
+	}
+	pakeStart := knock{Type: TypePakeStart, Msg: encodePake(start), Via: via}
+	if via == viaCode {
+		pakeStart.Code = t.Code
+	}
+	if err := send(pakeStart.encode()); err != nil {
 		fail(ErrUnavailable)
 		return
 	}
+	var ownerKey ed25519.PublicKey
 
 	msgs := make(chan []byte)
 	dropped := make(chan struct{})
@@ -526,13 +759,13 @@ func (c *Client) helpOverNostr(ctx context.Context, t Target, name string, emit 
 		viewing.Wait()
 	}()
 
-	until := time.Now().Add(nostrAskFor + 10*time.Second)
+	// The PAKE has nostrPakeFor; the owner's user then has nostrAskFor.
+	until := time.Now().Add(nostrPakeFor)
 	sess := Session{State: StateConsentRequested}
 	asking := func() {
 		sess.ExpiresIn = int(time.Until(until).Truncate(time.Second) / time.Second)
 		emit(HelperEvent{Phase: HelperAsking, Session: sess})
 	}
-	asking()
 	tick := time.NewTicker(time.Second)
 	defer tick.Stop()
 
@@ -555,16 +788,50 @@ func (c *Client) helpOverNostr(ctx context.Context, t Target, name string, emit 
 				continue
 			}
 			if time.Now().After(until) {
-				emit(HelperEvent{Phase: HelperExpired, Session: sess})
+				if ownerKey == nil {
+					// The owner never answered the PAKE.
+					emit(HelperEvent{Phase: HelperFailed, Session: sess, Err: ErrUnavailable})
+				} else {
+					emit(HelperEvent{Phase: HelperExpired, Session: sess})
+				}
 				return
 			}
-			asking()
+			if ownerKey != nil {
+				asking()
+			}
 		case raw := <-msgs:
 			var head knock
 			if json.Unmarshal(raw, &head) != nil {
 				continue
 			}
 			switch {
+			case head.Type == TypePakeReply && ownerKey == nil && ini != nil:
+				reply, ok := decodePake(head.Msg)
+				var confirm []byte
+				var res pake.Result
+				err := ErrWrongCode
+				if ok {
+					confirm, res, err = ini.Finish(reply)
+				}
+				ini = nil // one reply only
+				if err != nil {
+					emit(HelperEvent{Phase: HelperFailed, Session: sess, Err: ErrWrongCode})
+					return
+				}
+				ownerKey = res.PeerKey
+				if send(knock{Type: TypePakeConfirm, Msg: encodePake(confirm)}.encode()) != nil ||
+					send(knock{Type: TypeAskConsent, Name: name}.encode()) != nil {
+					emit(HelperEvent{Phase: HelperFailed, Session: sess, Err: ErrUnavailable})
+					return
+				}
+				until = time.Now().Add(nostrAskFor + 10*time.Second)
+				asking()
+			case head.Type == TypeConsentAnswer && head.Reason == reasonAuth && sc == nil:
+				emit(HelperEvent{Phase: HelperFailed, Session: sess, Err: ErrWrongCode})
+				return
+			case head.Type == TypeConsentAnswer && head.Granted && ownerKey == nil:
+				// An answer before the owner proved itself is not its.
+				continue
 			case head.Type == TypeSessionEnd:
 				emit(HelperEvent{Phase: HelperEnded, Session: sess})
 				return
@@ -578,6 +845,7 @@ func (c *Client) helpOverNostr(ctx context.Context, t Target, name string, emit 
 					}
 					cn := newSessionConn(head.SessionID, nil, send)
 					cn.Nostr = true
+					cn.SigningKey, cn.PeerKey, cn.ViewerID = signKey, ownerKey, conn.PublicKey()
 					sc, scDone = cn, cn.Done()
 					viewing.Add(1)
 					go func() {
@@ -595,7 +863,8 @@ func (c *Client) helpOverNostr(ctx context.Context, t Target, name string, emit 
 					emit(HelperEvent{Phase: HelperDeclined, Session: sess})
 					return
 				}
-			case head.Type == TypeAskConsent || head.Type == TypeConsentAnswer:
+			case head.Type == TypeAskConsent || head.Type == TypeConsentAnswer ||
+				head.Type == TypePakeStart || head.Type == TypePakeReply || head.Type == TypePakeConfirm:
 				// Not for remotekit.
 			case sc != nil:
 				// The owner's runner addressed this to the key this end

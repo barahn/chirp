@@ -7,16 +7,19 @@ require github.com/google/uuid v1.6.0
 require github.com/gorilla/websocket v1.5.3
 
 require (
-	github.com/barahn/remotekit v0.6.0
+	github.com/barahn/remotekit v0.6.1-0.20261013080612-20e7c3cf88d0
 	github.com/barahn/remotekit/signal/nostr v0.1.0
 )
 
 require (
+	filippo.io/edwards25519 v1.2.0 // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.5.0 // indirect
 	github.com/btcsuite/btcd/chainhash/v2 v2.0.0 // indirect
 	github.com/decred/dcrd/crypto/blake256 v1.1.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 // indirect
+	github.com/gtank/ristretto255 v0.2.0 // indirect
 	github.com/jezek/xgb v1.3.1 // indirect
+	github.com/mendsec/cpace v0.1.0 // indirect
 	github.com/pion/datachannel v1.6.3 // indirect
 	github.com/pion/dtls/v3 v3.1.9 // indirect
 	github.com/pion/ice/v4 v4.4.4 // indirect

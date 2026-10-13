@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"crypto/ed25519"
 	"encoding/json"
 	"errors"
 	"reflect"
@@ -12,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/barahn/chirp/client"
 	"github.com/barahn/remotekit/stream"
 	"github.com/barahn/remotekit/webrtc"
 )
@@ -73,7 +75,7 @@ func (p *pipe) Close() error { p.once.Do(func() { close(p.done) }); return nil }
 // than sent the screen through the relay.
 func TestTheRunnerNeverSendsTheScreenThroughTheRelay(t *testing.T) {
 	agent, viewer := newPipe()
-	r := newRunner("session", []string{stream.PermissionScreenView}, false, webrtc.PeerConfig{})
+	r := newRunner(&client.SessionConn{ID: "session", Permissions: []string{stream.PermissionScreenView}}, webrtc.PeerConfig{})
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
 	go func() { _ = r.Serve(ctx, agent); close(done) }()
@@ -111,7 +113,7 @@ func TestTheRunnerNeverSendsTheScreenThroughTheRelay(t *testing.T) {
 // must come over the data channel, and never through the relays.
 func TestASessionOverNostrTakesInputOnlyOnTheDataChannel(t *testing.T) {
 	agent, viewer := newPipe()
-	r := newRunner("session", []string{stream.PermissionScreenView, stream.PermissionRemoteControl}, true, webrtc.PeerConfig{})
+	r := newRunner(&client.SessionConn{ID: "session", Permissions: []string{stream.PermissionScreenView, stream.PermissionRemoteControl}, Nostr: true}, webrtc.PeerConfig{})
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
 	go func() { _ = r.Serve(ctx, agent); close(done) }()
@@ -146,5 +148,53 @@ func TestNostrIsOnlyWhenRelaysAreGiven(t *testing.T) {
 	c := nostrConfig("wss://a.example.org, wss://b.example.org")
 	if c == nil || len(c.Relays) != 2 || c.Relays[1] != "wss://b.example.org" {
 		t.Errorf("nostrConfig = %+v", c)
+	}
+}
+
+// With keys the PAKE proved, the runner acts only on offers the controller
+// signed: an unsigned one, as the relays could forge, gets no answer.
+func TestASessionWithProvedKeysRefusesUnsignedOffers(t *testing.T) {
+	_, ownerKey, _ := ed25519.GenerateKey(nil)
+	controllerPub, _, _ := ed25519.GenerateKey(nil)
+	agent, viewer := newPipe()
+	r := newRunner(&client.SessionConn{
+		ID: "session", Permissions: []string{stream.PermissionScreenView}, Nostr: true,
+		SigningKey: ownerKey, PeerKey: controllerPub,
+	}, webrtc.PeerConfig{})
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { _ = r.Serve(ctx, agent); close(done) }()
+	defer func() { cancel(); <-done }()
+
+	if err := viewer.WriteMessage([]byte(`{"type":"offer","viewer_id":"v","sdp":"v=0"}`)); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.After(time.Second)
+	for {
+		select {
+		case m := <-viewer.in:
+			var head struct {
+				Type string `json:"type"`
+			}
+			_ = json.Unmarshal(m, &head)
+			if head.Type == "answer" {
+				t.Fatalf("the runner answered an unsigned offer: %s", m)
+			}
+		case <-deadline:
+			return
+		}
+	}
+}
+
+func TestTheViewerPinsTheProvedKeys(t *testing.T) {
+	ownerPub, _, _ := ed25519.GenerateKey(nil)
+	_, controllerKey, _ := ed25519.GenerateKey(nil)
+	cfg := viewerConfig(&client.SessionConn{ID: "s", ViewerID: "npub-of-controller", SigningKey: controllerKey, PeerKey: ownerPub}, webrtc.PeerConfig{})
+	if cfg.ID != "npub-of-controller" || !cfg.AgentKey.Equal(ownerPub) || cfg.SigningKey == nil {
+		t.Errorf("viewerConfig = %+v", cfg)
+	}
+	plain := viewerConfig(&client.SessionConn{ID: "s"}, webrtc.PeerConfig{})
+	if plain.ID != "chirp-controller" || plain.AgentKey != nil || plain.SigningKey != nil {
+		t.Errorf("viewerConfig without keys = %+v", plain)
 	}
 }

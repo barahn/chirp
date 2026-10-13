@@ -37,6 +37,33 @@ func TestTheWindowStartsWithoutACode(t *testing.T) {
 	}
 }
 
+// Over Nostr the code and link carry their secret parts, and what is copied
+// is what another Chirp accepts whole.
+func TestTheWholeCodeAndLinkAreShownAndCopied(t *testing.T) {
+	w := newWindow(t)
+	p := shown
+	p.Secret, p.LinkSecret = "5071", "0042"
+	w.ApplyOwner(client.OwnerEvent{Phase: client.OwnerReady, Peer: p})
+	if w.code.Text != "482-913-5071" {
+		t.Fatalf("the window shows %q", w.code.Text)
+	}
+	test.Tap(w.copyCode)
+	if got := w.app.Clipboard().Content(); got != "482-913-5071" {
+		t.Errorf("copied code = %q", got)
+	}
+	if target, err := client.ParseTarget(w.app.Clipboard().Content()); err != nil || target.Code != "482913" || target.Secret != "5071" {
+		t.Errorf("ParseTarget(copied code) = %+v, %v", target, err)
+	}
+	test.Tap(w.copyLink)
+	got := w.app.Clipboard().Content()
+	if got != "https://usechirp.app/l#"+token+".0042" {
+		t.Errorf("copied link = %q", got)
+	}
+	if target, err := client.ParseTarget(got); err != nil || target.Token != token || target.Secret != "0042" {
+		t.Errorf("ParseTarget(copied link) = %+v, %v", target, err)
+	}
+}
+
 func TestTheCodeAndLinkCanBeCopied(t *testing.T) {
 	w := newWindow(t)
 	w.ApplyOwner(client.OwnerEvent{Phase: client.OwnerReady, Peer: shown})
@@ -193,6 +220,8 @@ func TestHelpProblemNamesEveryRelayRefusal(t *testing.T) {
 		{&client.RelayError{Status: http.StatusTooManyRequests}, "Too many tries from this network. Try again in a few minutes."},
 		{&client.RelayError{Status: http.StatusServiceUnavailable}, "Chirp's server is busy. Try again shortly."},
 		{client.ErrUnavailable, "Can't reach the Chirp server. Check your connection and try again."},
+		{client.ErrIncompleteCode, "Enter the whole code, all ten digits, or the whole link."},
+		{client.ErrWrongCode, "The last four digits don't match. Check them with the other person."},
 		{client.ErrNoNostr, "Their Chirp isn't set up for Nostr relays. Ask them for a new code, and use the same setup as they do."},
 		{client.ErrBadContact, "Chirp's server gave an address that can't be used. Nothing was connected."},
 		{errors.New("anything else"), "Something went wrong. Try again."},
@@ -277,5 +306,13 @@ func TestHandDrawnTextFollowsTheTheme(t *testing.T) {
 	want := warm.New().Color(theme.ColorNameForeground, a.Settings().ThemeVariant())
 	if w.mark.Color == before || w.mark.Color != want || w.code.Color != want || w.doneTitle.Color != want {
 		t.Errorf("after switching to Warm the wordmark is %v, the code %v; want %v", w.mark.Color, w.code.Color, want)
+	}
+}
+
+func TestAWrongCodeIsSaidOnTheOwnersSideToo(t *testing.T) {
+	w := newWindow(t)
+	w.ApplyOwner(client.OwnerEvent{Phase: client.OwnerReady, Peer: shown, WrongCode: true})
+	if !w.note.Visible() || w.note.Text != "The last four digits don't match. Check them with the other person." {
+		t.Errorf("note = %q (visible %v)", w.note.Text, w.note.Visible())
 	}
 }

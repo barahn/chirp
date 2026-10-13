@@ -91,8 +91,10 @@ session bar.
 | In a session | `active` | the session bar (§ During a session) | not drawn | changes shape and colour |
 | Session ended | `terminated` | "Session ended. You have a new code." | back on its perch | outline |
 
-The code shown is `formatted_code` as the server returns it: six digits today,
-`482-913-5071` once decision 5 lands. The window shows how long the code has
+The code shown is `formatted_code` as the server returns it, six digits, when
+sessions go through a relay its users trust. A Chirp that signals over Nostr
+adds four secret digits of its own, which the server never sees:
+`482-913-5071` (decision 5). Its link carries its own four after a dot. The window shows how long the code has
 left only in its last two minutes, so a code read aloud does not expire
 mid-sentence without warning.
 

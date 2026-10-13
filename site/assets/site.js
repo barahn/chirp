@@ -301,12 +301,14 @@
   // and pasted into Chirp. The token is in the fragment, which the browser
   // never sends: this page, and the server behind it, never receive it. A
   // token has the form Chirp checks (client.ParseTarget): 43 characters of
-  // unpadded base64url.
+  // unpadded base64url, then -- from a Chirp that signals over Nostr -- a dot
+  // and the link's four secret digits, which are part of the link and must
+  // be copied with it.
   var linkBox = document.getElementById("linkbox");
   if (linkBox) {
     var showLink = function () {
       var token = location.hash.slice(1);
-      var ok = /^[A-Za-z0-9_-]{43}$/.test(token);
+      var ok = /^[A-Za-z0-9_-]{43}(\.[0-9]{4})?$/.test(token);
       document.getElementById("the-link").textContent = ok ? location.origin + location.pathname + "#" + token : "";
       linkBox.hidden = !ok;
       document.getElementById("no-token").hidden = ok;

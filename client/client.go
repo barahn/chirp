@@ -77,6 +77,30 @@ type Peer struct {
 	Code      string `json:"code"`
 	Formatted string `json:"formatted_code"`
 	Link      string `json:"link"`
+
+	// Secret and LinkSecret are the four digits that go with the code and
+	// with the link when sessions are signalled over Nostr (pake.go). This
+	// Chirp makes them; the server never sees them. Empty otherwise.
+	Secret     string `json:"-"`
+	LinkSecret string `json:"-"`
+}
+
+// Spoken is the code as people read it out: the routing part the server
+// formats, then the secret part, "482-913-5071".
+func (p Peer) Spoken() string {
+	if p.Secret == "" {
+		return p.Formatted
+	}
+	return p.Formatted + "-" + p.Secret
+}
+
+// LinkFragment is what follows the "#" in the link people send: the token,
+// then the link's secret part after a dot.
+func (p Peer) LinkFragment() string {
+	if p.LinkSecret == "" {
+		return p.Link
+	}
+	return p.Link + "." + p.LinkSecret
 }
 
 // Session is what either end of a session may know about it.
