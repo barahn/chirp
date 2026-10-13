@@ -367,7 +367,10 @@ func (o *Owner) onNostr(ctx context.Context, m nostrMsg, shown *Peer) error {
 		case typeClose:
 			// The controller gave up, or ended the session.
 			o.endSession()
-			return o.refresh(ctx, shown)
+			if err := o.refresh(ctx, shown); errors.Is(err, errLost) {
+				return err
+			}
+			return nil
 		case TypeAskConsent, TypeConsentAnswer:
 			return nil // asked already; not for remotekit
 		}
@@ -430,7 +433,10 @@ func (o *Owner) onNostr(ctx context.Context, m nostrMsg, shown *Peer) error {
 	o.mu.Unlock()
 	o.emit(OwnerEvent{Phase: OwnerReady, Peer: *shown, Consent: req})
 	// The lookup that led here spent the start code.
-	return o.refresh(ctx, shown)
+	if err := o.refresh(ctx, shown); errors.Is(err, errLost) {
+		return err
+	}
+	return nil
 }
 
 // busy reports whether a controller is already let in, or being asked about.
@@ -463,8 +469,27 @@ func (o *Owner) onPakeStart(ctx context.Context, m nostrMsg, shown *Peer) error 
 	switch m.head.Via {
 	case viaCode:
 		if m.head.Code == shown.Code {
-			if err := o.refresh(ctx, shown); err != nil {
-				return err
+			var rerr error
+			for retry := 0; retry < 3; retry++ {
+				rerr = o.refresh(ctx, shown)
+				if rerr == nil || errors.Is(rerr, errLost) {
+					break
+				}
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case <-time.After(20 * time.Millisecond):
+				}
+			}
+			if rerr != nil {
+				if errors.Is(rerr, errLost) {
+					return errLost
+				}
+				// The peer state could not be confirmed due to a transient
+				// error. Tell the controller to try again (busy) rather than
+				// sending an authentication failure for a potentially valid code.
+				_ = n.send(m.viewer, knock{Type: TypeConsentAnswer, Reason: reasonBusy}.encode())
+				return nil
 			}
 			if m.head.Code == shown.Code {
 				// The code is still displayed and has not been redeemed on
@@ -555,7 +580,10 @@ func (o *Owner) pakeFailed(ctx context.Context, via string, shown *Peer) error {
 	}
 	err := o.refresh(ctx, shown)
 	o.emit(OwnerEvent{Phase: OwnerReady, Peer: *shown, WrongCode: true})
-	return err
+	if errors.Is(err, errLost) {
+		return err
+	}
+	return nil
 }
 
 // answerNostr gives the owner's answer to a request that came over Nostr. It

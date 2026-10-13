@@ -337,19 +337,19 @@ func (o *Owner) listen(ctx context.Context, sock *Socket, shown *Peer, nmsgs <-c
 					o.emit(OwnerEvent{Phase: OwnerReady, Peer: *shown, Consent: m.Consent})
 				}
 				// The session that asked spent the start code.
-				if err := o.refresh(ctx, shown); err != nil {
+				if err := o.refresh(ctx, shown); errors.Is(err, errLost) {
 					return err
 				}
 			case TypePeerLeft:
 				// The relay's session is over; one over Nostr is not the
 				// relay's to end.
 				o.endRelaySession()
-				if err := o.refresh(ctx, shown); err != nil {
+				if err := o.refresh(ctx, shown); errors.Is(err, errLost) {
 					return err
 				}
 			}
 		case <-poll.C:
-			if err := o.refresh(ctx, shown); err != nil {
+			if err := o.refresh(ctx, shown); errors.Is(err, errLost) {
 				return err
 			}
 		}
@@ -364,7 +364,7 @@ func (o *Owner) refresh(ctx context.Context, shown *Peer) error {
 	case errors.Is(err, ErrNotFound):
 		return errLost
 	case err != nil:
-		return ctx.Err()
+		return err
 	}
 	if p.Code != shown.Code || p.Link != shown.Link {
 		o.decorate(&p)

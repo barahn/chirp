@@ -748,3 +748,49 @@ func TestNostrResetCountsPendingLinkPakeFailure(t *testing.T) {
 		t.Fatal("the link was not renewed after resets")
 	}
 }
+
+type faultTransport struct {
+	base          http.RoundTripper
+	mu            sync.Mutex
+	failPeersOnce bool
+}
+
+func (f *faultTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	f.mu.Lock()
+	fail := f.failPeersOnce && strings.Contains(req.URL.Path, "/api/peers") && req.Method == http.MethodGet
+	if fail {
+		f.failPeersOnce = false
+	}
+	f.mu.Unlock()
+	if fail {
+		return nil, errors.New("simulated transient peer error")
+	}
+	base := f.base
+	if base == nil {
+		base = http.DefaultTransport
+	}
+	return base.RoundTrip(req)
+}
+
+// When a controller has redeemed the displayed code and the owner refreshes its
+// peer state, a transient error during refresh retries rather than immediately
+// rejecting the valid code with reasonAuth.
+func TestTransientRefreshFailureDoesNotRejectRedeemedCode(t *testing.T) {
+	r, nr := newRelay(t), newNostrRelay(t)
+	ownerClient := newNostrClient(t, r, nr)
+	ownerClient.pollEvery = 5 * time.Second
+	ft := &faultTransport{base: ownerClient.http.Transport}
+	ownerClient.http.Transport = ft
+
+	_, events, _, _ := runOwner(t, ownerClient)
+	shown := await(t, events, "a code", ready).Peer
+
+	ft.mu.Lock()
+	ft.failPeersOnce = true
+	ft.mu.Unlock()
+
+	helpWith(t, newNostrClient(t, r, nr), shown.Spoken(), "Ana")
+	if req, _ := askedAndReplaced(t, events, shown.Code); req == nil {
+		t.Fatal("the redeemed code was rejected due to transient refresh failure")
+	}
+}
