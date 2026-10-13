@@ -249,7 +249,7 @@ func (w *Window) ApplyOwner(ev client.OwnerEvent) {
 	}
 	w.code.Text = noCode
 	if usable {
-		w.code.Text = w.peer.Formatted
+		w.code.Text = w.peer.Spoken()
 	}
 	w.codeDim = ev.Phase != client.OwnerReady
 	w.recolor()
@@ -427,7 +427,7 @@ func (w *Window) show(c *fyne.Container) {
 }
 
 func (w *Window) copyTheCode() {
-	w.app.Clipboard().SetContent(w.peer.Formatted)
+	w.app.Clipboard().SetContent(w.peer.Spoken())
 	w.hint.SetText("Code copied.")
 	w.relayout()
 }
@@ -440,7 +440,7 @@ const linkPage = "https://usechirp.app/l#"
 // copyTheLink copies the link as the person sends it: the page that says
 // what to do with it, with the token in its fragment.
 func (w *Window) copyTheLink() {
-	w.app.Clipboard().SetContent(linkPage + w.peer.Link)
+	w.app.Clipboard().SetContent(linkPage + w.peer.LinkFragment())
 	w.copyLink.SetText("Link copied")
 	w.relayout()
 }

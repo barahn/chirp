@@ -23,6 +23,7 @@ const (
 	hintCode       = "Read it only to someone you called."
 	hintHelp       = "Typing their code lets you control their computer, after they allow it."
 	noteReplaced   = "New code. The old one no longer works."
+	noteWrongCode  = wrongCode
 	noteReconnect  = "Reconnecting. Your code still works when you're back."
 	noteLost       = "Your old code and link stopped working. You'll get new ones when you're back online."
 	noteOffline    = "You're offline. You'll get a code once Chirp reaches its server."
@@ -74,11 +75,16 @@ func ownerNote(ev client.OwnerEvent) string {
 		return noteLost
 	case ev.Phase == client.OwnerOffline:
 		return noteOffline
+	case ev.WrongCode:
+		return noteWrongCode
 	case ev.Replaced:
 		return noteReplaced
 	}
 	return ""
 }
+
+// wrongCode is what both ends say when the PAKE fails (docs/ux.md, Messages).
+const wrongCode = "The last four digits don't match. Check them with the other person."
 
 // The consent prompt's words (docs/ux.md, Consent). Plain on purpose: no
 // brand words, nothing that sounds like the product vouching for anyone.
@@ -202,6 +208,10 @@ func helpProblem(err error) string {
 		return "That code doesn't exist or was already used. Ask for a new one."
 	case errors.Is(err, client.ErrBusy):
 		return "That person is already getting help from someone else."
+	case errors.Is(err, client.ErrIncompleteCode):
+		return "Enter the whole code, all ten digits, or the whole link."
+	case errors.Is(err, client.ErrWrongCode):
+		return wrongCode
 	case errors.Is(err, client.ErrNoNostr):
 		return "Their Chirp isn't set up for Nostr relays. Ask them for a new code, and use the same setup as they do."
 	case errors.Is(err, client.ErrBadContact):
