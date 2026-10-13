@@ -208,9 +208,12 @@ any public relay): a running Chirp registers and gets its code and link,
 whoever redeems the code opens a session to control it, and consent is asked
 of the owner over its own socket. It also offers the lookup that decision 5
 reduces the public server to: an owner registers how it can be reached over
-Nostr, and a code or a link returns exactly that, with nothing relayed. There
-is no binary yet, so no prompt is drawn. `HANDOFF.md` §4.5, §4.6 and §4.7
-describe the endpoints and the known limits.
+Nostr, and a code or a link returns exactly that, with nothing relayed. With
+`-nostr`, the two Chirps then meet over Nostr relays, and before anyone is
+asked they run the PAKE over the code's four secret digits, which this Chirp
+makes and the server never sees: the code reads `482-913-5071`, and each end
+comes out with the other's key, which signs the session that follows.
+`HANDOFF.md` §4.5 to §4.8 describe the endpoints and the known limits.
 
 ---
 

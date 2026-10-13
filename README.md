@@ -124,7 +124,7 @@ Chirp is not yet a runnable product.
 - **A public server.** When Chirp offers one, it will be blind: it finds the
   other machine from the first part of the code, and never sees the rest of
   it or a single signalling message ([decision 5](docs/product-model.md);
-  Nostr signalling is in, the PAKE is next).
+  Nostr signalling and the PAKE over the code's secret part are in).
 
 Planned work is in this repository's issues and the
 [Chirp roadmap](https://github.com/orgs/barahn/projects/2) project.
