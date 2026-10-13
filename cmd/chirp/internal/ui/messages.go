@@ -182,6 +182,9 @@ func decidedNote(name string, granted bool) string {
 	return "You declined " + who + ". Nobody got in."
 }
 
+// sessionOverNote is the main window's line once a session has ended.
+const sessionOverNote = "The session is over. Nobody can see or use this computer now."
+
 // answerProblem is shown when an answer did not reach the relay.
 func answerProblem(granted bool) string {
 	if granted {

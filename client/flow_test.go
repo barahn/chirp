@@ -264,3 +264,90 @@ func TestCancellingHelpReportsNothing(t *testing.T) {
 		}
 	}
 }
+
+func TestTheOwnerIsToldWhenASessionStartsAndEnds(t *testing.T) {
+	r := newRelay(t)
+	c := newClient(t, r)
+	serve := func(ctx context.Context, conn *SessionConn) {
+		for {
+			if _, err := conn.ReadMessage(); err != nil {
+				return
+			}
+		}
+	}
+	o, events, _, _ := runOwnerServing(t, c, serve)
+	shown := await(t, events, "a code", ready).Peer
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go c.Help(ctx, shown.Code, "Ana", func(HelperEvent) {})
+	asked := await(t, events, "the request", func(ev OwnerEvent) bool { return ev.Consent != nil }).Consent
+	if _, err := o.Answer(context.Background(), asked.SessionID, true); err != nil {
+		t.Fatal(err)
+	}
+	started := await(t, events, "the session starting", func(ev OwnerEvent) bool { return ev.Started != nil }).Started
+	if started.ID != asked.SessionID || started.Name != "Ana" {
+		t.Errorf("started = %+v", started)
+	}
+	o.NewCode()
+	await(t, events, "the session ending", func(ev OwnerEvent) bool { return ev.Ended })
+}
+
+func TestAQueuedApprovalForASessionThatIsGoneStartsNothing(t *testing.T) {
+	r := newRelay(t)
+	c := newClient(t, r)
+	var events []OwnerEvent
+	o := NewOwner(c, "", func(ev OwnerEvent) { events = append(events, ev) })
+	o.Serve = func(context.Context, *SessionConn) { t.Error("served a session the relay no longer allows") }
+	// The request the owner answered, for a session the relay does not hold
+	// (the controller left, or the code was replaced, before it was served).
+	o.setAsked(&ConsentRequest{SessionID: "gone", Name: "Ana"})
+	o.startSession(context.Background(), "gone")
+	if o.active != nil || len(events) != 0 {
+		t.Errorf("active %v, events %+v", o.active, events)
+	}
+	// Ending a session forgets the request and any approval still queued.
+	o.allowed <- "gone"
+	o.endSession()
+	if len(o.allowed) != 0 {
+		t.Error("an approval stayed queued after the session ended")
+	}
+	o.mu.Lock()
+	asked := o.asked
+	o.mu.Unlock()
+	if asked != nil {
+		t.Error("the answered request was kept after the session ended")
+	}
+}
+
+func TestAFailedLookupKeepsTheApprovalPendingInsteadOfDecidingOnIt(t *testing.T) {
+	r := newRelay(t)
+	c := newClient(t, r)
+	r.Close() // every lookup now fails without an answer
+	var events []OwnerEvent
+	o := NewOwner(c, "", func(ev OwnerEvent) { events = append(events, ev) })
+	o.Retry = 10 * time.Millisecond
+	o.Serve = func(context.Context, *SessionConn) { t.Error("served a session the relay never confirmed") }
+	o.setAsked(&ConsentRequest{SessionID: "s1", Name: "Ana"})
+
+	o.startSession(context.Background(), "s1")
+	if o.active != nil || len(events) != 0 {
+		t.Fatalf("an unconfirmed session started: active %v, events %+v", o.active, events)
+	}
+	select {
+	case id := <-o.allowed:
+		if id != "s1" {
+			t.Errorf("handed back %q", id)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("the approval was dropped instead of retried")
+	}
+
+	// Once the session is over, a pending retry hands nothing back.
+	o.startSession(context.Background(), "s1")
+	o.endSession()
+	time.Sleep(50 * time.Millisecond)
+	if len(o.allowed) != 0 {
+		t.Error("a retry brought back an approval for a session that ended")
+	}
+}
