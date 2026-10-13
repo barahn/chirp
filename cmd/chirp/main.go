@@ -24,6 +24,11 @@
 // (docs/stun-turn.md). Without any, the screen reaches only a controller on
 // the same network. Nothing is written to disk to remember them
 // (barahn/chirp#49).
+//
+// With -nostr, or CHIRP_NOSTR, a comma-separated list of Nostr relays
+// (wss://...), sessions are signalled over those relays instead of through
+// the Chirp server, which then only looks codes up (docs/product-model.md,
+// decision 5; barahn/chirp#43). There is no default list yet.
 package main
 
 import (
@@ -47,6 +52,7 @@ import (
 func main() {
 	relay := flag.String("relay", os.Getenv("CHIRP_RELAY"), "address of the Chirp server, http or https (default $CHIRP_RELAY)")
 	iceList := flag.String("ice", os.Getenv("CHIRP_ICE"), "STUN and TURN servers, comma-separated (default $CHIRP_ICE)")
+	nostrList := flag.String("nostr", os.Getenv("CHIRP_NOSTR"), "Nostr relays to signal sessions over, comma-separated (default $CHIRP_NOSTR)")
 	flag.Parse()
 	ice := iceConfig(*iceList, os.Getenv("CHIRP_TURN_USERNAME"), os.Getenv("CHIRP_TURN_PASSWORD"))
 
@@ -61,6 +67,7 @@ func main() {
 		w.Window().ShowAndRun()
 		return
 	}
+	c.Nostr = nostrConfig(*nostrList)
 
 	ctx, stop := context.WithCancel(context.Background())
 	w.Animate(ctx)
@@ -122,7 +129,7 @@ func main() {
 
 // serveSession serves a session its owner has allowed, until it ends.
 func serveSession(ctx context.Context, s *client.SessionConn, ice webrtc.PeerConfig) {
-	_ = newRunner(s.ID, s.Permissions, ice).Serve(ctx, s)
+	_ = newRunner(s.ID, s.Permissions, s.Nostr, ice).Serve(ctx, s)
 }
 
 // newRunner builds the runner for a session its owner has allowed.
@@ -134,26 +141,46 @@ func serveSession(ctx context.Context, s *client.SessionConn, ice webrtc.PeerCon
 // frame. Signed viewers stay off for the trusted relay the first runnable Chirp
 // ships with (docs/product-model.md, decision 5): they need the controller's
 // key from a route the relay does not control, which is the PAKE
-// (barahn/chirp#21). A public relay turns them on, with RequireDataChannel.
-func newRunner(id string, permissions []string, ice webrtc.PeerConfig) *stream.Runner {
+// (barahn/chirp#21). A public relay turns them on.
+//
+// A session signalled over Nostr keeps input, clipboard and files on the data
+// channel: every signal must fit a gift wrap, and the relays have no business
+// carrying them even encrypted.
+func newRunner(id string, permissions []string, overNostr bool, ice webrtc.PeerConfig) *stream.Runner {
 	r := stream.New(stream.Config{ID: id, PeerConfig: &ice})
 	r.RequireScreenViewConsent(true)
 	r.DisableRelayFallback(true)
+	r.RequireDataChannel(overNostr)
 	r.Grant(permissions...)
 	return r
+}
+
+// nostrConfig turns signalling over Nostr on when relays are given. The
+// relays are checked when the contact is registered, not here.
+func nostrConfig(list string) *client.NostrConfig {
+	relays := splitList(list)
+	if len(relays) == 0 {
+		return nil
+	}
+	return &client.NostrConfig{Relays: relays}
 }
 
 // iceConfig builds the STUN and TURN servers sessions use. It is always
 // explicit, and empty when none are given: remotekit's default would tell a
 // third party about every session (docs/stun-turn.md).
 func iceConfig(list, username, password string) webrtc.PeerConfig {
-	servers := []string{}
+	return webrtc.PeerConfig{ICEServers: splitList(list), TURNUsername: username, TURNPassword: password}
+}
+
+// splitList reads a comma-separated list, never nil.
+func splitList(list string) []string {
+	items := []string{}
 	for _, s := range strings.Split(list, ",") {
 		if s = strings.TrimSpace(s); s != "" {
-			servers = append(servers, s)
+			items = append(items, s)
 		}
 	}
-	return webrtc.PeerConfig{ICEServers: servers, TURNUsername: username, TURNPassword: password}
+	return items
 }
 
 // viewSession shows a session this machine was let into, until it ends: the

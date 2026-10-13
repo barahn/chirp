@@ -60,6 +60,10 @@ func (c *Client) Help(ctx context.Context, input, name string, emit func(HelperE
 		fail(err)
 		return
 	}
+	if c.Nostr != nil {
+		c.helpOverNostr(ctx, t, name, emit, fail)
+		return
+	}
 	var sess Session
 	if t.Code != "" {
 		sess, err = c.Redeem(ctx, t.Code, name)
