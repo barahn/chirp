@@ -339,7 +339,7 @@ SOFTWARE.
 
 ### github.com/barahn/remotekit/signal/nostr
 
-- Version: `v0.0.0-20261009195026-df877a789195`
+- Version: `v0.1.0`
 - License: Apache-2.0
 - Homepage: https://github.com/barahn/remotekit/signal/nostr
 
@@ -550,7 +550,7 @@ SOFTWARE.
 
 ### github.com/barahn/remotekit
 
-- Version: `v0.4.1-0.20261011140308-1fa867b04915`
+- Version: `v0.6.0`
 - License: Apache-2.0
 - Homepage: https://github.com/barahn/remotekit
 
