@@ -205,6 +205,10 @@ func helpProblem(err error) string {
 		return "That code doesn't exist or was already used. Ask for a new one."
 	case errors.Is(err, client.ErrBusy):
 		return "That person is already getting help from someone else."
+	case errors.Is(err, client.ErrNoNostr):
+		return "Their Chirp isn't set up for Nostr relays. Ask them for a new code, and use the same setup as they do."
+	case errors.Is(err, client.ErrBadContact):
+		return "Chirp's server gave an address that can't be used. Nothing was connected."
 	case errors.Is(err, client.ErrTooMany):
 		return "Too many tries from this network. Try again in a few minutes."
 	case errors.As(err, &re) && re.Status == http.StatusServiceUnavailable:

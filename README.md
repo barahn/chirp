@@ -108,6 +108,9 @@ Chirp is not yet a runnable product.
   per-network limits on guessing codes. Codes, links and the throttle are
   remotekit's `rendezvous` package; the state machine, consent rules and
   values are Chirp's.
+- **Signalling over Nostr relays** — optional session negotiation and
+  signalling over public Nostr relays with `-nostr` / `CHIRP_NOSTR`, leaving
+  the server only code lookup and blind to signalling traffic.
 
 **Not here yet:**
 
@@ -120,7 +123,8 @@ Chirp is not yet a runnable product.
   own STUN/TURN (coturn works): see [docs/stun-turn.md](docs/stun-turn.md).
 - **A public server.** When Chirp offers one, it will be blind: it finds the
   other machine from the first part of the code, and never sees the rest of
-  it or a single signalling message ([decision 5](docs/product-model.md)).
+  it or a single signalling message ([decision 5](docs/product-model.md);
+  Nostr signalling is in, the PAKE is next).
 
 Planned work is in this repository's issues and the
 [Chirp roadmap](https://github.com/orgs/barahn/projects/2) project.
