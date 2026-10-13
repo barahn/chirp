@@ -164,7 +164,10 @@ git push -u origin feature/consent-expiry
 ```
 
 To release: a pull request from `develop` to `main`, merged with a merge commit,
-and a `vX.Y.Z` tag on that merge.
+and a `vX.Y.Z` tag on that merge. An automated workflow
+(`.github/workflows/create_release_pr.yml`) keeps a release pull request from
+`develop` into `main` open and synchronised with the changelog whenever `develop`
+moves ahead.
 
 The security posture behind all of this — which gates run, why they overlap,
 and the repository settings that cannot live in a file — is in
