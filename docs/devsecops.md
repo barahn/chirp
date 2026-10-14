@@ -217,8 +217,10 @@ cost is an error in the console. The Pro plan makes it optional.
 
 `scripts/check-live-site.sh`, run by `site-live.yml` after each deploy and
 weekly, fetches the pages and scripts from usechirp.app and fails unless they
-match the repository byte for byte, with that one snippet as the only
-exception, and unless every header in `response-headers.json` comes back. It
+match what `scripts/build-site.sh` makes of the repository byte for byte (the
+pages with a content hash on each asset reference), with that one snippet as
+the only exception, and unless every header in `response-headers.json` comes
+back. It
 also requires `www.usechirp.app` to answer every path with a 301 to the same
 path on `usechirp.app`, carrying the same headers, which is why both rules
 match both hosts: a page served on `www` would sit outside the check. A

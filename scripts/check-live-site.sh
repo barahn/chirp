@@ -38,6 +38,12 @@ jsd="<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
+# Compare with the site as it is deployed, not with site/ itself: the build
+# adds a content hash to every asset reference (?v=...), so the pages served
+# never match their sources byte for byte.
+"$root/scripts/build-site.sh" "$work/site" >/dev/null
+built="$work/site"
+
 # check_headers <label> <headers-file> prints each ruleset header that is
 # missing or different, and returns non-zero if any is.
 check_headers() {
@@ -57,8 +63,8 @@ check_headers() {
 check_once() {
 	local fail=0 path src got html www status location
 	for path in "" "l/" "assets/site.js" "assets/site.css"; do
-		src="$root/site/${path:-index.html}"
-		[ "${path%/}" != "$path" ] && src="$root/site/${path}index.html"
+		src="$built/${path:-index.html}"
+		[ "${path%/}" != "$path" ] && src="$built/${path}index.html"
 		got="$work/body"
 		if ! curl -fsS --max-time 20 -H 'Cache-Control: no-cache' \
 			-D "$work/headers" -o "$got" "$base/$path?check=$RANDOM"; then
@@ -75,7 +81,7 @@ check_once() {
 			printf '%s' "$html" > "$got"
 		fi
 		if ! cmp -s "$src" "$got"; then
-			echo "/$path differs from ${src#"$root"/}:"
+			echo "/$path differs from the build of site/${src#"$built"/}:"
 			diff <(sed 's/></>\n</g' "$src") <(sed 's/></>\n</g' "$got") | grep '^[<>]' | cut -c1-200 | head -20 || true
 			fail=1
 		fi
