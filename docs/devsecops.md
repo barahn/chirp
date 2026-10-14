@@ -8,21 +8,17 @@ inconvenient.
 
 ## Branching model
 
-`develop` is the default branch and the integration branch. Work lands there
-first; `main` holds what has been integrated and is what a release is tagged
-from.
+Chirp follows **Trunk-Based Development**. `main` is the default branch and the primary trunk.
+Work lands there via pull request with linear history; releases are tagged points (`v*.*.*`)
+on `main`.
 
 ```
-feature/*  ──▶  develop  ──▶  main  ──▶  tag v*.*.*
-   PR, CI        PR, CI       release
+feature/*  ──(squash/rebase)──▶  main  ──(tag)──▶  tag v*.*.*
+    PR, CI                       release
 ```
 
-- **Branch from `develop`**, not `main`. `git switch develop && git pull`.
-- **Open pull requests against `develop`.** CI runs the same gates on both
-  branches, so a change that could not pass on `develop` cannot pass later.
-- **`main` receives merges from `develop` only.** No feature branch targets
-  `main` directly; a hotfix is still a branch off `develop` that is merged
-  forward, so `main` never holds a commit `develop` lacks.
+- **Branch from `main`**. `git switch main && git pull`.
+- **Open pull requests against `main`.** CI runs all gates on each PR.
 - **Tags are cut from `main`** and match `v*.*.*`, which is what triggers the
   SBOM job.
 
@@ -34,19 +30,19 @@ not CLA acceptance, and that external pull requests are not merged yet.
 
 | Workflow | Runs on | Gate |
 | --- | --- | --- |
-| `ci.yml` | push and PR to `develop`/`main`, tags | DCO, licence gate, build, vet, cross-compile, lint, `go test -race`, website check, `HANDOFF.md` snapshot, gosec, govulncheck; separately, the relay's container image, deploy scripts and Quadlet units |
+| `ci.yml` | push and PR to `main`, tags | DCO, licence gate, build, vet, cross-compile, lint, `go test -race`, website check, `HANDOFF.md` snapshot, gosec, govulncheck; separately, the relay's container image, deploy scripts and Quadlet units |
 | `codeql.yml` | push and PR, weekly — **when `CODE_SCANNING` is set** | CodeQL `security-extended` for Go |
 | `secret-scan.yml` | push and PR, weekly | gitleaks over the PR commit range, or the tree and full history |
 | `dependency-review.yml` | PR — **when `CODE_SCANNING` is set** | what the PR adds: advisories at `low` and above, denied licences |
 | `sbom.yml` | release tags | SPDX SBOM attached to the release |
-| `pages.yml` | push to `develop` touching the site | website check, then publishes usechirp.app |
+| `pages.yml` | push to `main` touching the site | website check, then publishes usechirp.app |
 | `site-live.yml` | after each deploy, weekly | usechirp.app serves the pages, scripts and headers the repository has |
 
 ### CodeQL and dependency review are gated on `CODE_SCANNING`
 
 Both jobs run only when the repository variable `CODE_SCANNING` is `true`.
 This repository is public, where both are free, and the variable is set: they
-run on every pull request and are required checks on `develop` and `main`.
+run on every pull request and are required checks on `main`.
 
 The gate exists for private copies. On a private repository GitHub runs both
 only with GitHub Advanced Security (Code Security). That was observed, not
@@ -87,7 +83,7 @@ Why the overlaps are not redundant:
   trailing comment. A tag can be moved; a SHA cannot.
 - Go security tools are pinned to exact versions and run via `go run`, so the
   tool version lives in the workflow and is reviewed like any other change.
-- Dependabot rewrites both, weekly, into `develop`. Pinning without an update
+- Dependabot rewrites both, weekly, into `main`. Pinning without an update
   path is just freezing on a known-vulnerable version.
 - Workflows declare `permissions: contents: read` at the top level; a job that
   needs more (SARIF upload, release assets, PR comments) asks for it and nothing
@@ -105,17 +101,15 @@ Why the overlaps are not redundant:
 Workflows cannot grant themselves these. They are repository settings, and they
 are the half of DevSecOps that a pull request cannot deliver:
 
-1. **Default branch → `develop`**
-   Settings → Branches → Default branch → switch to `develop`.
+1. **Default branch → `main`**
+   Settings → Branches → Default branch → `main`.
 
-2. **Branch protection on `develop` and `main`.** The rules live as code in
+2. **Branch protection on `main`.** The rules live as code in
    [`.github/rulesets/`](../.github/rulesets/), and
-   [branching.md](branching.md) explains each one — including why `main` has
-   neither linear history nor required signatures yet, and why `develop`
-   requires no approval: a single maintainer cannot approve their own
-   pull requests. Import
-   those files rather than configuring rules by hand: a hand-made rule that is
-   not in the files is drift.
+   [branching.md](branching.md) explains each one — including why `main` requires
+   linear history, squash/rebase merges, and 0 approvals while there is a single
+   maintainer. Import those files rather than configuring rules by hand: a hand-made
+   rule that is not in the files is drift.
 
 3. **Code security** (Settings → Advanced Security):
    - Secret scanning **and** push protection. gitleaks in CI catches a secret

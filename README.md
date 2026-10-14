@@ -14,8 +14,8 @@ account, and nothing happens on your screen until you press *Allow*.
 [Roadmap](https://github.com/orgs/barahn/projects/2)
 
 [![License](https://img.shields.io/badge/License-AGPL--3.0-blue.svg?style=flat-square)](LICENSE)
-[![CI](https://github.com/barahn/chirp/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/barahn/chirp/actions/workflows/ci.yml)
-[![CodeQL](https://github.com/barahn/chirp/actions/workflows/codeql.yml/badge.svg?branch=develop)](https://github.com/barahn/chirp/actions/workflows/codeql.yml)
+[![CI](https://github.com/barahn/chirp/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/barahn/chirp/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/barahn/chirp/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/barahn/chirp/actions/workflows/codeql.yml)
 
 </div>
 
@@ -168,7 +168,7 @@ Chirp grants remote control of an end user's machine, so its pipeline treats
 that as the threat model rather than an afterthought: every pull request runs
 gosec, govulncheck, gitleaks, a third-party licence gate, CodeQL and
 dependency review, with every action pinned to a commit SHA, and all of them
-are required checks on `develop` and `main`. What each gate is for, and the
+are required checks on `main`. What each gate is for, and the
 repository settings that back it, are in
 [docs/devsecops.md](docs/devsecops.md).
 

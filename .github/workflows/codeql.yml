@@ -7,9 +7,9 @@ name: CodeQL
 # subsumes the other.
 on:
   push:
-    branches: [ develop, main ]
+    branches: [ main ]
   pull_request:
-    branches: [ develop, main ]
+    branches: [ main ]
   schedule:
     # Queries improve without the code changing, so re-scan weekly rather than
     # only on push. Wednesday 04:17 UTC -- off the hour, where runner capacity

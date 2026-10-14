@@ -9,11 +9,11 @@ body:
         > [!WARNING]
         > **Never post an active or historical Chirp code or link**, password, session token, or TURN credential. Redact them from any log, configuration, or screenshot you attach. Issues are public.
         >
-        > Anything that could weaken code generation or redemption, the consent prompt, or the session lifecycle is security-sensitive even when it looks cosmetic. Email [security@fabrintek.com.br](mailto:security@fabrintek.com.br) instead of opening a public issue; see [SECURITY.md](https://github.com/barahn/chirp/blob/develop/SECURITY.md).
+        > Anything that could weaken code generation or redemption, the consent prompt, or the session lifecycle is security-sensitive even when it looks cosmetic. Email [security@fabrintek.com.br](mailto:security@fabrintek.com.br) instead of opening a public issue; see [SECURITY.md](https://github.com/barahn/chirp/blob/main/SECURITY.md).
   - type: markdown
     attributes:
       value: |
-        Chirp is the user-facing remote-support application. Capture, encoding, input injection, and WebRTC transport live in [remotekit](https://github.com/barahn/remotekit). See [ECOSYSTEM.md](https://github.com/barahn/chirp/blob/develop/ECOSYSTEM.md) to confirm which repository a bug belongs in.
+        Chirp is the user-facing remote-support application. Capture, encoding, input injection, and WebRTC transport live in [remotekit](https://github.com/barahn/remotekit). See [ECOSYSTEM.md](https://github.com/barahn/chirp/blob/main/ECOSYSTEM.md) to confirm which repository a bug belongs in.
   - type: dropdown
     id: component
     attributes:
@@ -61,7 +61,7 @@ body:
       description: Operating system, display server (Wayland, X11, Windows, macOS), and Chirp version or commit.
       placeholder: |
         - OS: [e.g. Ubuntu 24.04 (Wayland), Windows 11 23H2, macOS 14.5]
-        - Chirp commit / version: [e.g. develop @ c5a79c5]
+        - Chirp commit / version: [e.g. main @ c5a79c5]
         - Go version (if building from source): [e.g. go1.24.0]
     validations:
       required: true

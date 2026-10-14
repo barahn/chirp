@@ -1,7 +1,7 @@
 # Sole maintainer; see SECURITY.md and CONTRIBUTING.md.
 #
 # CODEOWNERS only requests review. It becomes a gate when "Require review from
-# Code Owners" is enabled in the branch protection rule for develop and main --
+# Code Owners" is enabled in the branch protection rule for main --
 # see docs/devsecops.md.
 
 *                       @mendsec

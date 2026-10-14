@@ -41,16 +41,15 @@ advisory unless they ask not to be.
 
 Chirp is **not yet a runnable product** (see [README.md](README.md)):
 `cmd/chirp` goes as far as the consent decision, and no screen is shared yet.
-Until it is, only the tip of `develop` and the last release on `main` are
+Until it is, only the tip of `main` and the last release tag are
 supported, and the answer to "which versions get fixes" is "the one you get by
 pulling".
 
 | Version | Supported |
 | --- | --- |
-| `develop` (tip) | ✅ |
-| `main` (`v0.2.0`, the last release) | ✅ |
-| `v0.2.0` tag | fixes land on `develop` and ship in the next release; no backports. |
-| `v0.1.0` | no. It predates the product model, the reaper deadlock fix and the redemption throttle — do not run it. |
+| `main` (tip) | ✅ |
+| `v0.3.0` tag (last release) | ✅ |
+| `v0.2.0` and earlier | fixes land on `main` and ship in the next release tag; no backports. |
 
 ## What is in scope
 

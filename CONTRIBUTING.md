@@ -84,17 +84,16 @@ drawn from a sign-off.
 
 ## Branching model
 
-`develop` is the default branch and where work is integrated. `main` holds what
-has been integrated, and releases are tagged from it.
+Chirp follows **Trunk-Based Development**. `main` is the default branch and where
+work is integrated. Releases are tagged points (`v*.*.*`) on `main`.
 
 ```
-feature/*  ──▶  develop  ──▶  main  ──▶  tag v*.*.*
+feature/*  ──(squash/rebase)──▶  main  ──(tag)──▶  tag v*.*.*
 ```
 
-Branch from `develop` and open pull requests against `develop`. Nothing targets
-`main` directly — it is reached by merging `develop` forward, so `main` never
-holds a commit `develop` lacks. The full model, and the branch protection it
-assumes, is in [docs/devsecops.md](docs/devsecops.md).
+Branch from `main` and open pull requests against `main`. The full model, and the
+branch protection it assumes, is in [docs/branching.md](docs/branching.md) and
+[docs/devsecops.md](docs/devsecops.md).
 
 ## What is enforced today
 

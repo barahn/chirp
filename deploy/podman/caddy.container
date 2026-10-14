@@ -16,7 +16,7 @@
 
 [Unit]
 Description=Caddy for the Chirp relay
-Documentation=https://github.com/barahn/chirp/blob/develop/docs/relay.md
+Documentation=https://github.com/barahn/chirp/blob/main/docs/relay.md
 Requires=chirp-relay.service
 After=chirp-relay.service
 
