@@ -1,0 +1,54 @@
+# The Chirp relay as a container image: a static binary on distroless, run as
+# an unprivileged user, with no shell, package manager or libc.
+#
+# Build from the repository root (the context must be the root, since the
+# relay is built from the module):
+#
+#   podman build -f deploy/container/Containerfile -t localhost/chirp-relay .
+#
+# The base images are pinned by the digest of their multi-platform index, so
+# a build is reproducible and a tag cannot be moved under it. Dependabot
+# rewrites the digests (.github/dependabot.yml). docs/relay.md describes how
+# to run the image.
+#
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Fabrintek Engenharia Digital Ltda
+
+FROM docker.io/library/golang:1.27-trixie@sha256:2f84bc93ecfb2689f782b153fdcd368b5a7ab96c1386c65cdaccf35e726d6a44 AS build
+
+WORKDIR /src
+# Only what the relay is built from. cmd/chirp and its Fyne dependencies are
+# never compiled, so the build needs no cgo and fetches none of their modules.
+COPY go.mod go.sum ./
+COPY cmd/chirp-relay/ cmd/chirp-relay/
+COPY session/ session/
+COPY signalling/ signalling/
+
+ARG TARGETOS=linux
+ARG TARGETARCH
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
+    go build -trimpath -ldflags='-s -w' -o /out/chirp-relay ./cmd/chirp-relay
+
+FROM gcr.io/distroless/static-debian13:nonroot@sha256:e2e927ec666bae08560abb3c55d0659eceabb657f56b6782ab500a9fc7f555e3
+
+LABEL org.opencontainers.image.title="chirp-relay" \
+      org.opencontainers.image.description="Chirp's self-hosted relay: codes, links, consent and WebRTC signalling" \
+      org.opencontainers.image.source="https://github.com/barahn/chirp" \
+      org.opencontainers.image.licenses="AGPL-3.0-only" \
+      org.opencontainers.image.vendor="Fabrintek Engenharia Digital Ltda"
+
+COPY --from=build /out/chirp-relay /usr/local/bin/chirp-relay
+
+# Inside a container the relay has to listen beyond loopback to be reached at
+# all; publish the port on the host's loopback, or only to the proxy's
+# network, never to the world (docs/relay.md).
+ENV CHIRP_RELAY_ADDR=:8080
+EXPOSE 8080
+USER nonroot:nonroot
+
+# OCI images carry no HEALTHCHECK, so the check is the runner's: the Quadlet
+# unit's HealthCmd, or podman run --health-cmd. Both run this.
+#   /usr/local/bin/chirp-relay -healthcheck
+ENTRYPOINT ["/usr/local/bin/chirp-relay"]

@@ -171,6 +171,25 @@ Decided by the maintainer:
      relay to anyone. Changing the code format then is accepted: Chirp is
      pre-1.0.
 
+6. **Chirp's domain is `usechirp.app`.** It was registered on 2026-10-10.
+   It carries the website, and the page a link opens is part of it, so the
+   links people send each other carry the domain too. That makes it the
+   address people will learn to trust. "Use Chirp" reads the same in
+   Portuguese and in English, and `.app` is preloaded as HTTPS-only in
+   browsers, so a link to it never opens over plain HTTP.
+
+   - **The site and the link use it first.** The site is static, served by
+     GitHub Pages behind Cloudflare's proxy, which adds the security headers
+     Pages cannot set (docs/devsecops.md): it offers the download and the
+     page a link opens (decision 4), and needs no relay. *Copy link* copies
+     `https://usechirp.app/l#<token>`, which works whatever relay its users
+     run, because the page only says what to do with the link.
+   - **The relay and the lookup do not, yet.** They come with the public
+     server of decision 5. Until then a Chirp reaches only a relay its users
+     run or trust, given with `-relay`, so relay examples and tests keep
+     names reserved for examples (RFC 2606). Showing `usechirp.app` there
+     would suggest a public relay that is not offered yet.
+
 ## Where the pieces live
 
 The mechanism behind this — allocating and redeeming codes, minting codes from a
@@ -189,9 +208,12 @@ any public relay): a running Chirp registers and gets its code and link,
 whoever redeems the code opens a session to control it, and consent is asked
 of the owner over its own socket. It also offers the lookup that decision 5
 reduces the public server to: an owner registers how it can be reached over
-Nostr, and a code or a link returns exactly that, with nothing relayed. There
-is no binary yet, so no prompt is drawn. `HANDOFF.md` §4.5 and §4.6 describe
-the endpoints and the known limits.
+Nostr, and a code or a link returns exactly that, with nothing relayed. With
+`-nostr`, the two Chirps then meet over Nostr relays, and before anyone is
+asked they run the PAKE over the code's four secret digits, which this Chirp
+makes and the server never sees: the code reads `482-913-5071`, and each end
+comes out with the other's key, which signs the session that follows.
+`HANDOFF.md` §4.5 to §4.8 describe the endpoints and the known limits.
 
 ---
 

@@ -52,8 +52,35 @@ type Server struct {
 	// itself and choose a fresh origin for every guess.
 	ClientIP func(*http.Request) string
 
+	// ControllerGrace is how long a session waits for a controller whose
+	// socket dropped to dial back before the relay ends it. Until then the
+	// owner stays busy, so a dropped controller can resume; after, the owner
+	// is free for the next one. Zero means DefaultControllerGrace.
+	ControllerGrace time.Duration
+
+	// PingInterval is how often the relay pings each socket. A socket that
+	// answers none of the pings for two intervals is closed, so a peer that
+	// vanished without closing is noticed; and the pings keep the socket from
+	// looking idle to a reverse proxy that closes idle connections. Zero
+	// means DefaultPingInterval, and anything over MaxPingInterval is taken
+	// as MaxPingInterval: a Chirp gives up on a relay that has not pinged for
+	// client.PingWait.
+	PingInterval time.Duration
+
 	ownersMu sync.Mutex
 	owners   map[rendezvous.PeerID]*ownerConn
+
+	// graces holds, per session, the pending end of a controller that
+	// left; see holdSession and scheduleEnd.
+	graceMu sync.Mutex
+	graces  map[string]*graceEnd
+}
+
+// graceEnd is a session's pending end: when it is due, and the timer that
+// carries it out.
+type graceEnd struct {
+	due   time.Time
+	timer *time.Timer
 }
 
 // ownerConn is an owner's socket and the session it is joined to, if any.
@@ -79,6 +106,7 @@ func NewServer(sm *session.SessionManager) *Server {
 		hub:      NewHub(sm),
 		sessions: sm,
 		owners:   make(map[rendezvous.PeerID]*ownerConn),
+		graces:   make(map[string]*graceEnd),
 		upgrader: websocket.Upgrader{
 			HandshakeTimeout: 10 * time.Second,
 			// Same-origin checking is left off because Chirp is a binary, not
@@ -290,25 +318,77 @@ func (s *Server) submitConsent(w http.ResponseWriter, r *http.Request) {
 //
 // gorilla permits one concurrent writer, and the hub calls Send from the other
 // peer's goroutine, so writes are serialised here rather than left to chance.
+// Pings take the same lock: gorilla would allow them alongside a Send, but one
+// rule for every write is easier to keep than an exception.
 type wsConn struct {
 	conn *websocket.Conn
 	mu   chan struct{}
+
+	done      chan struct{}
+	closeOnce sync.Once
 }
 
 func newWSConn(c *websocket.Conn) *wsConn {
-	return &wsConn{conn: c, mu: make(chan struct{}, 1)}
+	return &wsConn{conn: c, mu: make(chan struct{}, 1), done: make(chan struct{})}
 }
+
+// writeWait bounds one write, so a peer that stopped reading cannot hold the
+// write lock.
+const writeWait = 10 * time.Second
 
 func (w *wsConn) Send(data []byte) error {
 	w.mu <- struct{}{}
 	defer func() { <-w.mu }()
-	if err := w.conn.SetWriteDeadline(time.Now().Add(10 * time.Second)); err != nil {
+	if err := w.conn.SetWriteDeadline(time.Now().Add(writeWait)); err != nil {
 		return err
 	}
 	return w.conn.WriteMessage(websocket.TextMessage, data)
 }
 
-func (w *wsConn) Close() error { return w.conn.Close() }
+func (w *wsConn) Close() error {
+	w.closeOnce.Do(func() { close(w.done) })
+	return w.conn.Close()
+}
+
+// keepAlive pings the socket every interval until it is closed, and closes it
+// when the other end stops answering: each pong pushes the read deadline two
+// intervals out, so a socket that answers none for that long fails its read,
+// and its handler cleans up as for any other departure.
+//
+// It is called before the socket's first read, from the goroutine that will
+// read it, since the pong handler runs inside reads.
+func (w *wsConn) keepAlive(interval time.Duration) {
+	wait := 2 * interval
+	_ = w.conn.SetReadDeadline(time.Now().Add(wait))
+	w.conn.SetPongHandler(func(string) error {
+		return w.conn.SetReadDeadline(time.Now().Add(wait))
+	})
+	go func() {
+		t := time.NewTicker(interval)
+		defer t.Stop()
+		for {
+			select {
+			case <-w.done:
+				return
+			case <-t.C:
+			}
+			if w.ping() != nil {
+				_ = w.Close()
+				return
+			}
+		}
+	}()
+}
+
+func (w *wsConn) ping() error {
+	select {
+	case w.mu <- struct{}{}:
+	case <-w.done:
+		return net.ErrClosed
+	}
+	defer func() { <-w.mu }()
+	return w.conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(writeWait))
+}
 
 // serveWS upgrades and dispatches by role.
 func (s *Server) serveWS(w http.ResponseWriter, r *http.Request) {
@@ -345,7 +425,9 @@ func (s *Server) serveOwner(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		return // Upgrade has already written a response.
 	}
+	conn.SetReadLimit(MaxMessageSize)
 	peer := newWSConn(conn)
+	peer.keepAlive(s.pingInterval())
 
 	s.ownersMu.Lock()
 	if _, taken := s.owners[id]; taken {
@@ -444,6 +526,27 @@ func (s *Server) attachOwner(id rendezvous.PeerID) {
 // serveController joins the Chirp that redeemed a code to its session.
 func (s *Server) serveController(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("session")
+	if _, err := s.sessions.GetSession(id); err != nil {
+		writeSessionError(w, err)
+		return
+	}
+	// A controller dialling back holds the end its leaving scheduled, before
+	// admission is decided; the session is read again after, since an end
+	// that won the race has already made it inadmissible. If this attempt
+	// never joins -- refused, or not a WebSocket at all -- the end goes back
+	// as it was, due when it was due: a failed attempt must not buy the
+	// session more time. Only a controller that joined schedules a new one,
+	// when it leaves.
+	held := s.holdSession(id)
+	joined := false
+	defer func() {
+		switch {
+		case joined:
+			s.scheduleEnd(id, time.Now().Add(s.controllerGrace()))
+		case held != nil:
+			s.scheduleEnd(id, held.due)
+		}
+	}()
 	sess, err := s.sessions.GetSession(id)
 	if err != nil {
 		writeSessionError(w, err)
@@ -461,12 +564,15 @@ func (s *Server) serveController(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		return
 	}
+	conn.SetReadLimit(MaxMessageSize)
 	peer := newWSConn(conn)
+	peer.keepAlive(s.pingInterval())
 	if err := s.hub.Join(sess.ID, RoleController, peer); err != nil {
 		_ = peer.Send(encodeError(err))
 		_ = peer.Close()
 		return
 	}
+	joined = true
 	defer func() {
 		s.hub.Leave(sess.ID, RoleController)
 		_ = peer.Close()
@@ -485,6 +591,97 @@ func (s *Server) serveController(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+}
+
+// MaxMessageSize bounds one message from either end, in bytes. A larger one
+// closes the socket that sent it, before the relay reads it into memory or
+// parses it (Hub.Forward reads every message's type). It matches what a Chirp
+// client accepts (client.Socket), so the relay never forwards a message the
+// other end would refuse anyway; signalling itself is a few kilobytes.
+const MaxMessageSize = 1 << 20
+
+// DefaultControllerGrace is ControllerGrace's default.
+const DefaultControllerGrace = 30 * time.Second
+
+// DefaultPingInterval is PingInterval's default. It is well under the idle
+// timeouts proxies are known for -- Cloudflare's is about 100 s -- and a
+// third of what a Chirp waits between pings before it gives up.
+const DefaultPingInterval = 30 * time.Second
+
+// MaxPingInterval caps PingInterval. A Chirp waits client.PingWait for each
+// ping before it gives the relay up, so a relay pinging less often would drop
+// healthy clients; the cap leaves that wait room for two pings to go missing.
+const MaxPingInterval = 40 * time.Second
+
+// pingInterval is PingInterval, or its default, capped at MaxPingInterval.
+func (s *Server) pingInterval() time.Duration {
+	switch {
+	case s.PingInterval <= 0:
+		return DefaultPingInterval
+	case s.PingInterval > MaxPingInterval:
+		return MaxPingInterval
+	}
+	return s.PingInterval
+}
+
+// controllerGrace is ControllerGrace, or its default.
+func (s *Server) controllerGrace() time.Duration {
+	if s.ControllerGrace > 0 {
+		return s.ControllerGrace
+	}
+	return DefaultControllerGrace
+}
+
+// holdSession takes sessionID's pending end, if a controller that left
+// scheduled one, and stops it. The caller puts it back with scheduleEnd if it
+// turns out not to be needed.
+func (s *Server) holdSession(sessionID string) *graceEnd {
+	s.graceMu.Lock()
+	defer s.graceMu.Unlock()
+	e, ok := s.graces[sessionID]
+	if !ok {
+		return nil
+	}
+	e.timer.Stop()
+	delete(s.graces, sessionID)
+	return e
+}
+
+// scheduleEnd ends sessionID at due unless a controller is connected then.
+// Of two ends, the later is kept: the grace runs from the latest departure,
+// so an earlier one is always stale -- an attempt that never joined putting
+// back the end it held, after a controller came and went meanwhile, must not
+// cut that controller's grace short. Nothing else ends a session its owner
+// has not given up: without this, a controller that left an allowed session
+// kept its owner busy until the session expired, and every other controller
+// was told the owner was already being helped.
+//
+// The end runs under graceMu and only if it is still the pending one, so a
+// controller dialling back -- whose holdSession takes the same lock before
+// admission is decided -- either takes it first or finds the session over.
+func (s *Server) scheduleEnd(sessionID string, due time.Time) {
+	s.graceMu.Lock()
+	defer s.graceMu.Unlock()
+	if old, ok := s.graces[sessionID]; ok {
+		if !due.After(old.due) {
+			return
+		}
+		old.timer.Stop()
+	}
+	e := &graceEnd{due: due}
+	e.timer = time.AfterFunc(time.Until(due), func() {
+		s.graceMu.Lock()
+		defer s.graceMu.Unlock()
+		if s.graces[sessionID] != e {
+			return // replaced or taken
+		}
+		delete(s.graces, sessionID)
+		if controller, _ := s.hub.Connected(sessionID); controller {
+			return // a controller is connected
+		}
+		_, _ = s.sessions.EndSession(sessionID)
+	})
+	s.graces[sessionID] = e
 }
 
 // maybeAskConsent asks the owner for consent once both ends are in the hub,

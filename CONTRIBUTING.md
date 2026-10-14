@@ -6,7 +6,10 @@ Pull requests from outside Fabrintek will not be merged until the Contributor
 License Agreement below is enforced automatically in this repository.
 
 Issues, bug reports, reproduction cases and design discussion are welcome and
-wanted. It is only code that has to wait.
+wanted. It is only code that has to wait. Bugs go in
+[issues](https://github.com/barahn/chirp/issues); questions, ideas and design
+go in [Discussions](https://github.com/barahn/chirp/discussions), where
+*Design* is the place to argue with a decision before anyone writes code.
 
 **Why.** Chirp is dual-licensed: AGPL-3.0-only to the public, and separately to
 Fabrintek for use in its proprietary platform. That arrangement works because
@@ -97,7 +100,9 @@ assumes, is in [docs/devsecops.md](docs/devsecops.md).
 
 CI checks that every non-merge commit in a pull request carries a
 `Signed-off-by` trailer, and that the dependency licences in
-[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) are current and permissive.
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) are current and permissive,
+apart from exceptions the maintainer has accepted by name (today, the fonts
+Fyne embeds: barahn/chirp#54).
 
 Fabrintek's ownership of Chirp is no defence against third-party code arriving
 here under terms Fabrintek cannot pass on. The licence gate treats an
@@ -117,9 +122,15 @@ gate in its own pull request.
 ## Reporting security vulnerabilities
 
 Do **not** open a public issue for a security-sensitive bug. Email
-[security@mendsec.com](mailto:security@mendsec.com). Scope, response targets and
-disclosure terms are in [SECURITY.md](SECURITY.md).
+[security@fabrintek.com.br](mailto:security@fabrintek.com.br). Scope, response
+targets and disclosure terms are in [SECURITY.md](SECURITY.md).
 
 Chirp hands a remote technician control of someone else's desktop. A defect in
 PIN generation, PIN redemption, the session lifecycle or the consent flow is
 security-sensitive even when it looks cosmetic.
+
+## Code of conduct
+
+Participation in this project is governed by the [Code of Conduct](CODE_OF_CONDUCT.md).
+Instances of abusive, harassing, or otherwise unacceptable behavior may be
+reported to [security@fabrintek.com.br](mailto:security@fabrintek.com.br).

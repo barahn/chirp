@@ -6,11 +6,13 @@ package signalling
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -488,20 +490,27 @@ func TestRoleIsRequired(t *testing.T) {
 }
 
 func TestOwnerSocketNeedsItsCredential(t *testing.T) {
-	_, ts := newServer(t)
+	srv, ts := newServer(t)
 	if _, resp, err := dial(t, ts, url.Values{"role": {"owner"}, "peer": {"nobody"}}); err == nil ||
 		resp == nil || resp.StatusCode != http.StatusNotFound {
 		t.Fatalf("unknown peer: err %v", err)
 	}
 	owner := register(t, ts, "Ana")
 	first := dialOwner(t, ts, owner.PeerID)
-	// A second socket for the same peer is refused -- before the upgrade, or
-	// on it if the first was still registering -- and the first stays.
-	c, _, err := dial(t, ts, url.Values{"role": {"owner"}, "peer": {owner.PeerID}})
-	if err == nil {
-		if _, m := read(t, c); m["type"] != RelayErrorType {
-			t.Fatalf("second owner socket got %v, want a relay error", m)
-		}
+	// Dial returns once the upgrade is written, and the relay registers the
+	// socket only after that. A second socket dialled before then can register
+	// first, and the first socket is the one refused, so wait for it.
+	waitFor(t, "the relay to register the first owner socket", func() bool {
+		srv.ownersMu.Lock()
+		defer srv.ownersMu.Unlock()
+		_, open := srv.owners[rendezvous.PeerID(owner.PeerID)]
+		return open
+	})
+	// A second socket for the same peer is then refused before the upgrade,
+	// and the first stays.
+	if _, resp, err := dial(t, ts, url.Values{"role": {"owner"}, "peer": {owner.PeerID}}); err == nil ||
+		resp == nil || resp.StatusCode != http.StatusConflict {
+		t.Fatalf("second owner socket: err %v, want %d", err, http.StatusConflict)
 	}
 	sess, _ := redeem(t, ts, owner.Code, "Bruno")
 	ctrl := dialController(t, ts, sess.SessionID)
@@ -610,5 +619,306 @@ func TestControllerReconnectionDoesNotAskAgain(t *testing.T) {
 	_ = ownerWS.SetReadDeadline(time.Now().Add(200 * time.Millisecond))
 	if _, data, err := ownerWS.ReadMessage(); err == nil {
 		t.Fatalf("owner got %s after a reconnection", data)
+	}
+}
+
+// A controller that leaves and does not come back frees its owner once the
+// grace is over: the session ends, and the owner's next code opens a new one.
+func TestALeftSessionEndsAfterTheControllerGrace(t *testing.T) {
+	srv, ts := newServer(t)
+	srv.ControllerGrace = 100 * time.Millisecond
+	owner := register(t, ts, "Ana")
+	ownerWS := dialOwner(t, ts, owner.PeerID)
+	sess, _ := redeem(t, ts, owner.Code, "Bruno")
+	ctrl := dialController(t, ts, sess.SessionID)
+	awaitPeer(t, ctrl, RoleOwner)
+	awaitPeer(t, ownerWS, RoleController)
+	awaitConsentRequest(t, ownerWS)
+	if st := consent(t, ts, owner.PeerID, sess.SessionID, true); st != http.StatusOK {
+		t.Fatalf("consent status %d", st)
+	}
+
+	_ = ctrl.Close()
+	waitFor(t, "the session to end", func() bool {
+		return state(t, ts, sess.SessionID) == string(session.StateTerminated)
+	})
+	var p peerView
+	call(t, ts, "GET", "/api/peers/"+owner.PeerID, "", &p)
+	if _, st := redeem(t, ts, p.Code, "Carla"); st != http.StatusCreated {
+		t.Fatalf("redeeming the owner's next code: status %d, want 201", st)
+	}
+}
+
+// Within the grace the owner is still busy, so the controller can resume.
+func TestALeftSessionWaitsForTheControllerWithinTheGrace(t *testing.T) {
+	srv, ts := newServer(t)
+	srv.ControllerGrace = time.Hour
+	owner := register(t, ts, "Ana")
+	ownerWS := dialOwner(t, ts, owner.PeerID)
+	sess, _ := redeem(t, ts, owner.Code, "Bruno")
+	ctrl := dialController(t, ts, sess.SessionID)
+	awaitPeer(t, ctrl, RoleOwner)
+	awaitPeer(t, ownerWS, RoleController)
+	awaitConsentRequest(t, ownerWS)
+	_ = consent(t, ts, owner.PeerID, sess.SessionID, true)
+
+	_ = ctrl.Close()
+	waitFor(t, "controller left", func() bool { c, _ := srv.Hub().Connected(sess.SessionID); return !c })
+	if got := state(t, ts, sess.SessionID); got != string(session.StateConsentGranted) {
+		t.Fatalf("state %s within the grace, want it still granted", got)
+	}
+	var p peerView
+	call(t, ts, "GET", "/api/peers/"+owner.PeerID, "", &p)
+	if _, st := redeem(t, ts, p.Code, "Carla"); st != http.StatusConflict {
+		t.Fatalf("redeeming within the grace: status %d, want 409", st)
+	}
+}
+
+// A message past MaxMessageSize closes the socket that sent it, unread and
+// unforwarded, whichever end it comes from.
+func TestAnOversizedMessageClosesTheSocket(t *testing.T) {
+	_, ts := newServer(t)
+	owner := register(t, ts, "Ana")
+	ownerWS := dialOwner(t, ts, owner.PeerID)
+	sess, _ := redeem(t, ts, owner.Code, "Bruno")
+	ctrl := dialController(t, ts, sess.SessionID)
+	awaitPeer(t, ctrl, RoleOwner)
+	awaitPeer(t, ownerWS, RoleController)
+	awaitConsentRequest(t, ownerWS)
+
+	big := append([]byte(`{"type":"offer","sdp":"`), make([]byte, MaxMessageSize)...)
+	if err := ctrl.WriteMessage(websocket.TextMessage, big); err != nil {
+		t.Fatal(err)
+	}
+	_ = ctrl.SetReadDeadline(time.Now().Add(5 * time.Second))
+	for {
+		if _, _, err := ctrl.ReadMessage(); err != nil {
+			if websocket.IsCloseError(err, websocket.CloseMessageTooBig) {
+				break
+			}
+			var ne interface{ Timeout() bool }
+			if errors.As(err, &ne) && ne.Timeout() {
+				t.Fatal("the relay kept the socket open after an oversized message")
+			}
+			break // closed
+		}
+	}
+	// The owner got a leave notice, not the message.
+	_ = ownerWS.SetReadDeadline(time.Now().Add(5 * time.Second))
+	_, m := read(t, ownerWS)
+	if m["type"] != PeerLeftType {
+		t.Fatalf("owner got %v, want %s", m, PeerLeftType)
+	}
+}
+
+// The grace runs from the latest departure: a controller that leaves, comes
+// back and leaves again is not cut off by the first departure's timer.
+func TestTheControllerGraceRunsFromTheLatestDeparture(t *testing.T) {
+	srv, ts := newServer(t)
+	srv.ControllerGrace = time.Second
+	owner := register(t, ts, "Ana")
+	ownerWS := dialOwner(t, ts, owner.PeerID)
+	sess, _ := redeem(t, ts, owner.Code, "Bruno")
+	ctrl := dialController(t, ts, sess.SessionID)
+	awaitPeer(t, ctrl, RoleOwner)
+	awaitPeer(t, ownerWS, RoleController)
+	awaitConsentRequest(t, ownerWS)
+	_ = consent(t, ts, owner.PeerID, sess.SessionID, true)
+
+	gone := func() bool { c, _ := srv.Hub().Connected(sess.SessionID); return !c }
+	_ = ctrl.Close()
+	first := time.Now()
+	waitFor(t, "controller left", gone)
+	time.Sleep(500 * time.Millisecond)
+	again := dialController(t, ts, sess.SessionID)
+	awaitPeer(t, again, RoleOwner)
+	_ = again.Close()
+	waitFor(t, "controller left again", gone)
+
+	// Past the first departure's grace, inside the second's.
+	time.Sleep(time.Until(first.Add(1300 * time.Millisecond)))
+	if got := state(t, ts, sess.SessionID); got != string(session.StateConsentGranted) {
+		t.Fatalf("state %s, want the session kept until the latest grace runs out", got)
+	}
+	waitFor(t, "the session to end", func() bool {
+		return state(t, ts, sess.SessionID) == string(session.StateTerminated)
+	})
+}
+
+// An attempt that never joins -- here a plain request, not a WebSocket --
+// does not buy the session more time: the end stays due when it was.
+func TestAFailedAttemptDoesNotExtendTheControllerGrace(t *testing.T) {
+	srv, ts := newServer(t)
+	srv.ControllerGrace = time.Second
+	owner := register(t, ts, "Ana")
+	ownerWS := dialOwner(t, ts, owner.PeerID)
+	sess, _ := redeem(t, ts, owner.Code, "Bruno")
+	ctrl := dialController(t, ts, sess.SessionID)
+	awaitPeer(t, ctrl, RoleOwner)
+	awaitPeer(t, ownerWS, RoleController)
+	awaitConsentRequest(t, ownerWS)
+	_ = consent(t, ts, owner.PeerID, sess.SessionID, true)
+
+	_ = ctrl.Close()
+	left := time.Now()
+	waitFor(t, "controller left", func() bool { c, _ := srv.Hub().Connected(sess.SessionID); return !c })
+	time.Sleep(500 * time.Millisecond)
+	for i := 0; i < 3; i++ {
+		resp, err := http.Get(ts.URL + "/ws?role=controller&session=" + sess.SessionID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = resp.Body.Close()
+	}
+
+	// Due a second after the departure, not a second after the attempts.
+	time.Sleep(time.Until(left.Add(1300 * time.Millisecond)))
+	if got := state(t, ts, sess.SessionID); got != string(session.StateTerminated) {
+		t.Fatalf("state %s; failed attempts pushed the end back", got)
+	}
+}
+
+// Of two pending ends the later is kept: an earlier one, put back by an
+// attempt that never joined, does not replace the grace of a controller that
+// left more recently.
+func TestTheLaterControllerGraceWins(t *testing.T) {
+	srv, _ := newServer(t)
+	sm, sess := newSession(t)
+	srv.sessions = sm
+	late := time.Now().Add(time.Hour)
+	srv.scheduleEnd(sess.ID, late)
+	srv.scheduleEnd(sess.ID, time.Now()) // stale: would end it at once
+	time.Sleep(100 * time.Millisecond)
+	got, err := sm.GetSession(sess.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.State == session.StateTerminated {
+		t.Fatal("an earlier end replaced a later one")
+	}
+	srv.graceMu.Lock()
+	due := srv.graces[sess.ID].due
+	srv.graceMu.Unlock()
+	if !due.Equal(late) {
+		t.Fatalf("pending end due %v, want the later %v", due, late)
+	}
+	// A later end still replaces an earlier one.
+	srv.scheduleEnd(sess.ID, late.Add(time.Minute))
+	srv.graceMu.Lock()
+	due = srv.graces[sess.ID].due
+	srv.graceMu.Unlock()
+	if !due.Equal(late.Add(time.Minute)) {
+		t.Fatalf("pending end due %v, want the later one", due)
+	}
+}
+
+// An idle socket that answers pings stays open, however long it is idle.
+func TestTheRelayPingsAnIdleSocket(t *testing.T) {
+	const interval = 20 * time.Millisecond
+	srv, ts := newServer(t)
+	srv.PingInterval = interval
+	owner := register(t, ts, "Ana")
+	ownerWS := dialOwner(t, ts, owner.PeerID)
+
+	var pings atomic.Int32
+	ownerWS.SetPingHandler(func(data string) error {
+		pings.Add(1)
+		return ownerWS.WriteControl(websocket.PongMessage, []byte(data), time.Now().Add(time.Second))
+	})
+	closed := make(chan error, 1)
+	go func() {
+		for {
+			if _, _, err := ownerWS.ReadMessage(); err != nil {
+				closed <- err
+				return
+			}
+		}
+	}()
+
+	waitFor(t, "ten pings", func() bool { return pings.Load() >= 10 })
+	select {
+	case err := <-closed:
+		t.Fatalf("the relay closed a socket that answered its pings: %v", err)
+	default:
+	}
+	srv.ownersMu.Lock()
+	_, held := srv.owners[rendezvous.PeerID(owner.PeerID)]
+	srv.ownersMu.Unlock()
+	if !held {
+		t.Fatal("the relay let go of an owner that answered its pings")
+	}
+}
+
+// A peer that stops answering pings is taken for gone: its socket is closed
+// and it leaves, as if it had closed the socket itself.
+func TestASocketThatStopsAnsweringPingsIsClosed(t *testing.T) {
+	const interval = 20 * time.Millisecond
+	srv, ts := newServer(t)
+	srv.PingInterval = interval
+	owner := register(t, ts, "Ana")
+	ownerWS := dialOwner(t, ts, owner.PeerID)
+	sess, _ := redeem(t, ts, owner.Code, "Bruno")
+	ctrl := dialController(t, ts, sess.SessionID)
+	// The controller reads throughout, so it answers its pings and stays.
+	left := make(chan struct{})
+	go func() {
+		for {
+			_, data, err := ctrl.ReadMessage()
+			if err != nil {
+				return
+			}
+			var m map[string]any
+			if json.Unmarshal(data, &m) == nil && m["type"] == PeerLeftType {
+				close(left)
+				return
+			}
+		}
+	}()
+
+	// The owner reads, so pings arrive, but never answers them.
+	ownerWS.SetPingHandler(func(string) error { return nil })
+	closed := make(chan struct{})
+	go func() {
+		defer close(closed)
+		for {
+			if _, _, err := ownerWS.ReadMessage(); err != nil {
+				return
+			}
+		}
+	}()
+
+	select {
+	case <-closed:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the relay kept a socket that stopped answering its pings")
+	}
+	waitFor(t, "the owner to be let go", func() bool {
+		srv.ownersMu.Lock()
+		defer srv.ownersMu.Unlock()
+		_, held := srv.owners[rendezvous.PeerID(owner.PeerID)]
+		return !held
+	})
+	select {
+	case <-left:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the controller was not told the owner left")
+	}
+}
+
+// A ping interval a Chirp would time out on is capped, and the default fills
+// in for none.
+func TestThePingIntervalIsCapped(t *testing.T) {
+	for set, want := range map[time.Duration]time.Duration{
+		0:                      DefaultPingInterval,
+		-time.Second:           DefaultPingInterval,
+		time.Second:            time.Second,
+		MaxPingInterval:        MaxPingInterval,
+		time.Hour:              MaxPingInterval,
+		time.Duration(1 << 62): MaxPingInterval,
+	} {
+		s := &Server{PingInterval: set}
+		if got := s.pingInterval(); got != want {
+			t.Errorf("PingInterval %v gives %v, want %v", set, got, want)
+		}
 	}
 }
