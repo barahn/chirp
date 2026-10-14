@@ -12,10 +12,14 @@ feature/*  fix/*  deps/*  ──(rebase)──▶  main  ──(tag)──▶  v
 ```
 
 Work lands on `main` via pull request with linear history. Releases are tagged
-points (`vX.Y.Z`) on `main` — CI recognises those tags to build release assets
-and generate SBOMs.
+points (`vX.Y.Z`) on `main` — CI runs on those tags, and `sbom.yml` attaches an
+SBOM to the release.
 
 Branch names: `feature/<topic>`, `fix/<topic>`, `deps/<topic>`, `docs/<topic>`.
+
+There is no `hotfix/*` branch. A released version gets no backports
+([SECURITY.md](../SECURITY.md#supported-versions)), so an urgent fix is a
+`fix/*` pull request like any other, shipped as the next patch tag.
 
 ## What the protection guarantees
 
@@ -56,10 +60,13 @@ using **rebase**, ensuring that each commit lands with its verified DCO
 disallowed because GitHub's automated squash commit can bypass or drop the
 individual DCO attestations.
 
-Signed commits are not required yet. Every commit here is unsigned except merge
-commits GitHub makes, and a DCO `Signed-off-by` trailer is not a cryptographic
-signature. Turn `required_signatures` on once every author — including coding
-agents — has a signing key.
+Signed commits are not required yet, and a DCO `Signed-off-by` trailer is not a
+cryptographic signature. Signing keys alone will not be enough to require them:
+GitHub cannot sign the commits of a rebase merge — it rewrites each one and has
+no key of the author's — so with rebase as the only merge method every commit
+lands on `main` unsigned, which is exactly what `required_signatures` refuses.
+Turning it on is a merge-method decision as well as a keys one, to be weighed
+against the reason squash is off above.
 
 ## The approval policy, as decided
 
@@ -77,6 +84,24 @@ The maintainer's decision:
 
 Nothing pushes directly to a protected branch. The `HANDOFF.md` snapshot is
 checked in CI instead of being committed by a bot, so no bot needs a bypass.
+
+### Before trunk-based development
+
+Up to v0.3.0 (2026-10-14) there were two long-lived branches: `develop`, for
+integration, with no approval required; and `main`, for releases, reached
+by a merge commit from `develop` and requiring a code owner's approval from
+someone other than the last pusher. That approval was the only thing the second
+branch bought, and with one maintainer it was never a second person: the one
+release made under the rule, v0.3.0 (barahn/chirp#97), was a pull request
+opened by a workflow and approved by the maintainer. An earlier version of this
+document had rejected exactly that, since it records the author reviewing their
+own code as if it were a second pair of eyes. Meanwhile the model cost a
+workflow to keep the release pull request open, a cherry-pick back to `develop`
+for every hotfix, and a `develop` that reported itself behind `main` after each
+release.
+
+`main`'s history up to v0.3.0 keeps those merge commits; linear history applies
+to what lands after it.
 
 ### Release tags
 
@@ -104,6 +129,10 @@ To update a ruleset that already exists, `PUT` it by id —
 ```sh
 gh api -X PUT repos/barahn/chirp/rulesets/24844665 --input .github/rulesets/main-protected.json
 ```
+
+Any ruleset on GitHub that is not one of these files is drift: compare with
+`gh api repos/barahn/chirp/rulesets --jq '.[].name'`, and remove one by id with
+`gh api -X DELETE repos/barahn/chirp/rulesets/<id>`.
 
 To ensure `main` is the default branch:
 

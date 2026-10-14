@@ -8,13 +8,13 @@ inconvenient.
 
 ## Branching model
 
-Chirp follows **Trunk-Based Development**. `main` is the default branch and the primary trunk.
-Work lands there via pull request with linear history; releases are tagged points (`v*.*.*`)
-on `main`.
+Chirp follows **Trunk-Based Development**. `main` is the default branch and the
+primary trunk. Work lands there via pull request with linear history; releases
+are tagged points (`v*.*.*`) on `main`.
 
 ```
-feature/*  ──(rebase)──▶  main  ──(tag)──▶  tag v*.*.*
-    PR, CI                       release
+feature/*  ──(rebase)──▶  main  ──▶  tag v*.*.*
+   PR, CI                            release
 ```
 
 - **Branch from `main`**. `git switch main && git pull`.
@@ -106,10 +106,10 @@ are the half of DevSecOps that a pull request cannot deliver:
 
 2. **Branch protection on `main`.** The rules live as code in
    [`.github/rulesets/`](../.github/rulesets/), and
-   [branching.md](branching.md) explains each one — including why `main` requires
-   linear history, rebase merges, and 0 approvals while there is a single
-   maintainer. Import those files rather than configuring rules by hand: a hand-made
-   rule that is not in the files is drift.
+   [branching.md](branching.md) explains each one — including why `main`
+   requires linear history, rebase merges, and 0 approvals while there is a
+   single maintainer. Import those files rather than configuring rules by hand:
+   a hand-made rule that is not in the files is drift.
 
 3. **Code security** (Settings → Advanced Security):
    - Secret scanning **and** push protection. gitleaks in CI catches a secret
@@ -131,8 +131,14 @@ are the half of DevSecOps that a pull request cannot deliver:
 6. **usechirp.app behind Cloudflare**, which adds the security headers GitHub
    Pages cannot set. See [The website's headers](#the-websites-headers).
 
+7. **Deployment branch of the `github-pages` environment → `main`**
+   (Settings → Environments → github-pages). `pages.yml` deploys only from
+   `main`, but a workflow can change its own `if:`; the environment's rule is
+   the check a pull request cannot edit.
+
 The first five are applied as of 2026-10-10 (barahn/chirp#17), when the
-repository went public. The sixth is applied as of 2026-10-12.
+repository went public. The sixth is applied as of 2026-10-12. The seventh
+moved from `develop` to `main` with the switch to trunk-based development.
 
 ### The website's headers
 
