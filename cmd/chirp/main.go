@@ -29,6 +29,11 @@
 // (wss://...), sessions are signalled over those relays instead of through
 // the Chirp server, which then only looks codes up (docs/product-model.md,
 // decision 5; barahn/chirp#43). There is no default list yet.
+//
+// It speaks the system's language when it has a translation for it, English
+// and Brazilian Portuguese so far (barahn/chirp#80). On Linux the language
+// comes from LANGUAGE, LC_ALL, LC_MESSAGES or LANG, so LANGUAGE=pt_BR chirp
+// shows it in Portuguese whatever the desktop's language.
 package main
 
 import (
@@ -41,6 +46,7 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
+	"fyne.io/fyne/v2/lang"
 
 	"github.com/barahn/chirp/client"
 	"github.com/barahn/chirp/cmd/chirp/internal/ui"
@@ -57,6 +63,9 @@ func main() {
 	flag.Parse()
 	ice := iceConfig(*iceList, os.Getenv("CHIRP_TURN_USERNAME"), os.Getenv("CHIRP_TURN_PASSWORD"))
 
+	if err := ui.UseLanguage(lang.SystemLocale().String()); err != nil {
+		fyne.LogError("Chirp's translation could not be read; using English", err)
+	}
 	a := app.New()
 	a.Settings().SetTheme(warm.New())
 	a.SetIcon(warm.AppIcon)

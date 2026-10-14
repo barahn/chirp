@@ -242,6 +242,25 @@ and no first person.
 `404` deliberately does not say which of its causes applies: telling them
 apart would help someone sweeping codes.
 
+## Languages
+
+Chirp speaks English and Brazilian Portuguese, and follows the system's
+language; Portuguese from Portugal gets the Brazilian words rather than
+English (barahn/chirp#80). On Linux the language comes from `LANGUAGE`,
+`LC_ALL`, `LC_MESSAGES` or `LANG`, so `LANGUAGE=pt_BR chirp` shows
+Portuguese on an English desktop.
+
+The words are written in English in `cmd/chirp/internal/ui`, and each English
+text is the key to its translation in `cmd/chirp/internal/ui/translations/`.
+A sentence that changes in English therefore shows in English until it is
+translated again, never as the old translation of what it used to say, and
+`TestEveryWordIsTranslated` fails until every language catches up. The tables
+above are the source for the prompt and the messages; the translation files
+follow them.
+
+The Warm fonts' Latin subset covers Portuguese. Check their coverage before
+adding a language that needs other letters.
+
 ## Before the system asks
 
 TunnelBear explains each operating-system warning before it appears. Chirp
