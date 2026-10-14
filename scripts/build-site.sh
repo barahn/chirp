@@ -31,11 +31,11 @@ cp "$warm/bird/icon.svg" "$out/favicon.svg"
 # Cloudflare tells browsers to keep /assets/ for hours, under the same names
 # from one deploy to the next, while the pages expire in minutes. A page from
 # a new deploy could then show an old screenshot, or run an old site.js that
-# lacks its new translations. Each reference to an asset in a page carries a
-# hash of that asset's content, so a changed file gets a new URL and an
-# unchanged one stays cached.
+# lacks its new translations. Each reference a page makes to an asset, or to
+# the favicon, which browsers keep longer still, carries a hash of that file's
+# content, so a changed file gets a new URL and an unchanged one stays cached.
 for page in "$out"/index.html "$out"/l/index.html; do
-  for ref in $(grep -o '"/assets/[^"?]*"' "$page" | tr -d '"' | sort -u); do
+  for ref in $(grep -oE '"/(assets/[^"?]*|favicon\.svg)"' "$page" | tr -d '"' | sort -u); do
     file="$out$ref"
     [ -f "$file" ] || { echo "$page refers to $ref, which is not in the site" >&2; exit 1; }
     hash="$(sha256sum "$file" | cut -c1-12)"
