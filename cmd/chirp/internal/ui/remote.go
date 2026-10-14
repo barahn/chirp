@@ -36,7 +36,7 @@ type Remote struct {
 // window, calls end once: it ends this session and no other, so a window
 // still closing from an earlier session cannot cancel a newer attempt.
 func (w *Window) OpenRemote(input func(bark.InputEvent), end func()) *Remote {
-	r := &Remote{win: w.app.NewWindow(remoteTitle)}
+	r := &Remote{win: w.app.NewWindow(tr(remoteTitle))}
 	ended := false
 	finish := func() {
 		if ended {
@@ -49,7 +49,7 @@ func (w *Window) OpenRemote(input func(bark.InputEvent), end func()) *Remote {
 	r.notice = widget.NewLabel("")
 	r.notice.Wrapping = fyne.TextWrapWord
 	r.notice.Hide()
-	r.stop = widget.NewButton(remoteEnd, finish)
+	r.stop = widget.NewButton(tr(remoteEnd), finish)
 	r.stop.Importance = widget.DangerImportance
 	bar := container.NewBorder(nil, nil, nil, r.stop, r.notice)
 	r.win.SetContent(container.NewBorder(bar, nil, nil, nil, r.view))

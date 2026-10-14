@@ -14,7 +14,9 @@ import (
 )
 
 // The words the window uses, from docs/ux.md. Kept apart from the widgets so
-// they can be checked, and later translated, without a display.
+// they can be checked without a display. They are written in English and
+// translated where they are used, through tr (tr.go): a constant here is the
+// English text, and the key to its translation.
 //
 // The rule from docs/ux.md holds here: each message says what happened and
 // what to do, with no error codes, no brand words and no first person.
@@ -43,9 +45,9 @@ const (
 func remoteNotice(kind string) string {
 	switch kind {
 	case "consent_required":
-		return "They haven't allowed you to see their screen."
+		return tr("They haven't allowed you to see their screen.")
 	case "capture_unavailable":
-		return "Their computer can't share its screen right now. Ask them whether it allows screen recording."
+		return tr("Their computer can't share its screen right now. Ask them whether it allows screen recording.")
 	}
 	return ""
 }
@@ -54,13 +56,13 @@ func remoteNotice(kind string) string {
 func statusText(p client.OwnerPhase) string {
 	switch p {
 	case client.OwnerReady:
-		return "Ready"
+		return tr("Ready")
 	case client.OwnerReconnecting:
-		return "Reconnecting"
+		return tr("Reconnecting")
 	case client.OwnerOffline:
-		return "Offline"
+		return tr("Offline")
 	default:
-		return "Starting"
+		return tr("Starting")
 	}
 }
 
@@ -68,17 +70,17 @@ func statusText(p client.OwnerPhase) string {
 func ownerNote(ev client.OwnerEvent) string {
 	switch {
 	case ev.Phase == client.OwnerReconnecting:
-		return noteReconnect
+		return tr(noteReconnect)
 	case ev.Phase == client.OwnerOffline && errors.Is(ev.Err, client.ErrTooMany):
-		return noteTooMany
+		return tr(noteTooMany)
 	case ev.Phase == client.OwnerOffline && ev.Lost:
-		return noteLost
+		return tr(noteLost)
 	case ev.Phase == client.OwnerOffline:
-		return noteOffline
+		return tr(noteOffline)
 	case ev.WrongCode:
-		return noteWrongCode
+		return tr(noteWrongCode)
 	case ev.Replaced:
-		return noteReplaced
+		return tr(noteReplaced)
 	}
 	return ""
 }
@@ -139,9 +141,9 @@ func claim(name string) string {
 func promptName(name string) string {
 	c := claim(name)
 	if c == "" {
-		return promptUnnamed
+		return tr(promptUnnamed)
 	}
-	return "They say they're “" + c + "”."
+	return trf("They say they're “%s”.", c)
 }
 
 // permissionText names what a permission lets the other person do. A name
@@ -149,15 +151,15 @@ func promptName(name string) string {
 func permissionText(p string) string {
 	switch p {
 	case "screen_view":
-		return "See your screen"
+		return tr("See your screen")
 	case "remote_control":
-		return "Use your mouse and keyboard"
+		return tr("Use your mouse and keyboard")
 	case "clipboard":
-		return "Share your clipboard"
+		return tr("Share your clipboard")
 	case "file_transfer":
-		return "Send and receive files"
+		return tr("Send and receive files")
 	}
-	return "Something Chirp doesn't know: " + claim(p)
+	return trf("Something Chirp doesn't know: %s", claim(p))
 }
 
 // promptCountdown says when the prompt declines by itself.
@@ -165,27 +167,29 @@ func promptCountdown(seconds int) string {
 	if seconds < 0 {
 		seconds = 0
 	}
-	return fmt.Sprintf("Declines by itself in %d:%02d", seconds/60, seconds%60)
+	return trf("Declines by itself in %d:%02d", seconds/60, seconds%60)
 }
 
 // allowLabel is the Allow button's label while it is still locked.
 func allowLabel(locked int) string {
 	if locked > 0 {
-		return fmt.Sprintf("%s (%d)", promptAllow, locked)
+		return fmt.Sprintf("%s (%d)", tr(promptAllow), locked)
 	}
-	return promptAllow
+	return tr(promptAllow)
 }
 
 // decidedNote tells the owner, in the main window, what they decided.
 func decidedNote(name string, granted bool) string {
-	who := "them"
-	if c := claim(name); c != "" {
-		who = "“" + c + "”"
+	c := claim(name)
+	switch {
+	case granted && c == "":
+		return tr("You let them in. They can see your screen and use your computer until you end the session.")
+	case granted:
+		return trf("You let “%s” in. They can see your screen and use your computer until you end the session.", c)
+	case c == "":
+		return tr("You declined them. Nobody got in.")
 	}
-	if granted {
-		return "You let " + who + " in. They can see your screen and use your computer until you end the session."
-	}
-	return "You declined " + who + ". Nobody got in."
+	return trf("You declined “%s”. Nobody got in.", c)
 }
 
 // sessionOverNote is the main window's line once a session has ended.
@@ -194,9 +198,9 @@ const sessionOverNote = "The session is over. Nobody can see or use this compute
 // answerProblem is shown when an answer did not reach the relay.
 func answerProblem(granted bool) string {
 	if granted {
-		return "Your Allow didn't reach the Chirp server, so nobody got in. The request will decline by itself."
+		return tr("Your Allow didn't reach the Chirp server, so nobody got in. The request will decline by itself.")
 	}
-	return "Your Decline didn't reach the Chirp server. The request will decline by itself anyway."
+	return tr("Your Decline didn't reach the Chirp server. The request will decline by itself anyway.")
 }
 
 // helpProblem says why an attempt to help someone failed, and what to do.
@@ -204,42 +208,42 @@ func helpProblem(err error) string {
 	var re *client.RelayError
 	switch {
 	case errors.Is(err, client.ErrNoName):
-		return "Enter your name first. They'll see it in their prompt."
+		return tr("Enter your name first. They'll see it in their prompt.")
 	case errors.Is(err, client.ErrNotATarget):
-		return "Enter a code or paste a link first."
+		return tr("Enter a code or paste a link first.")
 	case errors.Is(err, client.ErrNotFound):
-		return "That code doesn't exist or was already used. Ask for a new one."
+		return tr("That code doesn't exist or was already used. Ask for a new one.")
 	case errors.Is(err, client.ErrBusy):
-		return "That person is already getting help from someone else."
+		return tr("That person is already getting help from someone else.")
 	case errors.Is(err, client.ErrIncompleteCode):
-		return "Enter the whole code, all ten digits, or the whole link."
+		return tr("Enter the whole code, all ten digits, or the whole link.")
 	case errors.Is(err, client.ErrWrongCode):
-		return wrongCode
+		return tr(wrongCode)
 	case errors.Is(err, client.ErrNoNostr):
-		return "Their Chirp isn't set up for Nostr relays. Ask them for a new code, and use the same setup as they do."
+		return tr("Their Chirp isn't set up for Nostr relays. Ask them for a new code, and use the same setup as they do.")
 	case errors.Is(err, client.ErrBadContact):
-		return "Chirp's server gave an address that can't be used. Nothing was connected."
+		return tr("Chirp's server gave an address that can't be used. Nothing was connected.")
 	case errors.Is(err, client.ErrTooMany):
-		return "Too many tries from this network. Try again in a few minutes."
+		return tr("Too many tries from this network. Try again in a few minutes.")
 	case errors.As(err, &re) && re.Status == http.StatusServiceUnavailable:
-		return "Chirp's server is busy. Try again shortly."
+		return tr("Chirp's server is busy. Try again shortly.")
 	case errors.Is(err, client.ErrUnavailable):
-		return "Can't reach the Chirp server. Check your connection and try again."
+		return tr("Can't reach the Chirp server. Check your connection and try again.")
 	}
-	return "Something went wrong. Try again."
+	return tr("Something went wrong. Try again.")
 }
 
 // outcome is the title, text and button for an attempt that is over.
 func outcome(p client.HelperPhase) (title, text, button string) {
 	switch p {
 	case client.HelperAllowed:
-		return "You're in", "Their screen is open in its own window. End the session there or here when you're done.", "End"
+		return tr("You're in"), tr("Their screen is open in its own window. End the session there or here when you're done."), tr("End")
 	case client.HelperDeclined:
-		return "They declined", "Nothing was shared. If they meant to let you in, ask them for a new code.", "Try again"
+		return tr("They declined"), tr("Nothing was shared. If they meant to let you in, ask them for a new code."), tr("Try again")
 	case client.HelperExpired:
-		return "They didn't answer in time", "Nothing was shared. Ask them for a new code.", "Try again"
+		return tr("They didn't answer in time"), tr("Nothing was shared. Ask them for a new code."), tr("Try again")
 	default:
-		return "The session ended", "They closed Chirp, or the session ended.", "Done"
+		return tr("The session ended"), tr("They closed Chirp, or the session ended."), tr("Done")
 	}
 }
 
@@ -248,5 +252,5 @@ func countdown(seconds int) string {
 	if seconds < 0 {
 		seconds = 0
 	}
-	return fmt.Sprintf("Expires in %d:%02d", seconds/60, seconds%60)
+	return trf("Expires in %d:%02d", seconds/60, seconds%60)
 }

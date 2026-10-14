@@ -62,7 +62,7 @@ func (w *Window) showPrompt(req *client.ConsentRequest) {
 	}
 	p := &prompt{
 		w:      w,
-		win:    w.app.NewWindow(promptTitle),
+		win:    w.app.NewWindow(tr(promptTitle)),
 		req:    req,
 		left:   req.ExpiresIn,
 		locked: allowLock,
@@ -70,7 +70,7 @@ func (w *Window) showPrompt(req *client.ConsentRequest) {
 	}
 	w.prompt = p
 
-	p.decline = widget.NewButton(promptDecline, func() { p.answer(false) })
+	p.decline = widget.NewButton(tr(promptDecline), func() { p.answer(false) })
 	p.decline.Importance = widget.HighImportance
 	p.allow = widget.NewButton(allowLabel(p.locked), func() {
 		if p.locked == 0 {
@@ -82,7 +82,7 @@ func (w *Window) showPrompt(req *client.ConsentRequest) {
 	p.count = widget.NewLabel("")
 	p.showCountdown()
 
-	title := widget.NewLabelWithStyle(promptTitle, fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+	title := widget.NewLabelWithStyle(tr(promptTitle), fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 	title.Wrapping = fyne.TextWrapWord
 	perms := container.NewVBox()
 	for _, name := range req.Permissions {
@@ -94,10 +94,10 @@ func (w *Window) showPrompt(req *client.ConsentRequest) {
 	p.win.SetContent(container.NewPadded(container.NewVBox(
 		container.NewBorder(nil, nil, widget.NewIcon(theme.NewWarningThemedResource(theme.WarningIcon())), nil, title),
 		who,
-		wrapped(promptNoCheck),
-		widget.NewLabel(promptAsking),
+		wrapped(tr(promptNoCheck)),
+		widget.NewLabel(tr(promptAsking)),
 		perms,
-		p.warningBox(promptWarning),
+		p.warningBox(tr(promptWarning)),
 		container.NewHBox(p.count, layout.NewSpacer(), p.allow, p.decline),
 	)))
 	p.win.Resize(fyne.NewSize(480, 0))

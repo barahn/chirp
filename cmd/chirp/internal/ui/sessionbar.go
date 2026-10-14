@@ -43,7 +43,7 @@ func (w *Window) showSessionBar(s client.ActiveSession) {
 	if w.bar != nil {
 		w.bar.dismiss()
 	}
-	b := &sessionBar{w: w, win: w.app.NewWindow(barTitle), session: s, now: time.Now, stop: make(chan struct{})}
+	b := &sessionBar{w: w, win: w.app.NewWindow(tr(barTitle)), session: s, now: time.Now, stop: make(chan struct{})}
 	b.start = b.now()
 	w.bar = b
 
@@ -51,7 +51,7 @@ func (w *Window) showSessionBar(s client.ActiveSession) {
 	dot.Resize(fyne.NewSize(10, 10))
 	who := widget.NewLabelWithStyle(barText(s.Name), fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 	b.clock = widget.NewLabel(elapsedText(0))
-	b.end = widget.NewButton(barEnd, b.endNow)
+	b.end = widget.NewButton(tr(barEnd), b.endNow)
 	b.end.Importance = widget.DangerImportance
 	b.win.SetContent(container.NewPadded(container.NewHBox(
 		container.NewGridWrap(fyne.NewSize(10, 10), dot), who, b.clock, b.end,
@@ -117,9 +117,9 @@ func (b *sessionBar) dismiss() {
 // barText says who is in, as a claim.
 func barText(name string) string {
 	if c := claim(name); c != "" {
-		return "“" + c + "” is controlling this computer"
+		return trf("“%s” is controlling this computer", c)
 	}
-	return "Someone is controlling this computer"
+	return tr("Someone is controlling this computer")
 }
 
 // elapsedText is the bar's clock, as minutes and seconds.

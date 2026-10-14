@@ -156,19 +156,19 @@ func (w *Window) ownerCard() fyne.CanvasObject {
 	w.code.TextStyle = fyne.TextStyle{Monospace: true}
 	w.copyCode = widget.NewButtonWithIcon("", theme.ContentCopyIcon(), w.copyTheCode)
 	w.note = wrapped("")
-	w.hint = wrapped(hintCode)
-	w.copyLink = widget.NewButton("Copy link", w.copyTheLink)
-	w.newCode = widget.NewButton("New code", func() {
+	w.hint = wrapped(tr(hintCode))
+	w.copyLink = widget.NewButton(tr("Copy link"), w.copyTheLink)
+	w.newCode = widget.NewButton(tr("New code"), func() {
 		if w.OnNewCode != nil {
 			w.OnNewCode()
 		}
 	})
 	w.request = wrapped("")
 	w.request.Hide()
-	w.endSession = widget.NewButton("End session", w.endTheSession)
+	w.endSession = widget.NewButton(tr("End session"), w.endTheSession)
 	w.endSession.Importance = widget.DangerImportance
 	w.endSession.Hide()
-	return widget.NewCard("Your code", "", container.NewVBox(
+	return widget.NewCard(tr("Your code"), "", container.NewVBox(
 		container.NewBorder(nil, nil, nil, w.copyCode, w.code),
 		w.note,
 		w.hint,
@@ -178,34 +178,34 @@ func (w *Window) ownerCard() fyne.CanvasObject {
 
 func (w *Window) helpArea() fyne.CanvasObject {
 	w.name = widget.NewEntry()
-	w.name.SetPlaceHolder("As they'll see it")
+	w.name.SetPlaceHolder(tr("As they'll see it"))
 	w.target = widget.NewEntry()
-	w.target.SetPlaceHolder("482 913 5071 or a link")
+	w.target.SetPlaceHolder(tr("482 913 5071 or a link"))
 	w.target.OnSubmitted = func(string) { w.tryConnect() }
-	w.connect = widget.NewButton("Connect", w.tryConnect)
+	w.connect = widget.NewButton(tr("Connect"), w.tryConnect)
 	w.connect.Importance = widget.HighImportance
 	w.problem = wrapped("")
 	w.problem.Importance = widget.DangerImportance
 	w.problem.Hide()
-	hint := wrapped(hintHelp)
+	hint := wrapped(tr(hintHelp))
 	w.form = container.NewVBox(
-		widget.NewLabelWithStyle("Help someone", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-		widget.NewLabel("Your name"), w.name,
-		widget.NewLabel("Their code or link"),
+		widget.NewLabelWithStyle(tr("Help someone"), fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+		widget.NewLabel(tr("Your name")), w.name,
+		widget.NewLabel(tr("Their code or link")),
 		container.NewBorder(nil, nil, nil, w.connect, w.target),
 		w.problem,
 		hint,
 	)
 
-	w.waitHeading = heading(waitTitle)
+	w.waitHeading = heading(tr(waitTitle))
 	w.remaining = widget.NewLabel("")
 	w.progress = widget.NewProgressBar()
 	w.progress.TextFormatter = func() string { return "" }
-	w.cancel = widget.NewButton("Cancel", w.stopHelping)
+	w.cancel = widget.NewButton(tr("Cancel"), w.stopHelping)
 	w.waiting = container.NewVBox(
 		container.NewCenter(birdImage(warm.Chirping, 96)),
 		container.NewCenter(w.waitHeading),
-		wrapped(waitText),
+		wrapped(tr(waitText)),
 		w.progress,
 		w.remaining,
 		container.NewCenter(w.cancel),
@@ -269,8 +269,8 @@ func (w *Window) ApplyOwner(ev client.OwnerEvent) {
 		return
 	}
 	w.setPose(ownerPose(ev))
-	w.hint.SetText(hintCode)
-	w.copyLink.SetText("Copy link")
+	w.hint.SetText(tr(hintCode))
+	w.copyLink.SetText(tr("Copy link"))
 	if note := ownerNote(ev); note != "" {
 		w.note.SetText(note)
 		w.note.Show()
@@ -314,7 +314,7 @@ func (w *Window) sessionEnded() {
 	}
 	w.endSession.Hide()
 	w.request.Importance = widget.MediumImportance
-	w.request.SetText(sessionOverNote)
+	w.request.SetText(tr(sessionOverNote))
 	w.request.Show()
 }
 
@@ -322,7 +322,7 @@ func (w *Window) endTheSession() {
 	defer w.relayout()
 	w.endSession.Hide()
 	w.request.Importance = widget.MediumImportance
-	w.request.SetText("Session ended. Your code and link are being replaced.")
+	w.request.SetText(tr("Session ended. Your code and link are being replaced."))
 	if w.OnEndSession != nil {
 		w.OnEndSession()
 	}
@@ -395,14 +395,14 @@ func (w *Window) ApplyHelper(ev client.HelperEvent) {
 // ShowNoServer replaces the window's content when there is no usable relay
 // address. addr is what was given, if anything.
 func (w *Window) ShowNoServer(addr string) {
-	title := noServerTitle
+	title := tr(noServerTitle)
 	if addr != "" {
-		title = badServerTitle
+		title = tr(badServerTitle)
 	}
 	w.win.SetContent(container.NewPadded(container.NewVBox(
 		container.NewCenter(birdImage(warm.Asleep, 96)),
 		widget.NewLabelWithStyle(title, fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-		wrapped(noServerText),
+		wrapped(tr(noServerText)),
 	)))
 }
 
@@ -449,7 +449,7 @@ func (w *Window) show(c *fyne.Container) {
 
 func (w *Window) copyTheCode() {
 	w.app.Clipboard().SetContent(w.peer.Spoken())
-	w.hint.SetText("Code copied.")
+	w.hint.SetText(tr("Code copied."))
 	w.relayout()
 }
 
@@ -462,7 +462,7 @@ const linkPage = "https://usechirp.app/l#"
 // what to do with it, with the token in its fragment.
 func (w *Window) copyTheLink() {
 	w.app.Clipboard().SetContent(linkPage + w.peer.LinkFragment())
-	w.copyLink.SetText("Link copied")
+	w.copyLink.SetText(tr("Link copied"))
 	w.relayout()
 }
 
