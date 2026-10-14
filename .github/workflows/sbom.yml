@@ -1,9 +1,11 @@
 name: SBOM
 
 # An SBOM is only useful if it describes something that was actually shipped,
-# so this runs on release tags and attaches the result to the release. Chirp
-# has no cmd/ entry point yet (see README), so today the SBOM describes the
-# module graph; once a binary exists, the same job covers it.
+# so this runs on release tags and attaches the result to the release. A
+# release ships source only, with no built binaries yet (see README), so the
+# SBOM describes the module graph that cmd/chirp and cmd/chirp-relay both
+# build from. Once releases carry binaries, scan those too: each one records
+# the exact modules linked into it.
 on:
   push:
     tags: [ 'v*.*.*' ]
