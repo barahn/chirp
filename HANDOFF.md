@@ -348,10 +348,11 @@ free plan, `GET /repos/barahn/chirp/rulesets` answered the maintainer's own
 account with `403 Upgrade to GitHub Pro or make this repository public`, and
 CodeQL and dependency review needed GitHub Advanced Security
 (barahn/chirp#1). The repository variable `CODE_SCANNING` is `true`, so CodeQL
-and dependency review run and are enforced (`docs/devsecops.md`). The rulesets active on GitHub are the files in `.github/rulesets/`:
-*main protected*, requiring linear history, rebase merges and status checks, and
+and dependency review run and are enforced (`docs/devsecops.md`). The two
+rulesets active on GitHub are the two files in `.github/rulesets/`: *main
+protected*, requiring linear history, rebase merges and the five checks, and
 *release tags protected*, which refuses deleting, moving or force-pushing a
-`v*` tag. The reasoning, and the branching model history, are in
+`v*` tag. The reasoning, and why `develop` went after v0.3.0, are in
 `docs/branching.md`.
 
 The other three: the `Session` mutex
@@ -965,9 +966,9 @@ may become):
 - **v0.1.0** (barahn/chirp#2, barahn/chirp#3):
   - the deadlock (§4.1) and redemption throttling (§4.2);
   - the signalling server with its two security holes closed (§4.4);
-  - the CI branch integrated into `develop`: `ci.yml` runs on `develop`, and
-    CodeQL, gitleaks, dependency review, SBOM and Dependabot are in, with
-    the code-scanning pair gated as §4.3 describes.
+  - the CI branch integrated into `develop`, then the integration branch:
+    `ci.yml` ran there, and CodeQL, gitleaks, dependency review, SBOM and
+    Dependabot came in, with the code-scanning pair gated as §4.3 describes.
 - **v0.2.0** (barahn/chirp#28, tag `v0.2.0` on `main`, 2026-10-08):
   - remotekit's `rendezvous` adopted and the session direction inverted
     (§4.5), with remotekit pinned at `v0.3.0`;
@@ -979,9 +980,24 @@ may become):
 
   The GitHub Release carries the notes, and the SBOM workflow attaches its
   output to it.
+- **v0.3.0** (barahn/chirp#97, tag `v0.3.0` on `main`, 2026-10-14), the last
+  release merged from `develop`:
+  - `cmd/chirp` from the window to both halves of a session: the code and
+    link, consent in Chirp's own prompt, the owner's screen served by
+    remotekit's `stream.Runner` and shown by `stream.Viewer`, and the owner's
+    session bar (barahn/chirp#10, #11, #12; §5.5);
+  - signalling over Nostr relays (§4.7) and the PAKE over the code's secret
+    part (§4.8);
+  - the relay's deploy files, for a Proxmox LXC container, Podman or
+    systemd (`docs/relay.md`);
+  - usechirp.app on GitHub Pages, behind Cloudflare's headers
+    (`docs/devsecops.md`).
 
-Chirp follows Trunk-Based Development on `main`. A release is tagged directly
-on `main` (`docs/branching.md`).
+  The SBOM workflow ran on the tag, but there is no GitHub Release for it
+  yet, so nothing carries its notes.
+
+Since v0.3.0 there is no `develop`: work lands on `main` by pull request, and
+a release is a tag on `main` (`docs/branching.md`).
 
 Still to decide or do, in order. Each step has an issue, and the
 [Chirp roadmap](https://github.com/orgs/barahn/projects/2) project tracks them:

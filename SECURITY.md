@@ -40,10 +40,10 @@ advisory unless they ask not to be.
 ## Supported versions
 
 Chirp is **not yet a runnable product** (see [README.md](README.md)):
-`cmd/chirp` goes as far as the consent decision, and no screen is shared yet.
-Until it is, only the tip of `main` and the last release tag are
-supported, and the answer to "which versions get fixes" is "the one you get by
-pulling".
+`cmd/chirp` shares the screen through remotekit, but a session has been tried
+on one machine only, not yet between two (barahn/chirp#12). Until it is, only
+the tip of `main` and the last release tag are supported, and the answer to
+"which versions get fixes" is "the one you get by pulling".
 
 | Version | Supported |
 | --- | --- |
