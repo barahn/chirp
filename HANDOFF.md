@@ -349,7 +349,7 @@ account with `403 Upgrade to GitHub Pro or make this repository public`, and
 CodeQL and dependency review needed GitHub Advanced Security
 (barahn/chirp#1). The repository variable `CODE_SCANNING` is `true`, so CodeQL
 and dependency review run and are enforced (`docs/devsecops.md`). The rulesets active on GitHub are the files in `.github/rulesets/`:
-*main protected*, requiring linear history, squash/rebase merges and status checks, and
+*main protected*, requiring linear history, rebase merges and status checks, and
 *release tags protected*, which refuses deleting, moving or force-pushing a
 `v*` tag. The reasoning, and the branching model history, are in
 `docs/branching.md`.

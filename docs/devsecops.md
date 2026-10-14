@@ -13,7 +13,7 @@ Work lands there via pull request with linear history; releases are tagged point
 on `main`.
 
 ```
-feature/*  ──(squash/rebase)──▶  main  ──(tag)──▶  tag v*.*.*
+feature/*  ──(rebase)──▶  main  ──(tag)──▶  tag v*.*.*
     PR, CI                       release
 ```
 
@@ -107,7 +107,7 @@ are the half of DevSecOps that a pull request cannot deliver:
 2. **Branch protection on `main`.** The rules live as code in
    [`.github/rulesets/`](../.github/rulesets/), and
    [branching.md](branching.md) explains each one — including why `main` requires
-   linear history, squash/rebase merges, and 0 approvals while there is a single
+   linear history, rebase merges, and 0 approvals while there is a single
    maintainer. Import those files rather than configuring rules by hand: a hand-made
    rule that is not in the files is drift.
 
