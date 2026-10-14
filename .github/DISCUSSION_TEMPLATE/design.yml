@@ -5,11 +5,11 @@ body:
         > [!WARNING]
         > **Never post a Chirp code or link**, not even an expired one, or a password, token or TURN credential. Remove them from any log, setting or screenshot you paste. Discussions are public.
         >
-        > Anything that could weaken PIN generation or redemption, the consent prompt or the session lifecycle is security-sensitive even when it looks cosmetic. Email [security@fabrintek.com.br](mailto:security@fabrintek.com.br) instead of posting it here; see [SECURITY.md](https://github.com/barahn/chirp/blob/develop/SECURITY.md).
+        > Anything that could weaken PIN generation or redemption, the consent prompt or the session lifecycle is security-sensitive even when it looks cosmetic. Email [security@fabrintek.com.br](mailto:security@fabrintek.com.br) instead of posting it here; see [SECURITY.md](https://github.com/barahn/chirp/blob/main/SECURITY.md).
   - type: markdown
     attributes:
       value: |
-        Design discussion is wanted even while code contributions are closed ([CONTRIBUTING.md](https://github.com/barahn/chirp/blob/develop/CONTRIBUTING.md)). [How Chirp works](https://github.com/barahn/chirp/blob/develop/docs/product-model.md) records the decisions made so far; if you are questioning one, say which.
+        Design discussion is wanted even while code contributions are closed ([CONTRIBUTING.md](https://github.com/barahn/chirp/blob/main/CONTRIBUTING.md)). [How Chirp works](https://github.com/barahn/chirp/blob/main/docs/product-model.md) records the decisions made so far; if you are questioning one, say which.
   - type: textarea
     id: topic
     attributes:

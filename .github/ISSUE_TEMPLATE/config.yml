@@ -1,7 +1,7 @@
 blank_issues_enabled: false
 contact_links:
   - name: Security Vulnerability
-    url: https://github.com/barahn/chirp/blob/develop/SECURITY.md
+    url: https://github.com/barahn/chirp/blob/main/SECURITY.md
     about: Please report security vulnerabilities privately via security@fabrintek.com.br.
   - name: Questions & Community Discussions
     url: https://github.com/barahn/chirp/discussions

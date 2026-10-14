@@ -2,115 +2,79 @@
 
 ## Model
 
-`develop` is the integration branch: every working branch starts from it, and
-every pull request targets it. Making it the repository's default branch is a
-setting, listed under [Applying the rules](#applying-the-rules).
+Chirp follows **Trunk-Based Development**.
 
-`main` is the release branch. It receives only merges from `develop`, or a
-`hotfix/*`, and each merge into `main` is a release point tagged `vX.Y.Z` — CI
-already recognises those tags.
+`main` is the primary trunk: every working branch starts from it, and every pull
+request targets it. `main` is the repository's default branch.
 
 ```
-feature/*  fix/*  deps/*  ──▶  develop  ──▶  main  ──▶  tag vX.Y.Z
-                                   ▲                      │
-                                   └──── hotfix/* ────────┘
+feature/*  fix/*  deps/*  ──(squash or rebase)──▶  main  ──(tag)──▶  vX.Y.Z
 ```
 
-A `hotfix/*` starts from `main`, reaches `main` by pull request, and returns to
-`develop` the same day **by cherry-pick** — `develop` keeps a linear history,
-so a merge back is refused. Skip that step and the fix is lost at the next
-release.
+Work lands on `main` via pull request with linear history. Releases are tagged
+points (`vX.Y.Z`) on `main` — CI recognises those tags to build release assets
+and generate SBOMs.
 
-Branch names: `feature/<topic>`, `fix/<topic>`, `hotfix/<topic>`,
-`deps/<topic>`, `docs/<topic>`.
+Branch names: `feature/<topic>`, `fix/<topic>`, `deps/<topic>`, `docs/<topic>`.
 
 ## What the protection guarantees
 
-Neither branch accepts a direct push, a force-push or deletion. The rules are
+`main` accepts neither a direct push, a force-push nor deletion. The rules are
 versioned in [`.github/rulesets/`](../.github/rulesets/) and are the reference:
 anything configured on GitHub that is not there is drift.
 
-| Rule | `main` | `develop` |
-| --- | --- | --- |
-| Direct push | blocked | blocked |
-| Force-push / deletion | blocked | blocked |
-| Pull request required | yes | yes |
-| Approvals | 1, from a code owner | 0 — see below |
-| Approval dismissed on each push | yes | yes |
-| Last push needs another person's approval | yes | no |
-| Review threads resolved | yes | yes |
-| Merge method | merge commit | squash or rebase |
-| Linear history | no | yes |
-| Branch up to date with base before merge | no | yes |
-| Signed commits | not yet — see below | no |
+| Rule | `main` |
+| --- | --- |
+| Direct push | blocked |
+| Force-push / deletion | blocked |
+| Pull request required | yes |
+| Approvals | 0 — see below |
+| Approval dismissed on each push | yes |
+| Review threads resolved | yes |
+| Merge method | squash or rebase |
+| Linear history | yes |
+| Branch up to date with base before merge | yes |
+| Signed commits | not yet — see below |
 
-Required checks, on both: `Build, Test & SAST` (build, vet, lint, `-race`
-tests, DCO, third-party licences, gosec, govulncheck), `gitleaks`,
-`Analyze (Go)` (CodeQL), `Review dependency changes`, and `Relay image &
-deploy files` (the relay's image builds and serves, its deploy scripts pass
-shellcheck, its Quadlet units generate; [relay.md](relay.md)). CodeQL and
-dependency review run only while the `CODE_SCANNING` variable is set, as it
-is here — see [devsecops.md](devsecops.md). Where it is not set they are skipped, and a
-skipped required check counts as passing, so they enforce nothing there.
+Required checks: `Build, Test & SAST` (build, vet, lint, `-race` tests, DCO,
+third-party licences, gosec, govulncheck), `gitleaks`, `Analyze (Go)` (CodeQL),
+`Review dependency changes`, and `Relay image & deploy files` (the relay's image
+builds and serves, its deploy scripts pass shellcheck, its Quadlet units generate;
+[relay.md](relay.md)). CodeQL and dependency review run only while the
+`CODE_SCANNING` variable is set — see [devsecops.md](devsecops.md). Where it is
+not set they are skipped, and a skipped required check counts as passing, so they
+enforce nothing there.
 
-`bypass_actors` is empty on both, on purpose: the rules bind administrators
+`bypass_actors` is empty on all rulesets, on purpose: the rules bind administrators
 too.
 
-### Why the rules differ between the branches
+### Why linear history is enforced on `main`
 
-The first version of these rulesets could not have worked, and the reasons
-are worth keeping:
+Linear history keeps `git log` readable and bisectable. Pull requests are merged
+using **squash** or **rebase**, ensuring that each feature or fix lands as clean,
+self-contained commits without merge bubbles.
 
-- **Linear history is off on `main`.** Releases are merge commits, so that
-  `main`'s history points at the real commits rather than squashed copies.
-  Linear history forbids merge commits, and a ruleset allowing only
-  `merge` while requiring linear history admits nothing at all.
-- **"Up to date before merge" is off on `main`.** After a release, `main` holds
-  a merge commit `develop` does not contain. Requiring the next release's head
-  to contain it means merging `main` into `develop` — a merge commit, which
-  `develop`'s linear history refuses. From the second release on, nothing could
-  ship. On `develop` the rule stays: feature branches are not protected, so
-  they can be rebased onto `develop` freely.
-- **`develop` allows squash and rebase, not merge.** A merge button that linear
-  history always refuses is not an option, it is a trap. Rebase is there so a
-  multi-commit branch can land with its commits intact.
-- **Signed commits are not required yet.** Every commit here is unsigned
-  except the merge commits GitHub makes, and a DCO `Signed-off-by` trailer is
-  not a signature. With merge-only releases, requiring signatures on `main`
-  would refuse every release pull request. Turn `required_signatures` on once
-  every author — including the coding agents that work in this repository —
-  has a signing key.
+Signed commits are not required yet. Every commit here is unsigned except merge
+commits GitHub makes, and a DCO `Signed-off-by` trailer is not a cryptographic
+signature. Turn `required_signatures` on once every author — including coding
+agents — has a signing key.
 
 ## The approval policy, as decided
 
-**One maintainer cannot approve their own pull requests**, so both rulesets as
-first written would have blocked every merge. The maintainer's decision:
+**One maintainer cannot approve their own pull requests**, so requiring approvals
+on a single-maintainer repository would block every merge unless bypass is granted.
+GitHub's bypass lifts *every* rule in the ruleset for that actor (including status
+checks), which is unacceptable.
 
-- **`develop`: no approval required, and no bypass.** A pull request is still
-  the only way in, and every other rule — the four checks, linear history,
-  up to date with `develop`, review threads resolved — binds the maintainer
-  like anyone else.
-- **`main`: no bypass.** A release still needs a second person with write
-  access to approve it.
+The maintainer's decision:
+- **`main`: no approval required, and no bypass.** A pull request is still the
+  only way in, and every other rule — the required checks, linear history, up to
+  date with base, review threads resolved — binds the maintainer like anyone else.
+- When a second maintainer joins with write access, raise
+  `required_approving_review_count` to 1.
 
-`develop` first did this the other way: one approval required, with the
-repository admin (`RepositoryRole` `5`, `bypass_mode` `pull_request`) allowed
-to bypass. That was dropped on 2026-10-11. GitHub's bypass lifts *every* rule
-in the ruleset for that actor, not only the approval, so the admin could merge
-into `develop` past a failing check. Requiring zero approvals removes the one
-rule a single maintainer cannot meet and keeps the rest enforced.
-
-Having pull requests opened by a bot so the maintainer can approve them was
-considered and rejected. The approval would record the author reviewing their
-own code as if it were a second pair of eyes; pull requests opened with
-`GITHUB_TOKEN` do not trigger the workflows behind the required checks; and it
-would not help `main`, where the last push must be approved by someone other
-than its pusher. When a second maintainer joins, raise the count on `develop`
-back to 1.
-
-Nothing else in the repository pushes to a protected branch. The `HANDOFF.md`
-snapshot used to be committed to `main` by a workflow; it is now checked in CI
-instead, so no bot needs a bypass.
+Nothing pushes directly to a protected branch. The `HANDOFF.md` snapshot is
+checked in CI instead of being committed by a bot, so no bot needs a bypass.
 
 ### Release tags
 
@@ -129,45 +93,42 @@ Through the API (needs a token with `administration:write`):
 
 ```sh
 gh api -X POST repos/barahn/chirp/rulesets --input .github/rulesets/main-protected.json
-gh api -X POST repos/barahn/chirp/rulesets --input .github/rulesets/develop-protected.json
 gh api -X POST repos/barahn/chirp/rulesets --input .github/rulesets/release-tags-protected.json
 ```
 
-All three are imported (barahn/chirp#17). Any ruleset on GitHub that is not one
-of these files is drift: compare with
-`gh api repos/barahn/chirp/rulesets --jq '.[].name'`.
-
-To push a changed file to a ruleset that already exists, `PUT` it by id —
+To update a ruleset that already exists, `PUT` it by id —
 `gh api repos/barahn/chirp/rulesets --jq '.[] | "\(.id) \(.name)"'` lists them:
 
 ```sh
-gh api -X PUT repos/barahn/chirp/rulesets/24844667 --input .github/rulesets/develop-protected.json
+gh api -X PUT repos/barahn/chirp/rulesets/24844665 --input .github/rulesets/main-protected.json
 ```
 
-To make `develop` the default branch:
+To ensure `main` is the default branch:
 
 ```sh
-gh api -X PATCH repos/barahn/chirp -f default_branch=develop
+gh repo edit barahn/chirp --default-branch main
 ```
 
 ## Working flow
 
 ```sh
-git switch develop && git pull
+git switch main && git pull
 git switch -c feature/consent-expiry
 
 # ... changes ...
 git commit -s          # -s is required: CI checks the DCO trailer
 
 git push -u origin feature/consent-expiry
-# open the pull request against develop
+# open the pull request against main:
+gh pr create --base main
 ```
 
-To release: a pull request from `develop` to `main`, merged with a merge commit,
-and a `vX.Y.Z` tag on that merge. An automated workflow
-(`.github/workflows/create_release_pr.yml`) keeps a release pull request from
-`develop` into `main` open and synchronised with the changelog whenever `develop`
-moves ahead.
+To release: tag the release commit on `main` and push the tag:
+
+```sh
+git tag -a vX.Y.Z -m "Release vX.Y.Z"
+git push origin vX.Y.Z
+```
 
 The security posture behind all of this — which gates run, why they overlap,
 and the repository settings that cannot live in a file — is in

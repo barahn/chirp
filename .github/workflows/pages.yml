@@ -5,7 +5,7 @@ name: Website
 # fonts and icon cmd/chirp embeds, so a change to either republishes.
 on:
   push:
-    branches: [ develop ]
+    branches: [ main ]
     paths:
       - 'site/**'
       - 'cmd/chirp/internal/warm/fonts/**'
@@ -52,10 +52,10 @@ jobs:
   deploy:
     name: Deploy to GitHub Pages
     needs: build
-    # A manual run can be started on any branch; only develop, which takes
+    # A manual run can be started on any branch; only main, which takes
     # changes through review, may reach usechirp.app. Other runs still build,
     # so a branch can be checked without publishing it.
-    if: github.ref == 'refs/heads/develop'
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     # Only this job can publish, and only through the github-pages

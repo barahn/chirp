@@ -2,12 +2,12 @@ name: CI
 
 on:
   push:
-    branches: [ develop, main ]
+    branches: [ main ]
     tags: [ 'v*.*.*' ]
   pull_request:
-    branches: [ develop, main ]
+    branches: [ main ]
 
-# Least privilege by default. `develop` is the integration branch and takes
+# Least privilege by default. `main` is the primary branch and takes
 # pull requests from forks, where the default read/write token would be handed
 # to unreviewed code. Any job that needs more asks for it explicitly.
 permissions:
@@ -148,9 +148,7 @@ jobs:
 
       # HANDOFF.md's snapshot block is generated from the tree. Checked here
       # rather than committed by a bot: a workflow pushing to main would need a
-      # bypass of the branch protection in .github/rulesets/, and its commits
-      # would reach main without reaching develop, so the block would conflict
-      # at every release. See docs/branching.md.
+      # bypass of the branch protection in .github/rulesets/. See docs/branching.md.
       - name: HANDOFF.md snapshot is current
         run: |
           ./scripts/gen-handoff.sh HANDOFF.md

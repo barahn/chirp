@@ -21,7 +21,7 @@
 
 [Unit]
 Description=Chirp relay
-Documentation=https://github.com/barahn/chirp/blob/develop/docs/relay.md
+Documentation=https://github.com/barahn/chirp/blob/main/docs/relay.md
 After=network-online.target
 Wants=network-online.target
 

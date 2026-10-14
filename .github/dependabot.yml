@@ -11,7 +11,7 @@ updates:
       day: monday
       time: "06:23"
     open-pull-requests-limit: 5
-    target-branch: develop
+    target-branch: main
     commit-message:
       prefix: "build(deps)"
       include: scope
@@ -34,7 +34,7 @@ updates:
       day: monday
       time: "06:41"
     open-pull-requests-limit: 5
-    target-branch: develop
+    target-branch: main
     commit-message:
       prefix: "ci(deps)"
     labels: [ dependencies, github-actions ]
@@ -54,7 +54,7 @@ updates:
       day: monday
       time: "06:59"
     open-pull-requests-limit: 5
-    target-branch: develop
+    target-branch: main
     commit-message:
       prefix: "build(deps)"
       include: scope

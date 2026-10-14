@@ -7,7 +7,7 @@ name: Dependency Review
 # made before the merge, not after the next advisory lands.
 on:
   pull_request:
-    branches: [ develop, main ]
+    branches: [ main ]
 
 permissions:
   contents: read

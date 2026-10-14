@@ -6,11 +6,11 @@ body:
         > [!WARNING]
         > **Never post a Chirp code or link**, not even an expired one, or a password, token or TURN credential. Remove them from any log, setting or screenshot you paste. Discussions are public.
         >
-        > Anything that could weaken PIN generation or redemption, the consent prompt or the session lifecycle is security-sensitive even when it looks cosmetic. Email [security@fabrintek.com.br](mailto:security@fabrintek.com.br) instead of posting it here; see [SECURITY.md](https://github.com/barahn/chirp/blob/develop/SECURITY.md).
+        > Anything that could weaken PIN generation or redemption, the consent prompt or the session lifecycle is security-sensitive even when it looks cosmetic. Email [security@fabrintek.com.br](mailto:security@fabrintek.com.br) instead of posting it here; see [SECURITY.md](https://github.com/barahn/chirp/blob/main/SECURITY.md).
   - type: markdown
     attributes:
       value: |
-        Before asking, [docs/stun-turn.md](https://github.com/barahn/chirp/blob/develop/docs/stun-turn.md) covers bringing your own STUN/TURN, and the README's *Try it from source* covers the relay.
+        Before asking, [docs/stun-turn.md](https://github.com/barahn/chirp/blob/main/docs/stun-turn.md) covers bringing your own STUN/TURN, and the README's *Try it from source* covers the relay.
   - type: textarea
     id: setup
     attributes:
@@ -31,4 +31,4 @@ body:
     attributes:
       label: Chirp version
       description: The commit or tag you built.
-      placeholder: develop @ 7b7fa78
+      placeholder: main @ 7b7fa78
