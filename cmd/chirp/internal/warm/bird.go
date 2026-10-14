@@ -36,8 +36,9 @@ var birds = func() map[Pose]fyne.Resource {
 	return m
 }()
 
-// AppIcon is the perched bird on a teal tile, for the window and the
-// operating system.
+// AppIcon is the perched bird, close up, on a near-round teal tile, for the
+// window and the operating system. The tile is a path with arcs rather than a
+// rect with rx: Fyne's SVG renderer ignores rx, and drew the corners square.
 var AppIcon = load("icon.svg")
 
 func load(name string) fyne.Resource {
