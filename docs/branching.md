@@ -8,7 +8,7 @@ Chirp follows **Trunk-Based Development**.
 request targets it. `main` is the repository's default branch.
 
 ```
-feature/*  fix/*  deps/*  ──(squash or rebase)──▶  main  ──(tag)──▶  vX.Y.Z
+feature/*  fix/*  deps/*  ──(rebase)──▶  main  ──(tag)──▶  vX.Y.Z
 ```
 
 Work lands on `main` via pull request with linear history. Releases are tagged
@@ -31,7 +31,7 @@ anything configured on GitHub that is not there is drift.
 | Approvals | 0 — see below |
 | Approval dismissed on each push | yes |
 | Review threads resolved | yes |
-| Merge method | squash or rebase |
+| Merge method | rebase |
 | Linear history | yes |
 | Branch up to date with base before merge | yes |
 | Signed commits | not yet — see below |
@@ -48,11 +48,13 @@ enforce nothing there.
 `bypass_actors` is empty on all rulesets, on purpose: the rules bind administrators
 too.
 
-### Why linear history is enforced on `main`
+### Why linear history and rebase are enforced on `main`
 
 Linear history keeps `git log` readable and bisectable. Pull requests are merged
-using **squash** or **rebase**, ensuring that each feature or fix lands as clean,
-self-contained commits without merge bubbles.
+using **rebase**, ensuring that each commit lands with its verified DCO
+`Signed-off-by` trailer intact and without merge bubbles. Squash merges are
+disallowed because GitHub's automated squash commit can bypass or drop the
+individual DCO attestations.
 
 Signed commits are not required yet. Every commit here is unsigned except merge
 commits GitHub makes, and a DCO `Signed-off-by` trailer is not a cryptographic
