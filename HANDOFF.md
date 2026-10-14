@@ -197,9 +197,13 @@ signalling/hub_test.go
 signalling/lookup.go
 signalling/relay.go
 site/CNAME
+site/assets/images/consent-dark-pt.webp
 site/assets/images/consent-dark.webp
+site/assets/images/consent-light-pt.webp
 site/assets/images/consent-light.webp
+site/assets/images/window-dark-pt.webp
 site/assets/images/window-dark.webp
+site/assets/images/window-light-pt.webp
 site/assets/images/window-light.webp
 site/assets/site.css
 site/assets/site.js

@@ -85,12 +85,15 @@
         <div class="perched" id="hero-bird" aria-hidden="true">
           <svg viewBox="0 0 120 120"><g class="pose-perch"><use href="#bird-perched"/></g><g class="pose-chirp"><use href="#bird-chirping"/></g></svg>
         </div>
-        <div class="frame">
-          <img class="shot-light" src="/assets/images/window-light.webp" width="690" height="758" data-i18n-attr="alt:altWindow" alt="Chirp's window: your code, 482-913-5071, with a hint to read it only to someone you called, buttons to copy the link or get a new code, and a Help someone form to type another person's code.">
-          <img class="shot-dark" src="/assets/images/window-dark.webp" width="690" height="758" data-i18n-attr="alt:altWindowDark" alt="Chirp's window in dark mode: your code, 482-913-5071, and the Help someone form.">
+        <div class="frame" data-lang-only="en">
+          <img class="shot-light" src="/assets/images/window-light.webp" width="690" height="758" alt="Chirp's window: your code, 482-913-5071, with a hint to read it only to someone you called, buttons to copy the link or get a new code, and a Help someone form to type another person's code.">
+          <img class="shot-dark" src="/assets/images/window-dark.webp" width="690" height="758" alt="Chirp's window in dark mode: your code, 482-913-5071, and the Help someone form.">
+        </div>
+        <div class="frame" data-lang-only="pt-BR" lang="pt-BR" hidden>
+          <img class="shot-light" src="/assets/images/window-light-pt.webp" width="690" height="787" loading="lazy" alt="A janela do Chirp: o seu código, 482-913-5071, com a dica de lê-lo só para quem você chamou, botões para copiar o link ou gerar um novo código, e o formulário Ajudar alguém para digitar o código de outra pessoa.">
+          <img class="shot-dark" src="/assets/images/window-dark-pt.webp" width="690" height="787" loading="lazy" alt="A janela do Chirp no modo escuro: o seu código, 482-913-5071, e o formulário Ajudar alguém.">
         </div>
         <p class="shotnote" data-i18n="shotNostr">Shown signalling over Nostr (CHIRP_NOSTR): the last four digits are known only to the two Chirps. With a relay alone, the code is the first six.</p>
-        <p class="shotnote" data-lang-only="pt-BR">Capturas da versão atual, que por enquanto está só em inglês.</p>
       </div>
     </div>
   </div>
@@ -146,11 +149,14 @@
       </div>
       <div class="grid">
         <div>
-          <div class="frame">
-            <img class="shot-light" src="/assets/images/consent-light.webp" width="720" height="634" data-i18n-attr="alt:altConsent" alt="Chirp's consent prompt: Someone wants to control this computer. They say they're “João da TI”. Chirp can't check names. They're asking to see your screen, use your mouse and keyboard, share your clipboard, and send and receive files. A warning: allow only if you asked this person for help just now; banks, government agencies and big tech companies never ask for this. Declines by itself in 1:40. Allow (3), still locked, and Decline.">
-            <img class="shot-dark" src="/assets/images/consent-dark.webp" width="720" height="634" data-i18n-attr="alt:altConsentDark" alt="The same consent prompt in dark mode.">
+          <div class="frame" data-lang-only="en">
+            <img class="shot-light" src="/assets/images/consent-light.webp" width="720" height="634" alt="Chirp's consent prompt: Someone wants to control this computer. They say they're “João da TI”. Chirp can't check names. They're asking to see your screen, use your mouse and keyboard, share your clipboard, and send and receive files. A warning: allow only if you asked this person for help just now; banks, government agencies and big tech companies never ask for this. Declines by itself in 1:40. Allow (3), still locked, and Decline.">
+            <img class="shot-dark" src="/assets/images/consent-dark.webp" width="720" height="634" alt="The same consent prompt in dark mode.">
           </div>
-          <p class="shotnote" data-lang-only="pt-BR">Na versão em português, a janela dirá: “Alguém quer controlar este computador”, com Recusar e Permitir.</p>
+          <div class="frame" data-lang-only="pt-BR" lang="pt-BR" hidden>
+            <img class="shot-light" src="/assets/images/consent-light-pt.webp" width="720" height="664" loading="lazy" alt="A janela de consentimento do Chirp: Alguém quer controlar este computador. Diz se chamar “João da TI”. O Chirp não verifica nomes. Está pedindo para ver sua tela, usar seu mouse e teclado, compartilhar a área de transferência e enviar e receber arquivos. Um aviso: só permita se você pediu ajuda a essa pessoa agora; bancos, órgãos do governo e grandes empresas de tecnologia nunca pedem isso. Recusa sozinho em 1:40. Permitir (3), ainda bloqueado, e Recusar.">
+            <img class="shot-dark" src="/assets/images/consent-dark-pt.webp" width="720" height="664" loading="lazy" alt="A mesma janela de consentimento no modo escuro.">
+          </div>
         </div>
         <div>
           <ul class="points">
