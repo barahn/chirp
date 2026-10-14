@@ -89,6 +89,7 @@
           <img class="shot-light" src="/assets/images/window-light.webp" width="690" height="758" data-i18n-attr="alt:altWindow" alt="Chirp's window: your code, 482-913-5071, with a hint to read it only to someone you called, buttons to copy the link or get a new code, and a Help someone form to type another person's code.">
           <img class="shot-dark" src="/assets/images/window-dark.webp" width="690" height="758" data-i18n-attr="alt:altWindowDark" alt="Chirp's window in dark mode: your code, 482-913-5071, and the Help someone form.">
         </div>
+        <p class="shotnote" data-i18n="shotNostr">Shown signalling over Nostr (CHIRP_NOSTR): the last four digits are known only to the two Chirps. With a relay alone, the code is the first six.</p>
         <p class="shotnote" data-lang-only="pt-BR">Capturas da versão atual, que por enquanto está só em inglês.</p>
       </div>
     </div>
@@ -198,7 +199,10 @@
 <pre><span class="c" data-i18n="ownC1"># on a machine you control</span>
 chirp-relay
 <span class="c" data-i18n="ownC2"># point both Chirps at it</span>
-CHIRP_RELAY=https://relay.example.org chirp</pre>
+CHIRP_RELAY=https://relay.example.org chirp
+<span class="c" data-i18n="ownC3"># or signal over Nostr: the code gains four digits the relay never sees</span>
+CHIRP_RELAY=https://relay.example.org \
+CHIRP_NOSTR=wss://nostr.example.net chirp</pre>
           <p class="muted" data-i18n="ownNote">Bring your own STUN/TURN for now; coturn works. When Chirp runs a public server, it will be blind: it finds the other computer from the first part of your code and never sees the rest.</p>
         </div>
       </div>
