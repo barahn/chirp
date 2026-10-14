@@ -11,6 +11,7 @@ account, and nothing happens on your screen until you press *Allow*.
 
 **[usechirp.app](https://usechirp.app)** ·
 [How Chirp works](docs/product-model.md) ·
+[Wiki](https://github.com/barahn/chirp/wiki) ·
 [Roadmap](https://github.com/orgs/barahn/projects/2)
 
 [![License](https://img.shields.io/badge/License-AGPL--3.0-blue.svg?style=flat-square)](LICENSE)
@@ -28,10 +29,10 @@ account, and nothing happens on your screen until you press *Allow*.
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/chirp-dark.png">
-    <img src="docs/images/chirp-light.png" width="720" alt="Chirp's window, showing its code 482-913 and a hint to read it only to someone you called. Over it, the prompt Chirp opens when someone types that code: Someone wants to control this computer. They say they're “João da TI”. Chirp can't check names. The four permissions asked for, a warning that banks, government agencies and big tech companies never ask for this, a countdown, Allow still locked and Decline highlighted.">
+    <img src="docs/images/chirp-light.png" width="720" alt="Chirp's window, showing its code 482-913-5071 and a hint to read it only to someone you called. Over it, the prompt Chirp opens when someone types that code: Someone wants to control this computer. They say they're “João da TI”. Chirp can't check names. The four permissions asked for, a warning that banks, government agencies and big tech companies never ask for this, a countdown, Allow still locked and Decline highlighted.">
   </picture>
   <br>
-  <sub>The current build: a machine's code, and the prompt it shows when someone types that code.</sub>
+  <sub>The current build: a machine's code, and the prompt it shows when someone types that code. Shown signalling over Nostr, where the last four digits are known only to the two Chirps; with a relay alone, the code is the first six.</sub>
 </p>
 
 ## How it works
@@ -100,7 +101,8 @@ Chirp is not yet a runnable product.
   or pasted link; the other machine then asks its user in Chirp's own prompt.
   Once they allow it, the screen and input go through remotekit's `stream`
   package, and the owner sees a bar for as long as the session lasts. So far
-  on one machine only: see below.
+  on one machine only: see below. It speaks English and Brazilian Portuguese,
+  following the system's language.
 - **The relay** — `cmd/chirp-relay`, for a relay you host yourself. It
   matches the two ends of a session and relays their WebRTC signalling.
   Written for Chirp — no multi-tenancy, no RBAC — rather than taken from the
@@ -112,7 +114,10 @@ Chirp is not yet a runnable product.
   values are Chirp's.
 - **Signalling over Nostr relays** — optional session negotiation and
   signalling over public Nostr relays with `-nostr` / `CHIRP_NOSTR`, leaving
-  the server only code lookup and blind to signalling traffic.
+  the server only code lookup and blind to signalling traffic. The code then
+  has ten digits, `482-913-5071`: the server sees the first six, and the last
+  four bind the two Chirps through a PAKE, so a relay in the middle cannot
+  pose as either end.
 
 **Not here yet:**
 
@@ -120,13 +125,14 @@ Chirp is not yet a runnable product.
   through remotekit's `stream` package, and the tests show one Chirp's screen
   decoded in another's through the relay, on one machine. Across two
   machines, and with a Windows owner, is still to do (barahn/chirp#12).
-- **Downloads.** There are no builds to download; build from source below.
+- **Downloads.** There are no builds to download yet (signed release builds
+  are barahn/chirp#69); build from source below.
 - **A TURN relay.** Until Chirp ships one, self-hosting means bringing your
   own STUN/TURN (coturn works): see [docs/stun-turn.md](docs/stun-turn.md).
 - **A public server.** When Chirp offers one, it will be blind: it finds the
   other machine from the first part of the code, and never sees the rest of
-  it or a single signalling message ([decision 5](docs/product-model.md);
-  Nostr signalling and the PAKE over the code's secret part are in).
+  it or a single signalling message ([decision 5](docs/product-model.md)).
+  The parts it needs, Nostr signalling and the PAKE, are in.
 
 Planned work is in this repository's issues and the
 [Chirp roadmap](https://github.com/orgs/barahn/projects/2) project.
@@ -140,6 +146,13 @@ Ubuntu). Start a relay, then two Chirps, and type one's code into the other:
 ```sh
 go run ./cmd/chirp-relay
 CHIRP_RELAY=http://localhost:8080 go run ./cmd/chirp
+```
+
+To signal over Nostr instead, and get the ten-digit code, give both Chirps
+the same Nostr relays:
+
+```sh
+CHIRP_RELAY=http://localhost:8080 CHIRP_NOSTR=wss://nostr.example.net go run ./cmd/chirp
 ```
 
 ## Where Chirp sits
@@ -178,8 +191,9 @@ repository settings that back it, are in
 
 Issues and bug reports are welcome, and questions, ideas and design discussion
 go in [Discussions](https://github.com/barahn/chirp/discussions) (never post a
-Chirp code or link there). Pull requests from outside Fabrintek will not be
-merged yet.
+Chirp code or link there). Everyone taking part follows the
+[Code of Conduct](CODE_OF_CONDUCT.md). Pull requests from outside Fabrintek
+will not be merged yet.
 
 This is deliberate and temporary. Chirp is dual-licensed (see
 [LICENSING.md](LICENSING.md)), which works only while Fabrintek holds the
