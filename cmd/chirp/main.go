@@ -167,7 +167,9 @@ func newRunner(s *client.SessionConn, ice webrtc.PeerConfig) *stream.Runner {
 	if peer := s.PeerKey; peer != nil {
 		r.RequireSignedViewers(func(k ed25519.PublicKey) bool { return k.Equal(peer) })
 	}
-	r.Grant(s.Permissions...)
+	// Grantable again, so no caller can hand the runner a withheld
+	// permission it did not get through the prompt.
+	r.Grant(client.Grantable(s.Permissions)...)
 	return r
 }
 

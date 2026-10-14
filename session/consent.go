@@ -13,10 +13,15 @@ import (
 // accepts (tunnel.PermissionScreenView and its siblings), spelled out here
 // because Chirp does not import tunnel. A name remotekit does not know grants
 // nothing, and the feature behind it stays refused without an error.
+//
+// The clipboard is not among them: granted, remotekit's runner reads the
+// owner's clipboard on its own and sends every change to the controller,
+// which decision 4 in docs/product-model.md rules out. The owner's Chirp
+// withholds it from any request too (client.Grantable), since on the trusted
+// path the relay writes the request (barahn/chirp#79).
 var DefaultPermissions = []string{
 	"screen_view",
 	"remote_control",
-	"clipboard",
 	"file_transfer",
 }
 

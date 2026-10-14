@@ -110,6 +110,8 @@ client/nostr_test.go
 client/owner.go
 client/pake.go
 client/pake_test.go
+client/permissions.go
+client/permissions_test.go
 client/session.go
 client/session_test.go
 client/socket.go

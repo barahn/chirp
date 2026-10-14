@@ -424,7 +424,7 @@ func (o *Owner) onNostr(ctx context.Context, m nostrMsg, shown *Peer) error {
 	req := &ConsentRequest{
 		SessionID:   newSessionID(),
 		Name:        name,
-		Permissions: append([]string(nil), session.DefaultPermissions...),
+		Permissions: Grantable(session.DefaultPermissions),
 		ExpiresIn:   int(nostrAskFor / time.Second),
 	}
 	o.mu.Lock()

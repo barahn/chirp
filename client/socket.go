@@ -167,7 +167,7 @@ func decode(data []byte) Message {
 		m.Consent = &ConsentRequest{
 			SessionID:    head.Request.SessionID,
 			Name:         head.Request.TechnicianName,
-			Permissions:  head.Request.RequestedPermissions,
+			Permissions:  Grantable(head.Request.RequestedPermissions),
 			NameVerified: head.NameVerified,
 		}
 	}

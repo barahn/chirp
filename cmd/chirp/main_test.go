@@ -198,3 +198,18 @@ func TestTheViewerPinsTheProvedKeys(t *testing.T) {
 		t.Errorf("viewerConfig without keys = %+v", plain)
 	}
 }
+
+// Granted, remotekit's runner reads the owner's clipboard on its own and sends
+// every change to the controller (decision 4 forbids it): no session conn,
+// however it was built, gets the runner to grant it.
+func TestTheRunnerIsNeverGrantedTheClipboard(t *testing.T) {
+	r := newRunner(&client.SessionConn{ID: "session", Permissions: []string{
+		stream.PermissionScreenView, stream.PermissionRemoteControl, stream.PermissionClipboard,
+	}}, webrtc.PeerConfig{})
+	if r.Granted(stream.PermissionClipboard) {
+		t.Fatal("the runner was granted the clipboard")
+	}
+	if !r.Granted(stream.PermissionRemoteControl) {
+		t.Fatal("the runner lost what it may be granted")
+	}
+}

@@ -51,9 +51,14 @@ Because nobody registers, **the name a controlling user gives is whatever they
 typed**. The prompt must present it as a claim, not as an identity. What user 2
 is really deciding is whether they are expecting this connection right now.
 
-Permissions requested by default: viewing the screen, remote control, clipboard
-sync and file transfer. They are the free core and are never gated behind a
-licence or a tier.
+Permissions requested by default: viewing the screen, remote control and file
+transfer. They are the free core and are never gated behind a licence or a
+tier. The clipboard is part of that core too, but it is withheld for now:
+granted, remotekit's runner reads the owner's clipboard on its own and sends
+every change to the controller, which decision 4 rules out. It comes back when
+it moves only on an explicit action at either end (barahn/chirp#79), and until
+then the owner's Chirp drops it from any request, whatever the relay asks
+for.
 
 ## What follows for security
 
