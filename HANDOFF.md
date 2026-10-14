@@ -125,6 +125,9 @@ cmd/chirp/internal/ui/remote.go
 cmd/chirp/internal/ui/remote_test.go
 cmd/chirp/internal/ui/sessionbar.go
 cmd/chirp/internal/ui/sessionbar_test.go
+cmd/chirp/internal/ui/tr.go
+cmd/chirp/internal/ui/tr_test.go
+cmd/chirp/internal/ui/translations/pt-BR.json
 cmd/chirp/internal/ui/window.go
 cmd/chirp/internal/ui/window_test.go
 cmd/chirp/internal/warm/bird.go
