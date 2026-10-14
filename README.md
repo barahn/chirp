@@ -95,10 +95,12 @@ Chirp is not yet a runnable product.
 
 **Working and tested today:**
 
-- **The `cmd/chirp` app, up to the consent decision** — the one program both
-  sides run, in the window above. It shows this machine's code and link, and
-  takes someone else's code or pasted link; the other machine then asks its
-  user in Chirp's own prompt, and the answer reaches the relay.
+- **The `cmd/chirp` app** — the one program both sides run, in the window
+  above. It shows this machine's code and link, and takes someone else's code
+  or pasted link; the other machine then asks its user in Chirp's own prompt.
+  Once they allow it, the screen and input go through remotekit's `stream`
+  package, and the owner sees a bar for as long as the session lasts. So far
+  on one machine only: see below.
 - **The relay** — `cmd/chirp-relay`, for a relay you host yourself. It
   matches the two ends of a session and relays their WebRTC signalling.
   Written for Chirp — no multi-tenancy, no RBAC — rather than taken from the
