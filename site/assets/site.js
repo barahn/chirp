@@ -48,7 +48,7 @@
     s3Title: "Você decide",
     s3Text: "O seu Chirp pergunta a você, na sua própria tela, quem está pedindo e para quê. Nada começa até você apertar Permitir, e você pode encerrar a sessão a qualquer momento.",
     whose: "Quem digita o código controla. Quem compartilhou decide.",
-    sound: "E, do lado de quem ajuda, o Chirp faz o seu único som quando a outra pessoa deixa entrar. Ele nunca toca no computador que está sendo ajudado.",
+    sound: "E, do lado de quem ajuda, o Chirp vai fazer o seu único som quando a outra pessoa deixar entrar. Ele nunca vai tocar no computador que está sendo ajudado.",
     safetyKicker: "Segurança",
     safetyTitle: "Um pedido fácil de recusar",
     safetyText: "Ferramentas de acesso remoto são as preferidas dos golpistas por telefone. A janela de consentimento do Chirp foi feita para que um pedido inesperado seja fácil de recusar.",
@@ -93,7 +93,7 @@
     saysLinux: "<b>Torne o arquivo executável</b> e rode. No Wayland, depois que você aperta Permitir, o sistema pergunta mais uma vez <b>qual tela compartilhar</b>.",
     verify: "Toda cópia é idêntica. Confira a sua com o SHA-256 e a assinatura publicados em cada versão.",
     verifyCode: "sha256 · publicado com a primeira versão",
-    notYet: "<h3>Ainda não há o que baixar</h3><p>O Chirp está em desenvolvimento. O que já funciona:</p><ul><li>a janela, com o seu código e link, e o formulário para ajudar alguém;</li><li>a janela de consentimento, e a sua resposta chegando ao relay;</li><li>compartilhar a tela, o mouse e o teclado, com uma barra na sua tela enquanto durar, testado até agora em um computador só;</li><li>com a sinalização pelo Nostr, um código cujos quatro últimos dígitos só os dois Chirps conhecem, nunca o servidor;</li><li>um relay que você mesmo pode hospedar.</li></ul><p>Testar entre dois computadores é o próximo passo. <a href=\"https://github.com/barahn/chirp#status\">Acompanhe o andamento</a>.</p>",
+    notYet: "<h3>Ainda não há o que baixar</h3><p>O Chirp está em desenvolvimento. O que já funciona:</p><ul><li>a janela, com o seu código e link, e o formulário para ajudar alguém;</li><li>a janela de consentimento, e a sua resposta chegando ao relay;</li><li>compartilhar a tela, o mouse e o teclado, com uma barra na sua tela enquanto durar, testado até agora em um computador só;</li><li>com a sinalização pelo Nostr, um código cujos quatro últimos dígitos só os dois Chirps conhecem, nunca o servidor;</li><li>o app em inglês e em português do Brasil, seguindo o idioma do sistema;</li><li>um relay que você mesmo pode hospedar.</li></ul><p>Testar entre dois computadores é o próximo passo. <a href=\"https://github.com/barahn/chirp#status\">Acompanhe o andamento</a>.</p>",
     linkTitle: "Alguém te mandou um link do Chirp",
     linkLede: "Cole no Chirp para ajudar essa pessoa. Ela vai ser perguntada na própria tela antes de qualquer coisa começar.",
     copy: "Copiar link",
@@ -107,6 +107,9 @@
     by: "Por Fabrintek · AGPL-3.0",
     source: "Código-fonte",
     howChirpWorks: "Como o Chirp funciona",
+    wiki: "Wiki",
+    discussions: "Discussões",
+    conduct: "Código de Conduta",
     security: "Vulnerabilidades:",
     noToken: "<b>Este link está incompleto.</b> Peça para quem enviou copiar de novo do Chirp, inteiro."
   };
