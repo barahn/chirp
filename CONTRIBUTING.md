@@ -88,7 +88,7 @@ Chirp follows **Trunk-Based Development**. `main` is the default branch and wher
 work is integrated. Releases are tagged points (`v*.*.*`) on `main`.
 
 ```
-feature/*  ──(squash/rebase)──▶  main  ──(tag)──▶  tag v*.*.*
+feature/*  ──(rebase)──▶  main  ──▶  tag v*.*.*
 ```
 
 Branch from `main` and open pull requests against `main`. The full model, and the
