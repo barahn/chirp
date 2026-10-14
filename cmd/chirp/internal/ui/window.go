@@ -180,7 +180,7 @@ func (w *Window) helpArea() fyne.CanvasObject {
 	w.name = widget.NewEntry()
 	w.name.SetPlaceHolder("As they'll see it")
 	w.target = widget.NewEntry()
-	w.target.SetPlaceHolder("482 913 or a link")
+	w.target.SetPlaceHolder("482 913 5071 or a link")
 	w.target.OnSubmitted = func(string) { w.tryConnect() }
 	w.connect = widget.NewButton("Connect", w.tryConnect)
 	w.connect.Importance = widget.HighImportance
