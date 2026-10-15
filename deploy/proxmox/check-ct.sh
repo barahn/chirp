@@ -185,7 +185,7 @@ if ! $caddy_ok; then
 	elif $FIX_CADDY; then
 		in_ct test -x /root/chirp-relay-install/install.sh ||
 			die "no installer at /root/chirp-relay-install in the container; push the bundle and run install.sh --domain $DOMAIN there"
-		printf '\n==> Installing Caddy for %s in container %s\n' "$DOMAIN" "$CTID"
+		printf '\n==> Installing Caddy for %s%s\n' "$DOMAIN" "${CTID:+ in container $CTID}"
 		in_ct /root/chirp-relay-install/install.sh --binary /usr/local/bin/chirp-relay --domain "$DOMAIN"
 		problems=$((problems - 1))
 		caddy_ok=true
@@ -208,15 +208,17 @@ if $caddy_ok && [ -n "$DOMAIN" ]; then
 			bad "nothing listens on TCP $port"
 		fi
 	done
-	code="$(in_ct curl -sk -o /dev/null -w '%{http_code}' --max-time 5 \
-		--resolve "$DOMAIN:443:127.0.0.1" "https://$DOMAIN/healthz" 2>/dev/null || true)"
-	if [ "$code" = 200 ]; then
-		ok "/healthz answers through Caddy, inside the container"
-	else
-		bad "/healthz through Caddy, inside the container, answered ${code:-nothing}"
-	fi
+	# Without a certificate Caddy cannot finish a TLS handshake for the
+	# name, so /healthz through it can only be asked once it has one.
 	if in_ct sh -c "ls /var/lib/caddy/.local/share/caddy/certificates/*/$DOMAIN/$DOMAIN.crt" >/dev/null 2>&1; then
 		ok "Caddy has a certificate for $DOMAIN"
+		code="$(in_ct curl -sk -o /dev/null -w '%{http_code}' --max-time 5 \
+			--resolve "$DOMAIN:443:127.0.0.1" "https://$DOMAIN/healthz" 2>/dev/null || true)"
+		if [ "$code" = 200 ]; then
+			ok "/healthz answers through Caddy, inside the container"
+		else
+			bad "/healthz through Caddy, inside the container, answered ${code:-nothing}"
+		fi
 	else
 		warn "Caddy has no certificate for $DOMAIN yet. It gets one by itself once the name"
 		warn "resolves here and port 80 reaches the container. Its last words on it:"
