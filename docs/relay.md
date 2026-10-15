@@ -306,11 +306,14 @@ so it can be fetched on its own.
 node:
 
 ```bash
-pct create 120 local:vztmpl/debian-13-standard_13.1-2_amd64.tar.zst --hostname proxy --unprivileged 1 --cores 1 --memory 256 --rootfs local-lvm:2 --net0 name=eth0,bridge=vmbr0,ip=192.168.1.9/24,gw=192.168.1.1 --onboot 1 && pct start 120
+pct create 120 local:vztmpl/debian-13-standard_13.6-1_amd64.tar.zst --hostname proxy --unprivileged 1 --features nesting=1 --cores 1 --memory 256 --swap 256 --rootfs local-lvm:2 --net0 name=eth0,bridge=vmbr0,ip=192.168.1.9/24,gw=192.168.1.1 --onboot 1 && pct start 120
 ```
 
-Use the template name `pveam list local` shows, and your network's
-addresses.
+Use your node's names and your network's addresses: `pvesm status --content
+rootdir` lists the storages that take a container's disk (`local-lvm`,
+`local-zfs`, ...), and `pveam list local` the templates. Keep `nesting=1`:
+with systemd 257, Caddy's sandboxed service cannot start without it, as the
+relay's cannot.
 
 **2. Caddy, with the relay as a site.** In the proxy's container, as root,
 naming the relay's container and the port it will listen on:
