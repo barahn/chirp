@@ -293,3 +293,13 @@ footer .sel { user-select: all; color: var(--text); }
 .lang button { font: 800 var(--step--2)/1 var(--body); letter-spacing: .04em; color: var(--muted); padding: 8px 10px; }
 .lang button[aria-pressed="true"] { background: var(--primary); color: var(--on-primary); }
 .shotnote { margin-top: 12px; font-size: var(--step--2); color: var(--muted); text-align: center; }
+
+/* GitHub link and theme toggle, beside the language switch */
+.tools { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.nav + .tools { margin-left: 0; }
+@media (max-width: 640px) { .tools { margin-left: auto; } .nav + .tools { margin-left: auto; } }
+.icon-btn { display: inline-grid; place-items: center; width: 36px; height: 36px; flex: none; border: 0; border-radius: 50%; padding: 0; background: var(--button); color: var(--text); cursor: pointer; text-decoration: none; }
+.icon-btn:hover { color: var(--primary); }
+.icon-btn svg { width: 18px; height: 18px; }
+.theme-toggle .i-moon { display: var(--shot-light); }
+.theme-toggle .i-sun { display: var(--shot-dark); }

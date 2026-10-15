@@ -62,7 +62,7 @@ check_headers() {
 # check_once prints what differs and returns non-zero if anything does.
 check_once() {
 	local fail=0 path src got html www status location
-	for path in "" "l/" "assets/site.js" "assets/site.css"; do
+	for path in "" "l/" "assets/site.js" "assets/site.css" "assets/theme.js"; do
 		src="$built/${path:-index.html}"
 		[ "${path%/}" != "$path" ] && src="$built/${path}index.html"
 		got="$work/body"
