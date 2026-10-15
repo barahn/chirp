@@ -34,7 +34,7 @@ cp "$warm/bird/icon.svg" "$out/favicon.svg"
 # lacks its new translations. Each reference a page makes to an asset, or to
 # the favicon, which browsers keep longer still, carries a hash of that file's
 # content, so a changed file gets a new URL and an unchanged one stays cached.
-for page in "$out"/index.html "$out"/l/index.html; do
+for page in "$out"/index.html "$out"/l/index.html "$out"/status/index.html; do
   for ref in $(grep -oE '"/(assets/[^"?]*|favicon\.svg)"' "$page" | tr -d '"' | sort -u); do
     file="$out$ref"
     [ -f "$file" ] || { echo "$page refers to $ref, which is not in the site" >&2; exit 1; }

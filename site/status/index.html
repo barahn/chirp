@@ -1,0 +1,134 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: AGPL-3.0-only. Copyright (C) 2026 Fabrintek Engenharia Digital Ltda -->
+<html lang="en" data-release="pre">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; connect-src https://status.usechirp.app; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'; require-trusted-types-for 'script'; trusted-types 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Network status — Chirp</title>
+<meta name="description" content="Every server in Chirp's public network, probed from outside every 30 seconds: whether it is up, since when it has been off-line, and how much of each day it answered.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/assets/site.css">
+<script src="/assets/site.js" defer></script>
+<script src="/assets/status.js" defer></script>
+</head>
+<body>
+<svg width="0" height="0" class="sprite" aria-hidden="true">
+  <defs>
+    <g id="bird-body">
+      <path d="M30 64 L12 56 L18 72 Z" fill="#DB8E22"/>
+      <g class="perch" stroke-width="3" stroke-linecap="round"><line x1="52" y1="92" x2="52" y2="101"/><line x1="64" y1="92" x2="64" y2="101"/></g>
+      <circle cx="58" cy="64" r="30" fill="#F5B83D"/><ellipse cx="65" cy="75" rx="18" ry="13" fill="#FFF4D6"/>
+      <path d="M38 62 Q52 48 70 60 Q58 78 38 62 Z" fill="#DB8E22"/>
+      <circle cx="70" cy="54" r="4.2" fill="#2A2118"/><circle cx="71.6" cy="52.4" r="1.4" fill="#FFFFFF"/>
+    </g>
+    <g id="bird-perched"><use href="#bird-body"/><path d="M86 57 L101 63 L86 69 Z" fill="#E8692C"/></g>
+    <g id="bird-asleep">
+      <g transform="translate(0 3)"><path d="M30 64 L12 56 L18 72 Z" fill="#DB8E22"/><g class="perch" stroke-width="3" stroke-linecap="round"><line x1="52" y1="92" x2="52" y2="98"/><line x1="64" y1="92" x2="64" y2="98"/></g><circle cx="58" cy="64" r="30" fill="#F5B83D"/><ellipse cx="65" cy="75" rx="18" ry="13" fill="#FFF4D6"/><path d="M38 62 Q52 48 70 60 Q58 78 38 62 Z" fill="#DB8E22"/><path d="M65 55 Q70 59.5 75 55" fill="none" stroke="#2A2118" stroke-width="2.6" stroke-linecap="round"/><path d="M86 57 L101 63 L86 69 Z" fill="#E8692C"/></g>
+      <g fill="none" class="zz" stroke-linecap="round" stroke-linejoin="round"><path d="M84 36 H91 L84 44 H91" stroke-width="2.2"/><path d="M95 22 H104 L95 32 H104" stroke-width="2.6"/><path d="M106 6 H116 L106 18 H116" stroke-width="3"/></g>
+    </g>
+    <g id="perch-line"><line x1="6" y1="103" x2="114" y2="103" class="perch" stroke-width="4" stroke-linecap="round"/></g>
+  </defs>
+</svg>
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="/" data-i18n-attr="aria-label:brandHome" aria-label="Chirp — remote help, home">
+      <svg viewBox="0 0 120 120" aria-hidden="true"><use href="#bird-perched"/><use href="#perch-line"/></svg>
+      <b>Chirp</b><small data-i18n="descriptor">remote help</small>
+    </a>
+    <nav class="nav" data-i18n-attr="aria-label:navLabel" aria-label="Sections">
+      <a href="/#how" data-i18n="navHow">How it works</a>
+      <a href="/#safety" data-i18n="navSafety">Safety</a>
+      <a href="/#free" data-i18n="navFree">Free for good</a>
+      <a class="btn small" href="/#download" data-i18n="navDownload">Download</a>
+    </nav>
+    <div class="lang seg" role="group" data-i18n-attr="aria-label:langLabel" aria-label="Language">
+      <button type="button" data-lang="en" lang="en" aria-label="English" aria-pressed="true">EN</button>
+      <button type="button" data-lang="pt-BR" lang="pt-BR" aria-label="Português (Brasil)" aria-pressed="false">PT</button>
+    </div>
+  </div>
+</header>
+
+<main id="status" data-api="https://status.usechirp.app">
+  <div class="statuspage">
+    <div class="wrap">
+      <div class="intro">
+        <p class="kicker" data-i18n="stKicker">Public network</p>
+        <h1 data-i18n="stTitle">Network status</h1>
+        <p class="lede" data-i18n="stLede">Every server in Chirp's public network, probed from outside every 30 seconds. No figure here is something a server says about itself.</p>
+      </div>
+
+      <div class="summary" role="status">
+        <b id="st-headline">Loading the figures…</b>
+        <span id="st-checked"></span>
+      </div>
+      <p class="status" id="st-monitor" hidden></p>
+      <noscript><p class="status">This page needs JavaScript to fetch the figures. They are also at <a href="https://status.usechirp.app/v1/servers">status.usechirp.app/v1/servers</a>.</p></noscript>
+
+      <div class="toolbar" id="st-toolbar" hidden>
+        <div class="filters seg" role="group" data-i18n-attr="aria-label:filterLabel" aria-label="Show">
+          <button type="button" data-filter="all" aria-pressed="true" data-i18n="fAll">All</button>
+          <button type="button" data-filter="dedicated" aria-pressed="false" data-i18n="fDedicated">Dedicated</button>
+          <button type="button" data-filter="new" aria-pressed="false" data-i18n="fNew">New</button>
+          <button type="button" data-filter="offline" aria-pressed="false" data-i18n="fOffline">Off-line</button>
+        </div>
+        <p class="legend"><span data-i18n="legendLabel">Each bar is a UTC day:</span>
+          <span><i data-level="ok"></i><span data-i18n="lgOk">99.9% or more</span></span>
+          <span><i data-level="warn"></i><span data-i18n="lgWarn">99% or more</span></span>
+          <span><i data-level="bad"></i><span data-i18n="lgBad">less</span></span>
+          <span><i data-level="none"></i><span data-i18n="lgNone">no data</span></span>
+        </p>
+      </div>
+
+      <ul class="servers" id="st-servers"></ul>
+      <p class="nomatch" id="st-nomatch" hidden></p>
+
+      <div class="empty" id="st-empty" hidden>
+        <svg viewBox="0 0 120 120" aria-hidden="true"><use href="#bird-asleep"/><use href="#perch-line"/></svg>
+        <div>
+          <h2 data-i18n="emptyTitle">No servers yet</h2>
+          <p data-i18n="emptyText">The public network starts with its first node. Until then, Chirp works with a relay you run yourself, or one someone you trust runs.</p>
+        </div>
+      </div>
+
+      <section class="defs" id="definitions" aria-labelledby="defs-title">
+        <h2 id="defs-title" data-i18n="defsTitle">How these figures are made</h2>
+        <dl>
+          <div id="def-probe"><dt data-i18n="dProbe">Probing</dt><dd data-i18n="dProbeText">The monitor asks each server for /healthz over HTTPS every 30 seconds, from a host outside every server it watches, on a fresh connection each time. A server reports nothing about itself, and the relay's health check reveals no state.</dd></div>
+          <div id="def-uptime"><dt data-i18n="dUptime">Uptime</dt><dd data-i18n="dUptimeText">The share of the minutes a server was probed in that it was up. A minute counts as up when most of its probes succeeded; a tie counts as down. Figures are cut, never rounded, so 100% means every probed minute. The 30- and 90-day figures count whole UTC days, today so far included.</dd></div>
+          <div id="def-nodata"><dt data-i18n="dNoData">No data</dt><dd data-i18n="dNoDataText">A minute nobody probed, because the monitor itself was down, counts neither as up nor as down. In the 90-day strip it is a blank day.</dd></div>
+          <div id="def-offline"><dt data-i18n="dOffline">Off-line</dt><dd data-i18n="dOfflineText">Its last three probes failed: about 90 seconds without an answer. The time shown runs from its last answer.</dd></div>
+          <div id="def-failing"><dt data-i18n="dFailing">Failing</dt><dd data-i18n="dFailingText">Its latest probe failed, but not yet three in a row.</dd></div>
+          <div id="def-unknown"><dt data-i18n="dUnknown">Unknown</dt><dd data-i18n="dUnknownText">The monitor has not probed it for three rounds, so this page does not say what it is doing.</dd></div>
+          <div id="def-dedicated"><dt data-i18n="dDedicated">Dedicated</dt><dd data-i18n="dDedicatedText">A Chirp relay in public mode that has joined the network, run by the operator named on it.</dd></div>
+          <div id="def-new"><dt data-i18n="dNew">New</dt><dd data-i18n="dNewText">Joined the network less than 30 days ago. Its 90-day figure is still a short history.</dd></div>
+          <div id="def-suspended"><dt data-i18n="dSuspended">Suspended</dt><dd data-i18n="dSuspendedText">Still listed, but broke a rule of the network, and left out of the list Chirp uses until it is fixed.</dd></div>
+          <div id="def-latency"><dt data-i18n="dLatency">Latency</dt><dd data-i18n="dLatencyText">How long the latest probe took, when it succeeded, including a fresh TLS handshake. It depends on where the monitor is.</dd></div>
+        </dl>
+        <p class="more" data-i18n="defsMore">The rules, and how a server joins the network, are <a href="https://github.com/barahn/chirp/blob/main/docs/status-page-proposal.md">in the proposal</a>. The raw figures are <a href="https://status.usechirp.app/v1/servers">in the API</a>.</p>
+      </section>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <a class="brand" href="/"><svg viewBox="0 0 120 120" aria-hidden="true"><use href="#bird-perched"/><use href="#perch-line"/></svg><b>Chirp</b><small data-i18n="descriptor">remote help</small></a>
+    <span data-i18n="by">By Fabrintek · AGPL-3.0</span>
+    <div class="links">
+      <a href="https://github.com/barahn/chirp" data-i18n="source">Source</a>
+      <a href="https://github.com/barahn/chirp/blob/main/docs/product-model.md" data-i18n="howChirpWorks">How Chirp works</a>
+      <a href="/status/" data-i18n="networkStatus">Network status</a>
+      <a href="https://github.com/barahn/chirp/wiki" data-i18n="wiki">Wiki</a>
+      <a href="https://github.com/barahn/chirp/discussions" data-i18n="discussions">Discussions</a>
+      <a href="https://github.com/barahn/chirp/blob/main/CODE_OF_CONDUCT.md" data-i18n="conduct">Code of Conduct</a>
+      <span><span data-i18n="security">Security reports:</span> <span class="sel">security@fabrintek.com.br</span></span>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

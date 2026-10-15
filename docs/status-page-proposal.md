@@ -2,7 +2,8 @@
 
 **Status:** proposal, not decided. It records the maintainer's answers of
 2026-10-15 and the design that follows from them. Phase 1, the status service
-measuring only, is built: `cmd/chirp-status` and the `status` package.
+measuring only, is built: `cmd/chirp-status` and the `status` package. So
+is phase 2, the page.
 
 The goal is a page on usechirp.app that shows which servers make up Chirp's
 public network, how long each has been up, which are new, which are dedicated
@@ -323,7 +324,11 @@ sets a policy, and must allow the same for `/status/`.
    `/v1/servers/{id}/history`). Uptime arithmetic tested with a fake clock,
    including *no data* gaps. The registry ships empty: Chirp offers no hosted
    server yet, and the registry accepts only `node` entries until phase 3.
-2. **The page.** Polling, both languages, the CSP change, a footer link.
+2. **The page. Built.** `site/status/` and `site/assets/status.js`: polling,
+   both languages, the CSP change, a footer link on every page. Ages are
+   measured by the service's clock, read from its `Date` header, not the
+   visitor's. After merging, run `scripts/apply-cloudflare.sh` to load the
+   new rule, or `scripts/check-live-site.sh` fails on `/status/`.
 3. **Nostr and TURN members**, server-sent events, the conformance suite.
 4. **The relay's public mode:** `-mode public`, `/.well-known/chirp-node`,
    the node key, sealed version attestation, the trusted path disabled.

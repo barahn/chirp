@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (C) 2026 Fabrintek Engenharia Digital Ltda
 //
-// The site's one script: the language switch, the download button for this
+// The site's script: the language switch, the download button for this
 // computer, the bird's chirp, and on the link page, showing and copying the
 // link. English lives in the markup, so every page reads whole without it.
+// The status page adds status.js, which hears of the language from the
+// "chirp:lang" event this script sends.
 (function () {
   "use strict";
 
@@ -112,6 +114,44 @@
     discussions: "Discussões",
     conduct: "Código de Conduta",
     security: "Vulnerabilidades:",
+    networkStatus: "Status da rede",
+    stKicker: "Rede pública",
+    stTitle: "Status da rede",
+    stLede: "Cada servidor da rede pública do Chirp, sondado de fora a cada 30 segundos. Nenhum número aqui é o que um servidor diz de si mesmo.",
+    filterLabel: "Mostrar",
+    fAll: "Todos",
+    fDedicated: "Dedicados",
+    fNew: "Novos",
+    fOffline: "Fora do ar",
+    legendLabel: "Cada barra é um dia, em UTC:",
+    lgOk: "99,9% ou mais",
+    lgWarn: "99% ou mais",
+    lgBad: "menos",
+    lgNone: "sem dados",
+    emptyTitle: "Ainda não há servidores",
+    emptyText: "A rede pública começa com o primeiro nó. Até lá, o Chirp funciona com um relay que você mesmo roda, ou que alguém de confiança roda.",
+    defsTitle: "Como estes números são feitos",
+    dProbe: "Sondagem",
+    dProbeText: "O monitor pede o /healthz de cada servidor por HTTPS a cada 30 segundos, de uma máquina fora de todos os servidores que observa, abrindo uma conexão nova a cada vez. O servidor não informa nada sobre si, e o health check do relay não revela estado nenhum.",
+    dUptime: "Tempo no ar",
+    dUptimeText: "A parte dos minutos em que o servidor esteve no ar, entre os minutos em que foi sondado. Um minuto conta como no ar quando a maioria das sondas acertou; um empate conta como fora. Os números são cortados, nunca arredondados, então 100% quer dizer todos os minutos sondados. Os de 30 e 90 dias contam dias inteiros em UTC, incluindo hoje até agora.",
+    dNoData: "Sem dados",
+    dNoDataText: "Um minuto que ninguém sondou, porque o próprio monitor estava fora, não conta nem como no ar nem como fora. Na faixa de 90 dias, é um dia em branco.",
+    dOffline: "Fora do ar",
+    dOfflineText: "As três últimas sondas falharam: cerca de 90 segundos sem resposta. O tempo mostrado conta a partir da última resposta.",
+    dFailing: "Falhando",
+    dFailingText: "A sonda mais recente falhou, mas ainda não três seguidas.",
+    dUnknown: "Desconhecido",
+    dUnknownText: "O monitor não sonda o servidor há três rodadas, então esta página não diz o que ele está fazendo.",
+    dDedicated: "Dedicado",
+    dDedicatedText: "Um relay do Chirp em modo público que entrou na rede, rodado pelo operador indicado nele.",
+    dNew: "Novo",
+    dNewText: "Entrou na rede há menos de 30 dias. O número de 90 dias dele ainda é um histórico curto.",
+    dSuspended: "Suspenso",
+    dSuspendedText: "Continua listado, mas quebrou uma regra da rede e fica fora da lista que o Chirp usa até ser corrigido.",
+    dLatency: "Latência",
+    dLatencyText: "Quanto levou a sonda mais recente, quando ela acertou, contando uma negociação TLS nova. Depende de onde o monitor está.",
+    defsMore: "As regras, e como um servidor entra na rede, estão <a href=\"https://github.com/barahn/chirp/blob/main/docs/status-page-proposal.md\">na proposta</a>. Os números brutos estão <a href=\"https://status.usechirp.app/v1/servers\">na API</a>.",
     noToken: "<b>Este link está incompleto.</b> Peça para quem enviou copiar de novo do Chirp, inteiro."
   };
 
@@ -145,6 +185,10 @@
     link: {
       en: [document.title, ""],
       "pt-BR": ["Um link do Chirp — ajuda remota", "Alguém te mandou um link do Chirp. Cole no Chirp para ajudar essa pessoa; ela vai ser perguntada na própria tela antes."]
+    },
+    status: {
+      en: [document.title, ""],
+      "pt-BR": ["Status da rede — Chirp", "Cada servidor da rede pública do Chirp, sondado de fora a cada 30 segundos: se está no ar, desde quando está fora, e quanto de cada dia respondeu."]
     }
   };
 
@@ -262,6 +306,7 @@
     applyOS();
     labelTheme();
     if (remember) store.set("chirp-site-lang", lang);
+    document.dispatchEvent(new CustomEvent("chirp:lang", { detail: lang }));
   }
 
   // The theme: the visitor's choice, saved, or the system's. theme.js applies
