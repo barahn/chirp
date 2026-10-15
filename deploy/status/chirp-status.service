@@ -1,0 +1,64 @@
+# The status service (cmd/chirp-status) as a systemd service. deploy/status/
+# install.sh installs it; docs/status-service.md explains it.
+#
+# Settings live in /etc/chirp-status/status.env, the list of servers in
+# /etc/chirp-status/servers.json, and the probes in /var/lib/chirp-status/,
+# so an upgrade can replace this unit without losing any of them.
+#
+# It needs no privilege and no fixed user: systemd makes one for it each
+# start (DynamicUser), and keeps its database in a state directory only that
+# user can write. It listens on loopback; a TLS proxy or a tunnel on the same
+# machine publishes it.
+#
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Fabrintek Engenharia Digital Ltda
+
+[Unit]
+Description=Chirp status service
+Documentation=https://github.com/barahn/chirp/blob/main/docs/status-service.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+EnvironmentFile=/etc/chirp-status/status.env
+ExecStart=/usr/local/bin/chirp-status
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=15
+
+DynamicUser=yes
+StateDirectory=chirp-status
+StateDirectoryMode=0700
+UMask=0077
+
+CapabilityBoundingSet=
+AmbientCapabilities=
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+PrivateUsers=yes
+ProtectProc=invisible
+ProcSubset=pid
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RemoveIPC=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources
+SystemCallErrorNumber=EPERM
+
+[Install]
+WantedBy=multi-user.target
