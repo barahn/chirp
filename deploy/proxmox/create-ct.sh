@@ -39,6 +39,12 @@
 
 set -euo pipefail
 
+# pct exec hands the node's locale (LANG=en_US.UTF-8 on a usual Proxmox shell)
+# to every command it runs in the container, where the Debian template has no
+# such locale: apt and perl then print a screen of warnings each. C.UTF-8 is
+# built into glibc, so it works in any container and keeps UTF-8 output.
+export LC_ALL=C.UTF-8
+
 BUNDLE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 CTID=""
