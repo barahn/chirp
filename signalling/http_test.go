@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -920,5 +921,39 @@ func TestThePingIntervalIsCapped(t *testing.T) {
 		if got := s.pingInterval(); got != want {
 			t.Errorf("PingInterval %v gives %v, want %v", set, got, want)
 		}
+	}
+}
+
+// Every body the relay takes is a small JSON object: one declared larger than
+// MaxBodySize is refused before a handler reads it, and one that only turns
+// out larger (chunked, with no length) is cut off at MaxBodySize.
+func TestARequestBodyIsBounded(t *testing.T) {
+	_, ts := newServer(t)
+	big := `{"code":"` + strings.Repeat("1", MaxBodySize) + `"}`
+
+	resp, err := http.Post(ts.URL+"/api/redeem", "application/json", strings.NewReader(big))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusRequestEntityTooLarge {
+		t.Fatalf("declared-length body over the limit: %s, want 413", resp.Status)
+	}
+
+	// No Content-Length: the body is streamed chunked.
+	pr, pw := io.Pipe()
+	go func() { _, _ = io.WriteString(pw, big); _ = pw.Close() }()
+	resp, err = http.Post(ts.URL+"/api/redeem", "application/json", pr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode < 400 || resp.StatusCode >= 500 {
+		t.Fatalf("chunked body over the limit: %s, want a 4xx", resp.Status)
+	}
+
+	// A body within the limit still goes through.
+	if code := call(t, ts, "POST", "/api/peers", `{"name":"Ana"}`, nil); code != http.StatusCreated {
+		t.Fatalf("a small body: %d, want 201", code)
 	}
 }

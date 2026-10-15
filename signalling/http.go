@@ -135,7 +135,31 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/lookup", s.lookup)
 	mux.HandleFunc("POST /api/links/{token}/lookup", s.lookupLink)
 	mux.HandleFunc("GET /ws", s.serveWS)
-	return mux
+	return limitBody(mux)
+}
+
+// MaxBodySize bounds an HTTP request's body, in bytes. Every body the relay
+// takes is a small JSON object -- a name, a code, a consent answer, a
+// contact -- so a few kilobytes would do; this leaves room without letting a
+// client make the relay read megabytes into memory. A WebSocket's messages
+// are bounded separately, by MaxMessageSize.
+//
+// The relay enforces it itself rather than leave it to a proxy in front: not
+// every deployment has one that does (a Cloudflare Tunnel passes up to 100 MB).
+const MaxBodySize = 64 << 10
+
+// limitBody refuses a body declared larger than MaxBodySize with 413 before
+// any handler runs, and stops reading one that turns out larger than declared
+// (chunked, say) at MaxBodySize, which the handler then sees as malformed.
+func limitBody(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.ContentLength > MaxBodySize {
+			writeError(w, http.StatusRequestEntityTooLarge, "body too large")
+			return
+		}
+		r.Body = http.MaxBytesReader(w, r.Body, MaxBodySize)
+		next.ServeHTTP(w, r)
+	})
 }
 
 type peerView struct {

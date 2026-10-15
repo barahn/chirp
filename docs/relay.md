@@ -415,6 +415,10 @@ location / {
 A flag on the command line overrides the environment. Code lifetimes,
 throttles and caps are compiled in (`HANDOFF.md` §4.2, §4.6).
 
+The relay bounds request bodies itself, at 64 KB (`signalling.MaxBodySize`),
+and WebSocket messages at 1 MiB, so it doesn't depend on a proxy in front to
+do it.
+
 `GET /healthz` returns `200 ok` while the process is serving. It reads no
 state and reveals nothing.
 
