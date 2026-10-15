@@ -1,7 +1,8 @@
 # Proposal: the public relay network and its status page
 
 **Status:** proposal, not decided. It records the maintainer's answers of
-2026-10-15 and the design that follows from them. Nothing here is built yet.
+2026-10-15 and the design that follows from them. Phase 1, the status service
+measuring only, is built: `cmd/chirp-status` and the `status` package.
 
 The goal is a page on usechirp.app that shows which servers make up Chirp's
 public network, how long each has been up, which are new, which are dedicated
@@ -294,7 +295,8 @@ The page uses these definitions, each linked from the number it explains:
 
 | Shown | Meaning |
 |---|---|
-| Uptime % | Up minutes over observed minutes. Minutes when the status service itself was down are *no data*: a gap in the strip, counted neither way. |
+| Uptime % | Up minutes over observed minutes, cut (never rounded) at three decimals. A vantage point succeeded in a minute when more than half its probes in it succeeded; the minute was up when more than half the vantage points that probed in it succeeded, so a tie is down. Minutes when the status service itself was down are *no data*: a gap in the strip, counted neither way. The 24-hour figure counts the last 1,440 whole minutes; the 30- and 90-day figures count whole UTC days, today so far included, and are the sum of the days the history shows. |
+| Unknown | No vantage point has probed the server in the last three rounds, so the page does not say what it is doing now. |
 | Off-line | Three failed probes in a row, about 90 s. The same rule as the relay's Podman health check. |
 | Off-line for … | Time since the last successful probe, kept current by the page between updates. |
 | New | In probation, or listed for under 30 days. Shown with "short history" instead of a 90-day figure. |
@@ -316,9 +318,11 @@ sets a policy, and must allow the same for `/status/`.
 
 ## Phases
 
-1. **Status service, measuring only.** `network/servers.json` with the hosted
-   server, `/healthz` probes, SQLite, the JSON API. Uptime arithmetic tested
-   with a fake clock, including *no data* gaps.
+1. **Status service, measuring only. Built.** `network/servers.json`,
+   `/healthz` probes, SQLite, the JSON API (`/v1/servers`,
+   `/v1/servers/{id}/history`). Uptime arithmetic tested with a fake clock,
+   including *no data* gaps. The registry ships empty: Chirp offers no hosted
+   server yet, and the registry accepts only `node` entries until phase 3.
 2. **The page.** Polling, both languages, the CSP change, a footer link.
 3. **Nostr and TURN members**, server-sent events, the conformance suite.
 4. **The relay's public mode:** `-mode public`, `/.well-known/chirp-node`,
