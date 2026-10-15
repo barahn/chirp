@@ -118,8 +118,11 @@ client/socket.go
 client/target.go
 client/target_test.go
 client/view_test.go
+cmd/chirp-relay/landing.html
 cmd/chirp-relay/main.go
 cmd/chirp-relay/main_test.go
+cmd/chirp-relay/pages.go
+cmd/chirp-relay/pages_test.go
 cmd/chirp/internal/ui/consent.go
 cmd/chirp/internal/ui/consent_test.go
 cmd/chirp/internal/ui/keys.go

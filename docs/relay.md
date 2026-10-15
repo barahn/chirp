@@ -410,6 +410,7 @@ location / {
 | `-addr` | `CHIRP_RELAY_ADDR` | `localhost:8080` (`:8080` in the image) | Where to listen: `host:port`, or `unix:PATH` for a Unix socket. |
 | `-socket-mode` | `CHIRP_RELAY_SOCKET_MODE` | `0660` | Permissions of the Unix socket, in octal. |
 | `-trusted-proxies` | `CHIRP_RELAY_TRUSTED_PROXIES` | none | Over TCP: comma-separated addresses or CIDRs whose `X-Forwarded-For` is believed. |
+| `-security-contact` | `CHIRP_RELAY_SECURITY_CONTACT` | none | Where to report a security problem with this relay: an email address or an `https:` URL. Served as `/.well-known/security.txt`; without it, there is none. |
 | `-healthcheck` | | | Ask the relay on `-addr` for `/healthz`, and exit 0 if it answers. Used by container health checks. |
 
 A flag on the command line overrides the environment. Code lifetimes,
@@ -421,6 +422,16 @@ do it.
 
 `GET /healthz` returns `200 ok` while the process is serving. It reads no
 state and reveals nothing.
+
+A browser that opens the relay's address gets a short page, in English and
+Portuguese, saying what the relay is, that there is nothing to do there, and
+that Chirp never asks anyone to type a code into a web page: the page a
+scammer would send someone to. It has no form, no script and nothing loaded
+from elsewhere. `/robots.txt` keeps search engines out of every path, since
+the others carry credentials. With `-security-contact`,
+`/.well-known/security.txt` says where to report a problem with this relay,
+and points to Chirp's own policy for flaws in Chirp. None of them names the
+relay's version.
 
 ### How the pieces connect
 

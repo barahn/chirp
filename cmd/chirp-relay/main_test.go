@@ -17,7 +17,7 @@ func TestHealthzAndProbe(t *testing.T) {
 	relay := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusTeapot)
 	})
-	ts := httptest.NewServer(routes(relay))
+	ts := httptest.NewServer(routes(relay, ""))
 	defer ts.Close()
 
 	if err := probe(strings.TrimPrefix(ts.URL, "http://")); err != nil {
@@ -66,7 +66,7 @@ func TestUnixSocket(t *testing.T) {
 		t.Fatalf("socket mode %v, want 0660", fi.Mode().Perm())
 	}
 
-	srv := &http.Server{Handler: routes(http.NotFoundHandler())}
+	srv := &http.Server{Handler: routes(http.NotFoundHandler(), "")}
 	go func() { _ = srv.Serve(ln) }()
 	defer func() { _ = srv.Close() }()
 	if err := probe(addr); err != nil {
