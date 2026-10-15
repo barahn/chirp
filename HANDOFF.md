@@ -248,15 +248,19 @@ client/                 the relay side of cmd/chirp: Client (every endpoint of
                         the code, release on exit, hand an allowed session to
                         Serve as a SessionConn), Help (redeem a code or link,
                         follow the session, hand an allowed one to View as a
-                        SessionConn), ParseTarget. No Fyne, no cgo, and no
+                        SessionConn), ParseTarget; nostr.go, signalling over
+                        Nostr relays (§4.7), and pake.go, the PAKE over the
+                        code's secret part (§4.8). No Fyne, no cgo, and no
                         remotekit stream: SessionConn only satisfies it
-cmd/chirp/              the one binary: flags and wiring (-relay, -ice and
-                        their CHIRP_* variables), serveSession (stream.Runner),
-                        viewSession (stream.Viewer)
+cmd/chirp/              the one binary: flags and wiring (-relay, -ice, -nostr
+                        and their CHIRP_* variables), serveSession
+                        (stream.Runner), viewSession (stream.Viewer)
 cmd/chirp/internal/ui/  its Fyne window (docs/ux.md), the consent prompt
-                        (consent.go, barahn/chirp#11) and the remote screen
-                        (remote.go: frames, mouse; keys.go: Fyne keys to DOM
-                        codes)
+                        (consent.go, barahn/chirp#11), the owner's session bar
+                        (sessionbar.go) and the remote screen (remote.go:
+                        frames, mouse; keys.go: Fyne keys to DOM codes); tr.go
+                        and translations/pt-BR.json, Brazilian Portuguese when
+                        the system speaks it (barahn/chirp#80)
 cmd/chirp/internal/warm/ the Warm look (barahn/chirp#53): Fyne theme, tokens,
                         fonts (third-party, OFL; see fonts/README.md), the
                         bird's poses as SVG, the app icon
@@ -347,7 +351,16 @@ Consequences to know about:
 
 ### 4.3 Still open
 
-Nothing is open here now. Four items that used to be listed no longer apply.
+Three bugs reported on 2026-10-14 are open, each with its issue:
+
+- **Chirp does not start on Windows without OpenGL 2.1** — virtual machines,
+  Windows Server, some RDP sessions (barahn/chirp#107).
+- **Chirp keeps running with no window when Fyne cannot create one**
+  (barahn/chirp#108).
+- **Stale ICE candidates during a session** ("doesn't match the current
+  ufrags", barahn/chirp#109).
+
+Four items that used to be listed here no longer apply.
 
 **Branch protection and code scanning are on** (barahn/chirp#17). Making the
 repository public is what turned them on: while it was private on GitHub's
@@ -423,8 +436,8 @@ registered. The relay's own messages all live in the `chirp.` namespace
 
 ### 4.5 Adopting remotekit's `rendezvous`, and the direction inverted
 
-Chirp now requires `github.com/barahn/remotekit` at a release tag (`v0.6.0`;
-`rendezvous` first shipped in `v0.2.0`) and imports only `rendezvous` and
+Chirp now requires `github.com/barahn/remotekit` (`rendezvous` first shipped
+in `v0.2.0`; the pin is in §5.5) and imports only `rendezvous` and
 `bark` — both standard-library only, so no new transitive dependency and never
 `tunnel` (yamux, §5.5).
 `session/code.go` and `session/redemption.go` were deleted.
@@ -696,7 +709,8 @@ takes an explicit ID and an in-memory signing key instead. `tunnel` keeps
 `Start` and wraps the new runner, so Barahn does not change.
 
 remotekit `v0.4.0` shipped it as **`github.com/barahn/remotekit/stream`**, and
-Chirp pins `v0.6.0`. `stream.New(stream.Config{ID, SigningKey, PeerConfig})`
+Chirp pins remotekit past `v0.6.0`, at the merge of barahn/remotekit#107
+(§4.8). `stream.New(stream.Config{ID, SigningKey, PeerConfig})`
 builds a `stream.Runner`, and `Serve(ctx, conn)` runs it over any
 `stream.SignalConn`. The runner holds consent (`Grant`, `Revoke`,
 `RequireScreenViewConsent`), `RequireSignedViewers`, and the data-plane rules
@@ -713,7 +727,7 @@ What this commits Chirp to:
   (barahn/chirp#11), and serves the session over a `SignalConn` on Chirp's
   relay socket (barahn/chirp#12). A second implementation in Chirp would drift
   from Barahn's.
-- **Pinned at `v0.6.0`, a release.** barahn/chirp#20 is closed, and #12
+- **Pinned at a release, with one exception for now.** barahn/chirp#20 is closed, and #12
   builds on `stream`. remotekit `v0.5.0` shipped what the controller needs:
   `stream.Viewer`, the receive side of `webrtc` and the `vp8` decoder
   (barahn/remotekit#87: #88, #91, #92). `v0.6.0` adds the viewer's
@@ -721,7 +735,10 @@ What this commits Chirp to:
   `Disconnect` and received-file controls (barahn/remotekit#93, #94, #97,
   #98), which #77 and #79 build on. Until then `go.mod` pinned a commit of a
   remotekit feature branch that never reached `develop`; pin release tags
-  only, so every build resolves from a ref the repository keeps.
+  only, so every build resolves from a ref the repository keeps. The one
+  exception is current: `pake` (§4.8) is not in a remotekit release yet, so
+  `go.mod` pins the merge of barahn/remotekit#107, a pseudo-version past
+  `v0.6.0`. Pin the first release that includes it.
 
 **remotekit's Phase 2 did not build the `Signaler` its plan proposed.** It
 shipped the narrower `SignalConn` above, and **`signal/nostr`**: a separate Go
@@ -1000,8 +1017,17 @@ may become):
   - usechirp.app on GitHub Pages, behind Cloudflare's headers
     (`docs/devsecops.md`).
 
-  The SBOM workflow ran on the tag, but there is no GitHub Release for it
-  yet, so nothing carries its notes.
+  The GitHub Release carries the notes, and the SBOM workflow attached its
+  output to it.
+
+**On `main`, not yet released:**
+
+- the app in Brazilian Portuguese when the system speaks it, English
+  otherwise (barahn/chirp#80);
+- the site's pages hash their asset references (`?v=…`) past Cloudflare's
+  cache, and `scripts/check-live-site.sh` compares usechirp.app with that
+  build;
+- the app icon's bird drawn closer, for near-round icon masks.
 
 Since v0.3.0 there is no `develop`: work lands on `main` by pull request, and
 a release is a tag on `main` (`docs/branching.md`).
@@ -1020,8 +1046,8 @@ Still to decide or do, in order. Each step has an issue, and the
    are OFL 1.1 and Bitstream Vera, accepted by the maintainer and now gated
    font by font (barahn/chirp#54, §6). #11 is in too: the prompt, and the
    owner's answer sent to the relay (`Owner.Answer`). #12's owner half is in:
-   an allowed session is handed to remotekit's `stream.Runner` (pinned at
-   `v0.6.0`, barahn/chirp#20, §5.5) over a `client.SessionConn` on the owner
+   an allowed session is handed to remotekit's `stream.Runner`
+   (barahn/chirp#20, §5.5) over a `client.SessionConn` on the owner
    socket, granted exactly what the owner allowed, with the ICE servers from
    `-ice`/`CHIRP_ICE` and never remotekit's default. The controller's half
    is in too: Help hands an allowed session to remotekit's `stream.Viewer`,
