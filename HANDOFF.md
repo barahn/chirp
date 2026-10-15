@@ -175,6 +175,9 @@ deploy/proxmox/check-ct.sh
 deploy/proxmox/create-ct.sh
 deploy/proxy/setup-proxy.sh
 deploy/proxy/use-proxy.sh
+deploy/status/chirp-status.service
+deploy/status/install.sh
+deploy/status/status.env
 deploy/systemd/chirp-relay.service
 deploy/systemd/relay.env
 docs/branching.md
@@ -187,6 +190,7 @@ docs/product-model.md
 docs/relay.md
 docs/rendezvous-proposal.md
 docs/status-page-proposal.md
+docs/status-service.md
 docs/stun-turn.md
 docs/ux.md
 go.mod
@@ -195,6 +199,7 @@ network/servers.json
 scripts/apply-cloudflare.sh
 scripts/build-relay.sh
 scripts/build-site.sh
+scripts/build-status.sh
 scripts/check-live-site.sh
 scripts/check-relay.sh
 scripts/check-site.sh

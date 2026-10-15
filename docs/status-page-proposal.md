@@ -319,7 +319,8 @@ sets a policy, and must allow the same for `/status/`.
 
 ## Phases
 
-1. **Status service, measuring only. Built.** `network/servers.json`,
+1. **Status service, measuring only. Built**, and run as
+   [`status-service.md`](status-service.md) says. `network/servers.json`,
    `/healthz` probes, SQLite, the JSON API (`/v1/servers`,
    `/v1/servers/{id}/history`). Uptime arithmetic tested with a fake clock,
    including *no data* gaps. The registry lists one node, `pve-dc-01` at
