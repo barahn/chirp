@@ -108,12 +108,14 @@ Chirp is not yet a runnable product.
   Written for Chirp — no multi-tenancy, no RBAC — rather than taken from the
   proprietary Barahn control plane. [docs/relay.md](docs/relay.md) runs it
   behind TLS in a Proxmox LXC container, with Podman, or on any Linux host.
-- **A test relay** — `https://relay-test.usechirp.app`, run by Fabrintek so
-  two machines can try Chirp without hosting a relay first. A session
-  between two Chirps has run through it. It is not the public server below:
-  it may be reset or taken down, and on the default path it sees the whole
-  code and the signalling, as any relay does. Signal over Nostr if that
-  matters to you.
+- **Fabrintek's relay** — `https://relay.usechirp.app`, so two machines can
+  try Chirp without hosting a relay first. It replaces the test relay at
+  `relay-test.usechirp.app`, which is gone. It is the first node in the
+  public network's registry (`network/servers.json`), and the status service
+  measures it, but it is not yet the blind public server below: until relays
+  get a public mode ([docs/status-page-proposal.md](docs/status-page-proposal.md)),
+  on the default path it sees the whole code and the signalling, as any
+  relay does. Signal over Nostr if that matters to you.
 - **The session layer** — codes, share links, the consent rules, and
   per-network limits on guessing codes. Codes, links and the throttle are
   remotekit's `rendezvous` package; the state machine, consent rules and
@@ -155,10 +157,10 @@ CHIRP_RELAY=http://localhost:8080 go run ./cmd/chirp
 ```
 
 To try it between two machines without running a relay, point both Chirps
-at the test relay:
+at Fabrintek's relay:
 
 ```sh
-CHIRP_RELAY=https://relay-test.usechirp.app go run ./cmd/chirp
+CHIRP_RELAY=https://relay.usechirp.app go run ./cmd/chirp
 ```
 
 The relay only introduces the two Chirps. On different networks they also
