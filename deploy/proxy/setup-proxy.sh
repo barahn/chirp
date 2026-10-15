@@ -195,5 +195,12 @@ log "Next:"
 log "  - forward TCP 80 and 443 (and UDP 443) on the router to ${here:-this machine};"
 for r in "${relays[@]}"; do
 	split "$r"
-	log "  - in the relay's container: ./use-proxy.sh --proxy ${here:-<this address>} --listen $upstream"
+	# The relay sees this proxy at the address it leaves from towards the
+	# relay, which is not this machine's first one when they share a private
+	# network of their own.
+	host="${upstream%:*}"
+	host="${host#[}"
+	host="${host%]}"
+	from="$(ip route get "$host" 2>/dev/null | sed -n 's/.* src \([^ ]*\).*/\1/p' | head -n 1 || true)"
+	log "  - in the relay's container: ./use-proxy.sh --proxy ${from:-${here:-<this address>}} --listen $upstream"
 done
