@@ -187,9 +187,19 @@ if [ -n "$proxy" ]; then
 	if [ "$(in_ct systemctl is-active caddy 2>/dev/null || true)" = active ]; then
 		warn "a Caddy still runs here, though the proxy at $proxy does its work: systemctl disable --now caddy"
 	fi
-	todo+=("Let only the proxy reach $relay_addr: the container's firewall on the node
-      (docs/relay.md, \"One Caddy for several services\"). From the proxy, check:
-        curl http://$relay_addr/healthz")
+	# On a network of its own with the proxy (a bridge with no physical
+	# port), the relay's port is on no other network: the firewall is
+	# optional. On the interface of the default route, it is the LAN's.
+	relay_ip="${relay_addr%:*}"
+	relay_dev="$(in_ct ip -o addr show 2>/dev/null | awk -v ip="$relay_ip" '{ split($4, a, "/"); if (a[1] == ip) { print $2; exit } }' || true)"
+	default_dev="$(in_ct ip route show default 2>/dev/null | sed -n 's/.* dev \([^ ]*\).*/\1/p' | head -n 1 || true)"
+	if [ -n "$relay_dev" ] && [ "$relay_dev" != "$default_dev" ]; then
+		ok "the relay's port is on ${relay_dev:-?} only, apart from the network of the default route"
+	else
+		warn "the relay's port is on the same network as everything else on ${default_dev:-the LAN}"
+		todo+=("Let only the proxy reach $relay_addr: a network of their own, or the container's
+      firewall on the node (docs/relay.md, \"One Caddy for several services\").")
+	fi
 fi
 caddy_domain="$(in_ct sh -c 'cat /etc/systemd/system/caddy.service.d/chirp-relay.conf 2>/dev/null' |
 	sed -n 's/^[[:space:]]*Environment=CHIRP_RELAY_DOMAIN=//p' | head -n 1 || true)"
@@ -345,8 +355,23 @@ if [ -n "$DOMAIN" ]; then
 	fi
 fi
 
+# If the relay already answers at its public name, with a certificate this
+# container trusts, the way in works, whoever forwards it: no advice needed.
+reachable=false
+if [ -n "$DOMAIN" ] && [ -n "${dns4:-}" ]; then
+	code="$(in_ct curl -fsS -o /dev/null -w '%{http_code}' --max-time 8 "https://$DOMAIN/healthz" 2>/dev/null || true)"
+	if [ "$code" = 200 ]; then
+		reachable=true
+		ok "https://$DOMAIN/healthz answers, with a trusted certificate"
+	fi
+fi
+$reachable && nat=none
+
 # The ports go to the proxy when there is one, or straight to the container.
+# The relay knows the proxy only by the address it sees it at, which is not
+# the router's way to it when the two share a network of their own.
 fwd="${proxy:-$ct_ip4}"
+[ -z "$proxy" ] || [ "$relay_dev" = "$default_dev" ] || fwd="<the proxy's address on the LAN>"
 case "$nat" in
 node)
 	ext="$(ip -4 route show default | awk '{ for (i = 1; i < NF; i++) if ($i == "dev") print $(i + 1); exit }')"
@@ -366,9 +391,15 @@ router)
       100.64.0.0/10, the provider puts you behind CGNAT and forwarding cannot work.")
 	;;
 esac
-todo+=("From a machine on another network (a phone's data, not this LAN):
+$reachable || todo+=("From a machine on another network (a phone's data, not this LAN):
         scripts/check-relay.sh ${DOMAIN:-<domain>}")
 
+if [ "${#todo[@]}" -eq 0 ]; then
+	section "Nothing left to do"
+	echo
+	[ "$problems" -eq 0 ]
+	exit
+fi
 section "Left to do"
 n=1
 for item in "${todo[@]}"; do
