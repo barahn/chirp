@@ -63,7 +63,7 @@ func main() {
 	flag.Parse()
 	ice := iceConfig(*iceList, os.Getenv("CHIRP_TURN_USERNAME"), os.Getenv("CHIRP_TURN_PASSWORD"))
 
-	if err := ui.UseLanguage(lang.SystemLocale().String()); err != nil {
+	if err := ui.UseLanguage(chooseLanguage(displayLanguages(), lang.SystemLocale().String())); err != nil {
 		fyne.LogError("Chirp's translation could not be read; using English", err)
 	}
 	a := app.New()

@@ -37,11 +37,25 @@ var languages = map[string]string{
 // words is the chosen translation, or nil for English.
 var words map[string]string
 
+// Speaks reports whether Chirp has words for locale: English, which the code
+// is written in, or a language with a translation file.
+func Speaks(locale string) bool {
+	base := baseOf(locale)
+	_, ok := languages[base]
+	return ok || base == "en"
+}
+
+// baseOf is the language of a locale, lower case: "pt" for "pt-BR" or
+// "pt_BR".
+func baseOf(locale string) string {
+	base, _, _ := strings.Cut(strings.ReplaceAll(locale, "_", "-"), "-")
+	return strings.ToLower(base)
+}
+
 // UseLanguage chooses the words for locale, such as "pt-BR" from Fyne's
 // lang.SystemLocale. A language Chirp has no translation for stays English.
 func UseLanguage(locale string) error {
-	base, _, _ := strings.Cut(strings.ReplaceAll(locale, "_", "-"), "-")
-	file, ok := languages[strings.ToLower(base)]
+	file, ok := languages[baseOf(locale)]
 	if !ok {
 		words = nil
 		return nil

@@ -244,11 +244,21 @@ apart would help someone sweeping codes.
 
 ## Languages
 
-Chirp speaks English and Brazilian Portuguese, and follows the system's
-language; Portuguese from Portugal gets the Brazilian words rather than
-English (barahn/chirp#80). On Linux the language comes from `LANGUAGE`,
-`LC_ALL`, `LC_MESSAGES` or `LANG`, so `LANGUAGE=pt_BR chirp` shows
-Portuguese on an English desktop.
+Chirp speaks English and Brazilian Portuguese, and follows the language the
+system shows itself in; Portuguese from Portugal gets the Brazilian words
+rather than English (barahn/chirp#80). Where that language comes from:
+
+- **Linux:** `LANGUAGE`, `LC_ALL`, `LC_MESSAGES` or `LANG`, so
+  `LANGUAGE=pt_BR chirp` shows Portuguese on an English desktop.
+- **Windows:** the display languages (*Settings → Time & language →
+  Language*), the first in the user's order that Chirp speaks, and not the
+  regional format, which only says how dates and numbers are written
+  (barahn/chirp#104). Fyne's own words, such as an entry's Copy and Paste
+  menu, still follow the regional format, so the two can differ when the
+  display language and the format do.
+- **macOS:** the system locale (`AppleLocale`), or the app's preferred
+  localization once Chirp ships as an `.app` that declares its
+  localizations.
 
 The words are written in English in `cmd/chirp/internal/ui`, and each English
 text is the key to its translation in `cmd/chirp/internal/ui/translations/`.
