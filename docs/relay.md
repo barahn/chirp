@@ -341,7 +341,26 @@ put beside the relay, restarts the relay and checks that it answers. From
 the proxy's container, `curl http://192.168.1.8:8080/healthz` should print
 `ok`.
 
-**4. Only the proxy reaches the relay's port.** A request from anywhere else
+**4. A network of their own.** Between the proxy and the relay the requests
+travel in plain HTTP, URIs and their credentials included. On a LAN shared
+with other machines, any of them that can spoof ARP could read them. Give the
+two containers a bridge with no physical port, which nothing else reaches.
+On the node:
+
+```bash
+printf '\nauto vmbr1\niface vmbr1 inet manual\n\tbridge-ports none\n\tbridge-stp off\n\tbridge-fd 0\n' >> /etc/network/interfaces && ifreload -a
+```
+
+```bash
+pct set 120 --net1 name=eth1,bridge=vmbr1,ip=10.10.10.9/24 && pct set 101 --net1 name=eth1,bridge=vmbr1,ip=10.10.10.8/24
+```
+
+Then use those addresses in steps 2 and 3: `--relay
+relay.example.org=10.10.10.8:8080` on the proxy, and `--proxy 10.10.10.9
+--listen 10.10.10.8:8080` on the relay. The relay's port then exists on no
+network but that bridge, and step 5 becomes optional.
+
+**5. Only the proxy reaches the relay's port.** A request from anywhere else
 is attributed to its own address, whatever its headers say, so the throttle
 holds either way. Still, nothing but the proxy should reach the relay in
 plain HTTP. With the Proxmox firewall on for the datacenter, give the relay's
@@ -361,10 +380,10 @@ and turn the firewall on for its network interface: in the web UI,
 *Container → Network → eth0 → Firewall*. `policy_in: ACCEPT` keeps
 everything else reaching the container as before.
 
-**5. The router** forwards TCP 80 and 443, and UDP 443, to the **proxy's**
+**6. The router** forwards TCP 80 and 443, and UDP 443, to the **proxy's**
 address now, not the relay's. The DNS record does not change.
 
-**6. Check** with `check-ct.sh` in the relay's container, which recognises
+**7. Check** with `check-ct.sh` in the relay's container, which recognises
 this layout and says what is left, and from outside with
 `scripts/check-relay.sh relay.example.org`.
 
