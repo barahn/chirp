@@ -171,6 +171,7 @@ deploy/container/Containerfile
 deploy/install.sh
 deploy/podman/caddy.container
 deploy/podman/chirp-relay.container
+deploy/proxmox/check-ct.sh
 deploy/proxmox/create-ct.sh
 deploy/systemd/chirp-relay.service
 deploy/systemd/relay.env
@@ -193,9 +194,11 @@ scripts/apply-cloudflare.sh
 scripts/build-relay.sh
 scripts/build-site.sh
 scripts/check-live-site.sh
+scripts/check-relay.sh
 scripts/check-site.sh
 scripts/gen-handoff.sh
 scripts/gen-third-party-notices.sh
+scripts/set-relay-dns.sh
 session/consent.go
 session/lookup.go
 session/lookup_test.go

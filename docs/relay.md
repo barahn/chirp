@@ -173,14 +173,75 @@ does not make an unprivileged container privileged.
 
 ### 3. Let traffic reach it
 
-How ports 80 and 443 reach the container depends on your network:
+Start on the node, from the unpacked bundle. `check-ct.sh` finds the
+container, checks the relay and Caddy inside it, finds the public address its
+traffic leaves from, works out whether this node or a router NATs it, and asks
+Cloudflare's resolver what the name points at. It changes nothing, and ends
+with a numbered list of what is left, filled in with this container's
+addresses:
 
-- **The container has a public address** on a bridged network (as in the
-  example above). Nothing more to do. Point DNS at that address.
-- **The node has the only public address** and containers sit on a private
-  bridge. Forward the ports on the node, or on the router in front of it. On
-  the node, with the container at `10.10.10.20` and the public interface
-  `vmbr0`:
+```bash
+./proxmox/check-ct.sh
+```
+
+If the container was created without `--domain`, it says so. Let it install
+Caddy for the name, with the installer `create-ct.sh` left in the container:
+
+```bash
+./proxmox/check-ct.sh --domain relay.example.org --fix-caddy
+```
+
+Then do what the list says, in this order.
+
+**a. The DNS record.** It must point at the public address the script found,
+and on Cloudflare be *DNS only*. From a checkout of this repository, with an
+API token allowed to edit the zone's DNS:
+
+```bash
+scripts/set-relay-dns.sh --name relay.example.org --ipv4 203.0.113.10
+```
+
+That script knows only `usechirp.app`'s zone. For any other zone, or by hand
+on Cloudflare: *DNS → Records → Add record*, type `A`, the name's first label
+(`relay`), the address, and *Proxy status* switched to **DNS only** (the grey
+cloud). Leave out the `AAAA` record unless the container has a public IPv6
+address that IPv6 traffic can reach.
+
+**b. The ports.** How ports 80 and 443 reach the container depends on what
+the script found:
+
+- **The container's address is the public one** (a bridged network with
+  public addresses). Nothing to do.
+- **A router forwards to it.** The usual case for a node at home or in an
+  office. On the router's administration page (often `http://192.168.0.1` or
+  `http://192.168.1.1`; the address is the default gateway of the node's
+  network, `ip route` on the node shows it):
+  1. Find the port forwarding page. Routers call it *Port forwarding*,
+     *Virtual servers*, *NAT*, or *Applications*, usually under *Advanced*,
+     *Firewall* or *WAN*.
+  2. Add three rules to the container's address, as `check-ct.sh` printed it:
+
+     | Protocol | External port | Internal address | Internal port |
+     | --- | --- | --- | --- |
+     | TCP | 80 | the container's | 80 |
+     | TCP | 443 | the container's | 443 |
+     | UDP | 443 | the container's | 443 (HTTP/3, optional) |
+
+  3. Give the container a fixed address, so the rules keep pointing at it:
+     a DHCP reservation on the router, or a static `--ip` (`pct set <ctid>
+     --net0 name=eth0,bridge=vmbr0,ip=192.168.1.50/24,gw=192.168.1.1`).
+  4. Check the **WAN** or **Internet** address on the router's status page.
+     It must equal the public address `check-ct.sh` printed. If it differs,
+     or is in `100.64.0.0/10`, the provider has put you behind carrier-grade
+     NAT, and no forwarding on your router can reach you. Ask the provider for
+     a public IPv4 address (often called *IP fixo* or *IP público*), or run
+     the relay somewhere that has one.
+  5. If the router is behind another router (the provider's modem in router
+     mode), forward the same ports on that one to this router's address too,
+     or put the modem in bridge mode.
+- **This node NATs the container** (a private bridge with no physical port).
+  `check-ct.sh` prints the two `iptables` rules with the right interface and
+  address. For a container at `10.10.10.20` and the public interface `vmbr0`:
 
   ```bash
   iptables -t nat -A PREROUTING -i vmbr0 -p tcp -m multiport --dports 80,443 -j DNAT --to-destination 10.10.10.20
@@ -198,9 +259,25 @@ How ports 80 and 443 reach the container depends on your network:
   [Behind a proxy you already run](#behind-a-proxy-you-already-run).
 
 If the Proxmox firewall is on for the container, allow inbound TCP 80 and 443
-and UDP 443.
+and UDP 443. `check-ct.sh` prints the lines to add.
+
+**c. The certificate.** Nothing to do: once the name resolves and port 80
+reaches the container, Caddy gets a certificate within a minute. Run
+`check-ct.sh` again to see it.
 
 ### 4. Check it
+
+From a machine on **another network** than the relay's (a phone's mobile
+data, a server elsewhere), not from the relay's LAN, where a router without
+NAT loopback fails even when everything works:
+
+```bash
+scripts/check-relay.sh relay.example.org
+```
+
+It checks the name, ports 80 and 443, the redirect to HTTPS, the
+certificate, `/healthz`, and that no `Server` header names the software. With
+nothing but `curl`:
 
 ```bash
 curl https://relay.example.org/healthz
