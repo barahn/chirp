@@ -157,16 +157,48 @@ else
 	bad "chirp-relay is not active: ${in_hint}journalctl -u chirp-relay -n 50"
 fi
 if in_ct sh -c 'set -a; . /etc/chirp-relay/relay.env 2>/dev/null; exec /usr/local/bin/chirp-relay -healthcheck' >/dev/null 2>&1; then
-	ok "the relay answers /healthz on its socket"
+	ok "the relay answers /healthz"
 else
-	bad "the relay does not answer /healthz on its socket"
+	bad "the relay does not answer /healthz where relay.env says it listens"
 fi
 
+# Behind a proxy on another machine (deploy/proxy/), the relay listens on
+# TCP and names that proxy; Caddy beside it is then neither needed nor
+# wanted, and the ports go to the proxy.
+# shellcheck disable=SC2016 # expanded by the shell in the container
+relay_env="$(in_ct sh -c 'set -a; . /etc/chirp-relay/relay.env 2>/dev/null; printf "%s|%s" "$CHIRP_RELAY_ADDR" "$CHIRP_RELAY_TRUSTED_PROXIES"' 2>/dev/null || true)"
+relay_addr="${relay_env%%|*}"
+trusted="${relay_env#*|}"
+proxy=""
+case "$relay_addr" in
+unix:* | "") ;;
+*)
+	if [ -z "$trusted" ]; then
+		bad "the relay listens on TCP $relay_addr and trusts no proxy, so it counts every user as the proxy: run use-proxy.sh"
+	else
+		proxy="${trusted%%,*}"
+		proxy="${proxy%%/*}"
+		ok "the relay listens on TCP $relay_addr, behind the proxy at $trusted"
+	fi
+	;;
+esac
+
+if [ -n "$proxy" ]; then
+	if [ "$(in_ct systemctl is-active caddy 2>/dev/null || true)" = active ]; then
+		warn "a Caddy still runs here, though the proxy at $proxy does its work: systemctl disable --now caddy"
+	fi
+	todo+=("Let only the proxy reach $relay_addr: the container's firewall on the node
+      (docs/relay.md, \"One Caddy for several services\"). From the proxy, check:
+        curl http://$relay_addr/healthz")
+fi
 caddy_domain="$(in_ct sh -c 'cat /etc/systemd/system/caddy.service.d/chirp-relay.conf 2>/dev/null' |
 	sed -n 's/^[[:space:]]*Environment=CHIRP_RELAY_DOMAIN=//p' | head -n 1 || true)"
 [ -n "$DOMAIN" ] || DOMAIN="$caddy_domain"
 caddy_ok=true
-if ! in_ct sh -c 'command -v caddy' >/dev/null 2>&1; then
+if [ -n "$proxy" ]; then
+	caddy_ok=false
+	FIX_CADDY=false
+elif ! in_ct sh -c 'command -v caddy' >/dev/null 2>&1; then
 	bad "Caddy is not installed: the container was created without --domain"
 	caddy_ok=false
 elif [ -z "$caddy_domain" ]; then
@@ -179,7 +211,7 @@ else
 	ok "Caddy serves $caddy_domain"
 fi
 
-if ! $caddy_ok; then
+if ! $caddy_ok && [ -z "$proxy" ]; then
 	if [ -z "$DOMAIN" ]; then
 		todo+=("Name the relay: run this again with --domain NAME --fix-caddy")
 	elif $FIX_CADDY; then
@@ -313,21 +345,23 @@ if [ -n "$DOMAIN" ]; then
 	fi
 fi
 
+# The ports go to the proxy when there is one, or straight to the container.
+fwd="${proxy:-$ct_ip4}"
 case "$nat" in
 node)
 	ext="$(ip -4 route show default | awk '{ for (i = 1; i < NF; i++) if ($i == "dev") print $(i + 1); exit }')"
 	todo+=("Forward the ports on this node (public interface ${ext:-?}), and make the rules persistent
       as this node already does, e.g. post-up lines in /etc/network/interfaces:
-        iptables -t nat -A PREROUTING -i ${ext:-<public interface>} -p tcp -m multiport --dports 80,443 -j DNAT --to-destination $ct_ip4
-        iptables -t nat -A PREROUTING -i ${ext:-<public interface>} -p udp --dport 443 -j DNAT --to-destination $ct_ip4")
+        iptables -t nat -A PREROUTING -i ${ext:-<public interface>} -p tcp -m multiport --dports 80,443 -j DNAT --to-destination $fwd
+        iptables -t nat -A PREROUTING -i ${ext:-<public interface>} -p udp --dport 443 -j DNAT --to-destination $fwd")
 	;;
 router)
 	! $INSIDE || todo+=("Find out who NATs it: run this script on the Proxmox node. If the node does,
       it prints the iptables rules to forward the ports there instead of on the router.")
-	todo+=("On the router in front of this network, forward to $ct_ip4 (docs/relay.md, \"Let traffic reach it\"):
-        TCP 80  → $ct_ip4:80
-        TCP 443 → $ct_ip4:443
-        UDP 443 → $ct_ip4:443   (HTTP/3, optional)
+	todo+=("On the router in front of this network, forward to ${proxy:+the proxy at }$fwd (docs/relay.md, \"Let traffic reach it\"):
+        TCP 80  → $fwd:80
+        TCP 443 → $fwd:443
+        UDP 443 → $fwd:443   (HTTP/3, optional)
       and check the router's WAN address is $public4: if it is not, or is in
       100.64.0.0/10, the provider puts you behind CGNAT and forwarding cannot work.")
 	;;

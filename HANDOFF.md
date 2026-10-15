@@ -173,6 +173,8 @@ deploy/podman/caddy.container
 deploy/podman/chirp-relay.container
 deploy/proxmox/check-ct.sh
 deploy/proxmox/create-ct.sh
+deploy/proxy/setup-proxy.sh
+deploy/proxy/use-proxy.sh
 deploy/systemd/chirp-relay.service
 deploy/systemd/relay.env
 docs/branching.md

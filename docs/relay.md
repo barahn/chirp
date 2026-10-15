@@ -286,6 +286,85 @@ curl https://relay.example.org/healthz
 It should print `ok`. If it does not, see
 [Troubleshooting](#troubleshooting).
 
+### One Caddy for several services
+
+With one public address and several services behind it, only one program can
+have ports 80 and 443. Give them to a Caddy of their own, in a container of
+its own, and put the relay and everything else behind it. The relay then
+listens on TCP, and believes `X-Forwarded-For` from that Caddy only.
+
+```
+internet ─▶ router :80/:443 ─▶ proxy container (Caddy) ─┬─▶ relay container :8080
+                                                       └─▶ other services
+```
+
+`deploy/proxy/` has the two scripts. Each needs nothing else from the bundle,
+so it can be fetched on its own.
+
+**1. The proxy's container.** Create a small unprivileged Debian 13 container
+(1 core, 256 MiB, 2 GiB is plenty) with a fixed address, for example from the
+node:
+
+```bash
+pct create 120 local:vztmpl/debian-13-standard_13.1-2_amd64.tar.zst --hostname proxy --unprivileged 1 --cores 1 --memory 256 --rootfs local-lvm:2 --net0 name=eth0,bridge=vmbr0,ip=192.168.1.9/24,gw=192.168.1.1 --onboot 1 && pct start 120
+```
+
+Use the template name `pveam list local` shows, and your network's
+addresses.
+
+**2. Caddy, with the relay as a site.** In the proxy's container, as root,
+naming the relay's container and the port it will listen on:
+
+```bash
+./setup-proxy.sh --relay relay.example.org=192.168.1.8:8080
+```
+
+It installs Caddy, writes `/etc/caddy/Caddyfile` with the global logger that
+keeps request URIs out of Caddy's log, and the relay's site in
+`/etc/caddy/sites/`. Add other services the same way, now or later:
+`--site cloud.example.org=192.168.1.20:80`. Each run keeps the sites already
+there.
+
+**3. The relay, behind it.** In the relay's container, as root, naming the
+proxy's address:
+
+```bash
+./use-proxy.sh --proxy 192.168.1.9 --listen 192.168.1.8:8080
+```
+
+It backs up `/etc/chirp-relay/relay.env`, sets `CHIRP_RELAY_ADDR` and
+`CHIRP_RELAY_TRUSTED_PROXIES`, turns off the Caddy that `install.sh` may have
+put beside the relay, restarts the relay and checks that it answers. From
+the proxy's container, `curl http://192.168.1.8:8080/healthz` should print
+`ok`.
+
+**4. Only the proxy reaches the relay's port.** A request from anywhere else
+is attributed to its own address, whatever its headers say, so the throttle
+holds either way. Still, nothing but the proxy should reach the relay in
+plain HTTP. With the Proxmox firewall on for the datacenter, give the relay's
+container a file `/etc/pve/firewall/<ctid>.fw` on the node:
+
+```
+[OPTIONS]
+enable: 1
+policy_in: ACCEPT
+
+[RULES]
+IN ACCEPT -source 192.168.1.9 -p tcp -dport 8080
+IN DROP -p tcp -dport 8080
+```
+
+and turn the firewall on for its network interface: in the web UI,
+*Container → Network → eth0 → Firewall*. `policy_in: ACCEPT` keeps
+everything else reaching the container as before.
+
+**5. The router** forwards TCP 80 and 443, and UDP 443, to the **proxy's**
+address now, not the relay's. The DNS record does not change.
+
+**6. Check** with `check-ct.sh` in the relay's container, which recognises
+this layout and says what is left, and from outside with
+`scripts/check-relay.sh relay.example.org`.
+
 ### Doing it by hand
 
 Prefer the web UI? Create an unprivileged Debian 13 container with *Nesting*

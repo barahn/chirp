@@ -7,7 +7,8 @@
 #     chirp-relay-<version>-linux-<arch>/
 #       chirp-relay                  the static binary
 #       install.sh                   deploy/install.sh
-#       systemd/, caddy/, proxmox/   from deploy/
+#       systemd/, caddy/, proxmox/,  from deploy/
+#       proxy/
 #
 # The relay needs no cgo, so it cross-compiles from any machine with Go.
 #
@@ -42,7 +43,7 @@ for arch in "${ARCHES[@]}"; do
 		go build -trimpath -ldflags='-s -w' -o "$stage/chirp-relay" ./cmd/chirp-relay
 
 	cp deploy/install.sh "$stage/"
-	cp -r deploy/systemd deploy/caddy deploy/proxmox "$stage/"
+	cp -r deploy/systemd deploy/caddy deploy/proxmox deploy/proxy "$stage/"
 
 	tar -C bin -czf "bin/$name.tar.gz" "$name"
 	rm -rf "$stage"
