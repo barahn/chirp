@@ -1,0 +1,349 @@
+# Proposal: the public relay network and its status page
+
+**Status:** proposal, not decided. It records the maintainer's answers of
+2026-10-15 and the design that follows from them. Nothing here is built yet.
+
+The goal is a page on usechirp.app that shows which servers make up Chirp's
+public network, how long each has been up, which are new, which are dedicated
+nodes, which are off-line and since when, and which are out of date. Every
+number on it must be measured, not claimed, and it must update within seconds
+of a change.
+
+The page is the visible end of something larger: a public, decentralised
+network that anyone may join with their own relay. Most of this document is
+about that network, because the page can only be as honest as the rules
+behind it.
+
+## Terms
+
+- **The network** is the published list of servers a Chirp depends on when it
+  uses the public network. It has three kinds of member:
+  - **Nodes:** `chirp-relay` instances running in public mode. These are the
+    *dedicated* servers: each one is a relay someone has joined to the network.
+  - **Nostr relays:** third-party relays the network recommends for signalling
+    (`HANDOFF.md` §4.7).
+  - **TURN servers:** for sessions that cannot connect directly
+    ([`stun-turn.md`](stun-turn.md)).
+- **The list** is `network/servers.json` in this repository, plus a signed copy
+  published from it (see [The signed list](#the-signed-list)).
+- **The status service** is a new program, `cmd/chirp-status`. It probes every
+  member, keeps the history, runs the admission and conformance checks, and
+  serves the data the page shows.
+
+## Two modes of the relay
+
+`chirp-relay` gains `-mode private|public` (`CHIRP_RELAY_MODE`). The default
+is `private`.
+
+- **Private** is the relay as it is today: a self-hoster's server for their
+  own people, announced nowhere, configured as they like.
+- **Public** is a node of the network. It serves only what the network needs,
+  with the network's limits, and publishes a node identity at
+  `/.well-known/chirp-node`.
+
+### The invariant: no mode can read the traffic
+
+In neither mode may a relay read a session. This holds today only on the
+Nostr path:
+
+- **Nostr path (§4.7, §4.8).** The server sees six routing digits and returns
+  a key. Signalling travels as NIP-59 gift wraps. The PAKE over the four secret
+  digits binds the two ends, so a relay that hands out the wrong key fails the
+  PAKE. Media and data run over WebRTC (DTLS/SRTP), keyed by fingerprints both
+  ends have signed. A TURN server carries only DTLS-encrypted packets.
+- **The trusted relay path (§4.5)** has no PAKE and no signed viewers. The
+  relay forwards SDP, including the DTLS fingerprints, between the two ends. A
+  hostile relay could swap the fingerprints and sit in the middle. The
+  operator is trusted, which the invariant does not allow.
+
+So:
+
+1. **A public node does not offer the trusted path.** `GET /ws`,
+   `POST /api/redeem`, `POST /api/links/{token}/sessions`,
+   `GET /api/sessions/{id}` and `POST /api/peers/{peer}/consent` answer `404`.
+   A public node does lookup only: `POST /api/peers`, `GET`/`DELETE
+   /api/peers/{peer}`, `PUT /api/peers/{peer}/contact`, `POST /api/lookup` and
+   `POST /api/links/{token}/lookup`.
+2. **The private mode needs the PAKE too.** Either the PAKE also runs over the
+   relay's own WebSocket, or the private mode moves to the Nostr path with a
+   private Nostr relay. This is a separate change, and a precondition for
+   saying the invariant holds in both modes.
+
+### What a node still sees
+
+End-to-end encryption hides content, not metadata. A node sees the addresses
+of the Chirps that use it, the routing digits, and when and how often lookups
+happen. A Nostr relay sees that a key received gift wraps, when, and how big
+they were. Operators therefore pledge not to log or keep any of this beyond
+the throttle's in-memory window (see [Conformance](#conformance)). The pledge
+cannot be verified from outside, and the documentation for users must say so.
+
+## The precondition: finding the right node
+
+Today a code is valid on the one server that issued it. With many independent
+nodes, a controller who types six routing digits must know which node to ask.
+The obvious answers have costs:
+
+- **Ask every node.** Sends the routing digits to every operator, and
+  multiplies the per-origin guessing budget by the number of nodes.
+- **Reserve digits for the node.** Shrinks the routing space each node can
+  allocate from, and makes random guesses likelier to hit.
+- **Share registrations between nodes.** Gives up "all state in memory, one
+  process", and lets one bad node read or forge every registration.
+- **Carry the node in the code.** Lengthens the code, which decision 5 fixed at
+  6 + 4 digits.
+
+A link can name its node without cost, because nobody reads it aloud. Codes
+cannot. This needs its own decision in [`product-model.md`](product-model.md)
+before the public network can carry real sessions. The status page does not
+depend on it and can be built first.
+
+## Membership
+
+### Joining by pull request
+
+An operator adds an entry to `network/servers.json`:
+
+```json
+{
+  "id": "node-sp-01",
+  "kind": "node",
+  "url": "https://relay.example.org",
+  "operator": "Example Org",
+  "github": "example-ops",
+  "contact": "ops@example.org",
+  "region": "BR",
+  "behind_cdn": false
+}
+```
+
+`github` is required: alerts reach the operator through it (see
+[Alerts](#alerts)). `behind_cdn` declares a proxy such as Cloudflare, as
+Invidious requires.
+
+### Joining automatically
+
+Automatic entry follows the same rules, with no human in the checks:
+
+1. **The operator applies.** `chirp-relay -mode public` creates an ed25519
+   node key on first start and publishes it at `/.well-known/chirp-node`. The
+   operator submits the node's URL and their GitHub handle to the status
+   service: `POST /v1/applications`.
+2. **The node proves control of its domain.** The status service fetches
+   `/.well-known/chirp-node?nonce=…` over HTTPS and checks that the node key
+   signed the nonce.
+3. **Probation.** For 30 days the node is probed like a member and shown on the
+   page as *new (in probation)*. It is not in the signed list, so no Chirp
+   uses it.
+4. **Admission.** If probation ends with uptime ≥ 95 % and every conformance
+   check passing, the status service opens a pull request adding the entry.
+   The maintainer merges it. Making the merge automatic as well is possible,
+   but the repository's ruleset currently requires review on `main`.
+
+A failed probation closes the application with the reasons, and the operator
+may apply again.
+
+### Leaving
+
+An operator leaves with a pull request removing the entry. A node that
+breaks the rules is suspended and then removed (see [Alerts](#alerts)).
+
+## Conformance
+
+Every check is run from outside, against behaviour, on every member. A
+member that fails a check is *non-conforming*. The page says so, and the
+signed list leaves it out.
+
+**Nodes:**
+
+| Check | How |
+|---|---|
+| HTTPS with a valid certificate, TLS ≥ 1.2, a domain name rather than an IP | TLS handshake |
+| Up | `GET /healthz` returns `200` within 5 s |
+| Identity | `/.well-known/chirp-node` signs a fresh nonce with the listed key |
+| Public mode only | the trusted-path endpoints answer `404` |
+| Throttle on | the prober sends six malformed codes from its own address within the window and expects `429`. It spends only its own budget |
+| Up to date | see [Versions](#versions) |
+| No version on the wire | no `Server` or other header names the relay's version |
+
+**Nostr relays:**
+
+| Check | How |
+|---|---|
+| Up | WebSocket `REQ` with `limit: 0` reaches `EOSE` within 5 s |
+| Compatible | the NIP-11 document does not set `auth_required`, which Chirp cannot meet until barahn/remotekit#71 |
+| Carries gift wraps | kind 1059 is accepted, and the maximum message size fits one |
+
+**TURN servers:** a STUN Binding Request is answered over UDP and TCP.
+
+**Pledges** that cannot be checked from outside, and to which the operator
+agrees by joining: no logging of URIs, routing digits or link tokens (the
+Caddyfile's filtered logs, kept as shipped); no analytics; no access
+restrictions by country; any changes to the code published under the AGPL.
+
+## Versions
+
+A node must never tell the public its version, because that tells an attacker
+which flaws it has. Invidious, by contrast, publishes its version in
+`/api/v1/stats` and so does not have this problem to solve. Here the version
+goes only to the status service:
+
+- The status service has an X25519 key, published in this repository.
+- When the prober asks `/.well-known/chirp-node?nonce=…`, the node answers
+  with `attestation`: its version and the nonce, signed with the node key,
+  then sealed to the status service's key and padded to a fixed size. Anyone
+  else who asks gets a sealed box they cannot open, of the same length for
+  every version.
+- The status service opens it, checks the signature and the nonce, compares
+  the version with the releases, and publishes only the verdict.
+
+**Limit:** the version is still the node's own word. A modified node can claim
+any version. Where a security fix changes behaviour that can be seen from
+outside, the conformance suite gains a check for it, and those checks are the
+evidence that cannot be faked.
+
+**The rule:**
+
+- A node is **up to date** while it runs the latest release or the one before
+  it.
+- After a release marked **security**, a node has **7 days** to update.
+- After any other release, a node has **30 days**, the same as Invidious.
+- Past that, it is **out of date**. The page says "out of date for N days",
+  never which version it runs, and the signed list drops it.
+
+## Alerts
+
+When a member becomes non-conforming, or a release starts a node's grace
+period, the status service:
+
+1. opens a GitHub issue on this repository, labelled `network`, mentioning
+   the operator's `github` handle, naming the failed check and the deadline;
+2. emails the `contact` address with the same text.
+
+If the grace period ends without a fix, it opens a pull request setting the
+entry's `state` to `suspended`. When the member conforms again, it opens one
+setting it back to `active` and closes the issue. After 90 days suspended, it
+opens a pull request removing the entry.
+
+An issue never states the version, only that the node is behind.
+
+## The signed list
+
+The status service publishes `network.json` at
+`https://status.usechirp.app/v1/network.json`: the active, conforming members,
+signed with an ed25519 key whose public half is compiled into Chirp.
+
+- With `-network public`, a Chirp takes its lookup node, Nostr relays and TURN
+  servers from that list, and checks the signature first.
+- The list carries an expiry, so a Chirp that cannot reach the status service
+  keeps using the last list it verified, until it expires.
+- `-relay`, `-nostr` and `CHIRP_ICE` still override it. Self-hosting needs no
+  list and no permission.
+
+This ends "no default relay list" (`HANDOFF.md` §4.7). That is product
+decision 5's "public network", and it should be recorded there when decided.
+
+## The status service
+
+```
+ network/servers.json ──(pull request)──┐
+                                        ▼
+ ┌─────────────── cmd/chirp-status ───────────────────┐
+ │ probers (one or more vantage points) ─► SQLite      │
+ │ conformance suite · admission · alerts (GitHub API) │
+ │ aggregator ─► API JSON + SSE · signed list · exports│
+ └─────────────────────────┬──────────────────────────┘
+                           ▼  status.usechirp.app
+            site/status/index.html  (usechirp.app)
+```
+
+- It runs on a different host and network from every node, or it goes down
+  with what it watches.
+- **Probes** run every 30 s from each vantage point. A minute counts as up
+  when most vantage points succeeded. It starts with one vantage point; the
+  schema has a `vantage` column from the start.
+- **Storage:** SQLite through a pure-Go driver, so the binary needs no CGO.
+  `probes(server_id, vantage, ts, ok, latency_ms, err_class)` is kept for 90
+  days; `daily(server_id, day, up_minutes, observed_minutes, p50_ms)` is kept
+  for good. Sealed version attestations are opened, judged and discarded: only
+  the verdict is stored.
+- **API:**
+  - `GET /v1/servers`: the current state of every member and applicant;
+  - `GET /v1/servers/{id}/history?days=90`: one member's history;
+  - `GET /v1/stream`: server-sent events, one per change of state;
+  - `GET /v1/network.json`: the signed list;
+  - `GET /v1/exports/{day}.json`: that day's raw probes, signed.
+- **Authenticity:** every response and export is signed by the status
+  service. Anyone can run `chirp-status` against the same list and compare.
+  Notes written by people (incidents, maintenance) are kept apart from the
+  measurements, marked as written by a person, and never change a number.
+
+## The page
+
+`site/status/index.html` on usechirp.app, with the site's stylesheet and its
+English and Portuguese texts (`data-i18n`).
+
+- **Summary:** "7 of 8 operational · checked 12 s ago".
+- **Filters:** All, Nodes (dedicated), Nostr relays, TURN, New, Off-line, Out
+  of date.
+- **One card per member:** name, operator, region, kind, badges, uptime over
+  24 hours, 30 days and 90 days, a strip of 90 daily bars, median latency,
+  conformance.
+
+The page uses these definitions, each linked from the number it explains:
+
+| Shown | Meaning |
+|---|---|
+| Uptime % | Up minutes over observed minutes. Minutes when the status service itself was down are *no data*: a gap in the strip, counted neither way. |
+| Off-line | Three failed probes in a row, about 90 s. The same rule as the relay's Podman health check. |
+| Off-line for … | Time since the last successful probe, kept current by the page between updates. |
+| New | In probation, or listed for under 30 days. Shown with "short history" instead of a 90-day figure. |
+| Dedicated | A node: a `chirp-relay` in public mode that has joined the network. |
+| Out of date for … | Past the grace period of [Versions](#versions). No version is shown. |
+| Incompatible | A Nostr relay that requires NIP-42 authentication. |
+| Suspended | Non-conforming past its grace period, and not in the signed list. |
+
+**Real time:** changes arrive over SSE within about 30 s, the probe interval.
+If the stream drops, the page polls `/v1/servers` every 60 s. If the status
+service stops answering, the page says the monitor is unavailable and shows
+the last data with its age. It never shows old data as current.
+
+**Content Security Policy:** the site declares `default-src 'none'` with no
+`connect-src`, so a page cannot fetch anything. The status page adds
+`connect-src https://status.usechirp.app` to its own policy. The Cloudflare
+response-header ruleset (`.cloudflare/rulesets/response-headers.json`) also
+sets a policy, and must allow the same for `/status/`.
+
+## Phases
+
+1. **Status service, measuring only.** `network/servers.json` with the hosted
+   server, `/healthz` probes, SQLite, the JSON API. Uptime arithmetic tested
+   with a fake clock, including *no data* gaps.
+2. **The page.** Polling, both languages, the CSP change, a footer link.
+3. **Nostr and TURN members**, server-sent events, the conformance suite.
+4. **The relay's public mode:** `-mode public`, `/.well-known/chirp-node`,
+   the node key, sealed version attestation, the trusted path disabled.
+5. **Admission and alerts:** applications, probation, pull requests and
+   issues opened by the status service, emails, suspension.
+6. **The signed list and `-network public` in Chirp.** Needs the decision on
+   [finding the right node](#the-precondition-finding-the-right-node).
+7. **More vantage points**, signed daily exports.
+
+Separately, before the invariant can be claimed for both modes: the PAKE on
+the private mode's path.
+
+## Open questions
+
+1. How a code finds its node, among the options above.
+2. Whether admission ends with an automatic merge, which needs a change to
+   the `main` ruleset, or keeps a maintainer's review.
+3. The thresholds: 95 % uptime over a 30-day probation; 7 and 30 days of
+   grace; 90 days suspended before removal.
+4. Who holds the status service's signing and sealing keys, and how they are
+   rotated. A Chirp release pins the list key, so rotating it needs a release.
+5. Whether operators must state the jurisdiction they run in, beyond a region.
+
+---
+
+`SPDX-License-Identifier: AGPL-3.0-only`
+Copyright (C) 2026 Fabrintek Engenharia Digital Ltda
