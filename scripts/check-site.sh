@@ -15,6 +15,14 @@
 #    so a page served either way keeps the same rules, as long as the two
 #    stay equal.
 #
+# 3. One exception. The status page, under site/status/, reads the status
+#    service's API, so its policy, and only its, adds
+#    connect-src https://status.usechirp.app. Cloudflare sends it from a
+#    second rule (usechirp_status_csp) that replaces the first rule's policy
+#    on /status/. That policy must be the first one with exactly that added:
+#    the link page, where the token sits in the fragment, still connects to
+#    nothing.
+#
 # Usage: scripts/check-site.sh
 #
 # SPDX-License-Identifier: AGPL-3.0-only
@@ -30,19 +38,32 @@ if grep -rnE "$sinks" "$root/site" --include='*.js' --include='*.html'; then
 	fail=1
 fi
 
-header="$(jq -r '.rules[0].action_parameters.headers["Content-Security-Policy"].value' \
-	"$root/.cloudflare/rulesets/response-headers.json")"
+rules="$root/.cloudflare/rulesets/response-headers.json"
+header="$(jq -r '.rules[0].action_parameters.headers["Content-Security-Policy"].value' "$rules")"
 expected="${header%; frame-ancestors \'none\'}"
 if [ "$expected" = "$header" ]; then
 	echo "error: the Cloudflare CSP must end with \"; frame-ancestors 'none'\"" >&2
 	fail=1
 fi
+status_header="$(jq -r '.rules[] | select(.ref == "usechirp_status_csp") | .action_parameters.headers["Content-Security-Policy"].value' "$rules")"
+status_expected="${status_header%; frame-ancestors \'none\'}"
+connect="connect-src https://status.usechirp.app; "
+if [ "$status_header" != "${header/"default-src 'none'; "/"default-src 'none'; $connect"}" ]; then
+	echo "error: the status page's Cloudflare CSP must be the site's with \"$connect\" after default-src, and nothing else changed" >&2
+	echo "  status: $status_header" >&2
+	echo "  site:   $header" >&2
+	fail=1
+fi
 while IFS= read -r page; do
 	meta="$(grep -o 'http-equiv="Content-Security-Policy" content="[^"]*"' "$page" | sed 's/.*content="//; s/"$//')"
-	if [ "$meta" != "$expected" ]; then
+	case "$page" in
+	"$root"/site/status/*) want="$status_expected" ;;
+	*) want="$expected" ;;
+	esac
+	if [ "$meta" != "$want" ]; then
 		echo "error: ${page#"$root"/}'s CSP differs from the Cloudflare header's, less frame-ancestors" >&2
 		echo "  page:   $meta" >&2
-		echo "  header: $expected" >&2
+		echo "  header: $want" >&2
 		fail=1
 	fi
 done < <(find "$root/site" -name '*.html' | sort)

@@ -38,6 +38,20 @@
           }
         }
       }
+    },
+    {
+      "ref": "usechirp_status_csp",
+      "description": "The status page, and only it, may read the status service's API. Runs after usechirp_security_headers and replaces its policy.",
+      "expression": "(http.host in {\"usechirp.app\" \"www.usechirp.app\"} and (http.request.uri.path eq \"/status\" or starts_with(http.request.uri.path, \"/status/\")))",
+      "action": "rewrite",
+      "action_parameters": {
+        "headers": {
+          "Content-Security-Policy": {
+            "operation": "set",
+            "value": "default-src 'none'; connect-src https://status.usechirp.app; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'; require-trusted-types-for 'script'; trusted-types 'none'; frame-ancestors 'none'"
+          }
+        }
+      }
     }
   ]
 }

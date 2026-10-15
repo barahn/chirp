@@ -193,6 +193,9 @@ func TestAPI(t *testing.T) {
 	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "https://usechirp.app" {
 		t.Errorf("CORS origin %q", got)
 	}
+	if got := rec.Header().Get("Access-Control-Expose-Headers"); got != "Date" {
+		t.Errorf("exposed headers %q, want Date", got)
+	}
 	var snap Snapshot
 	if err := json.Unmarshal(rec.Body.Bytes(), &snap); err != nil {
 		t.Fatal(err)

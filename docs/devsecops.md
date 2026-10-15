@@ -159,6 +159,12 @@ the headers, from
 | `Cross-Origin-Resource-Policy` | `same-origin` | other sites cannot embed its files |
 | `Permissions-Policy` | camera, microphone, geolocation, display capture, USB and payment off | the site needs none of them |
 
+The status page, `/status/`, is the one exception to a single policy. It reads
+the status service's API, so a second rule, `usechirp_status_csp`, replaces the
+policy there with the same one plus `connect-src https://status.usechirp.app`.
+Every other page, the link page above all, still connects to nothing.
+`scripts/check-site.sh` fails if the two policies differ by anything else.
+
 HSTS is not among them: `.app` is on the browsers' HSTS preload list, so a
 browser never asks for it over plain HTTP in the first place.
 

@@ -221,9 +221,11 @@ site/assets/images/window-light-pt.webp
 site/assets/images/window-light.webp
 site/assets/site.css
 site/assets/site.js
+site/assets/status.js
 site/assets/theme.js
 site/index.html
 site/l/index.html
+site/status/index.html
 status/probe.go
 status/probe_test.go
 status/registry.go

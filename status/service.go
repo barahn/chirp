@@ -277,6 +277,9 @@ func (s *Service) headers(next http.Handler) http.Handler {
 		h.Set("Cache-Control", "no-cache")
 		if s.AllowOrigin != "" {
 			h.Set("Access-Control-Allow-Origin", s.AllowOrigin)
+			// The page reads the server's clock from Date, so the ages it
+			// shows do not depend on the visitor's clock being right.
+			h.Set("Access-Control-Expose-Headers", "Date")
 			h.Set("Vary", "Origin")
 		}
 		next.ServeHTTP(w, r)

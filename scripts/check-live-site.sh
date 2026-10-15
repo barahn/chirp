@@ -44,17 +44,21 @@ trap 'rm -rf "$work"' EXIT
 "$root/scripts/build-site.sh" "$work/site" >/dev/null
 built="$work/site"
 
-# check_headers <label> <headers-file> prints each ruleset header that is
-# missing or different, and returns non-zero if any is.
+# check_headers <label> <headers-file> <path> prints each ruleset header that
+# is missing or different, and returns non-zero if any is. Under status/, the
+# usechirp_status_csp rule's headers replace the first rule's.
 check_headers() {
-	local label="$1" file="$2" fail=0 name want have
+	local label="$1" file="$2" path="$3" fail=0 name want have status=false
+	case "$path" in status | status/*) status=true ;; esac
 	while IFS=$'\t' read -r name want; do
 		have="$(grep -i "^$name:" "$file" | head -1 | sed 's/^[^:]*:[[:space:]]*//' | tr -d '\r')"
 		if [ "$have" != "$want" ]; then
 			echo "$label: $name is \"$have\", want \"$want\""
 			fail=1
 		fi
-	done < <(jq -r '.rules[0].action_parameters.headers | to_entries[] | "\(.key)\t\(.value.value)"' \
+	done < <(jq -r --argjson status "$status" '.rules[0].action_parameters.headers
+		+ (if $status then (.rules[] | select(.ref == "usechirp_status_csp") | .action_parameters.headers) else {} end)
+		| to_entries[] | "\(.key)\t\(.value.value)"' \
 		"$root/.cloudflare/rulesets/response-headers.json")
 	return "$fail"
 }
@@ -62,7 +66,7 @@ check_headers() {
 # check_once prints what differs and returns non-zero if anything does.
 check_once() {
 	local fail=0 path src got html www status location
-	for path in "" "l/" "assets/site.js" "assets/site.css" "assets/theme.js"; do
+	for path in "" "l/" "status/" "assets/site.js" "assets/status.js" "assets/site.css" "assets/theme.js"; do
 		src="$built/${path:-index.html}"
 		[ "${path%/}" != "$path" ] && src="$built/${path}index.html"
 		got="$work/body"
@@ -86,7 +90,7 @@ check_once() {
 			fail=1
 		fi
 		# Every header the ruleset sets, on every response.
-		check_headers "/$path" "$work/headers" || fail=1
+		check_headers "/$path" "$work/headers" "$path" || fail=1
 
 		# The same path on www: a redirect here, with the same headers.
 		www="${base/:\/\//://www.}"
@@ -102,7 +106,7 @@ check_once() {
 				echo "www /$path: $status to \"$location\", want 301 to $base/$path"
 				fail=1
 			fi
-			check_headers "www /$path" "$work/headers" || fail=1
+			check_headers "www /$path" "$work/headers" "$path" || fail=1
 		fi
 	done
 	return "$fail"
