@@ -6,6 +6,7 @@ package status
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -229,6 +230,12 @@ func (s *Service) Status() (Snapshot, error) {
 // history returns n days up to today, oldest first, one entry for every day
 // whether or not it has data. Today is counted from the probes, up to until.
 func (s *Service) history(id string, today Day, n int, until time.Time) ([]DayTotal, error) {
+	// n comes from a request's ?days=. The handler checks it too; holding
+	// the bound here keeps every caller to it, and the allocation below
+	// sized by no more than MaxHistoryDays.
+	if n < 1 || n > MaxHistoryDays {
+		return nil, fmt.Errorf("a history of %d days: want 1 to %d", n, MaxHistoryDays)
+	}
 	from := today - Day(n-1)
 	totals, err := s.Store.Totals(id, from, today-1)
 	if err != nil {

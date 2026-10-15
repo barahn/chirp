@@ -228,6 +228,18 @@ func TestAPI(t *testing.T) {
 	}
 }
 
+func TestHistoryHoldsItsOwnBound(t *testing.T) {
+	f := newFixture(t, t0)
+	for _, n := range []int{0, -1, MaxHistoryDays + 1, 1 << 40} {
+		if _, err := f.svc.history("n1", DayOf(t0), n, t0); err == nil {
+			t.Errorf("history of %d days: no error", n)
+		}
+	}
+	if days, err := f.svc.history("n1", DayOf(t0), MaxHistoryDays, t0); err != nil || len(days) != MaxHistoryDays {
+		t.Errorf("history of %d days: %d, %v", MaxHistoryDays, len(days), err)
+	}
+}
+
 func TestServersBeforeTheFirstRefresh(t *testing.T) {
 	f := newFixture(t, t0)
 	rec := httptest.NewRecorder()
