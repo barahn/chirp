@@ -24,9 +24,12 @@
 //	chirp-relay -addr 10.0.0.5:8080 -trusted-proxies 10.0.0.1
 //	chirp-relay -healthcheck
 //
+// A browser at the relay's address gets a page saying what it is
+// (pages.go), robots.txt, and with -security-contact a security.txt.
+//
 // Each flag can also be set in the environment: CHIRP_RELAY_ADDR,
-// CHIRP_RELAY_SOCKET_MODE and CHIRP_RELAY_TRUSTED_PROXIES. A flag given on
-// the command line wins.
+// CHIRP_RELAY_SOCKET_MODE, CHIRP_RELAY_TRUSTED_PROXIES and
+// CHIRP_RELAY_SECURITY_CONTACT. A flag given on the command line wins.
 package main
 
 import (
@@ -55,6 +58,8 @@ func main() {
 	proxies := flag.String("trusted-proxies", os.Getenv("CHIRP_RELAY_TRUSTED_PROXIES"),
 		"comma-separated addresses or CIDRs of the reverse proxies in front of the relay, whose X-Forwarded-For is believed")
 	healthcheck := flag.Bool("healthcheck", false, "ask the relay listening on -addr whether it is up, and exit 0 if it is")
+	contactFlag := flag.String("security-contact", os.Getenv("CHIRP_RELAY_SECURITY_CONTACT"),
+		"where to report a security problem with this relay: an email address or an https: URL, served as /.well-known/security.txt")
 	flag.Parse()
 
 	if *healthcheck {
@@ -65,6 +70,10 @@ func main() {
 		return
 	}
 
+	contact, err := securityContact(*contactFlag)
+	if err != nil {
+		log.Fatalf("chirp-relay: -security-contact: %v", err)
+	}
 	trusted, err := signalling.ParsePrefixes(*proxies)
 	if err != nil {
 		log.Fatalf("chirp-relay: -trusted-proxies: %v", err)
@@ -87,7 +96,7 @@ func main() {
 	}
 
 	srv := &http.Server{
-		Handler:           routes(relay.Handler()),
+		Handler:           routes(relay.Handler(), contact),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
@@ -116,10 +125,11 @@ func main() {
 	}
 }
 
-// routes adds the relay's own health check in front of the signalling routes.
-// It says only that the process is serving; it reads no state.
-func routes(relay http.Handler) http.Handler {
+// routes adds the relay's own health check, and the pages a browser finds,
+// in front of the signalling routes. None of them reads any state.
+func routes(relay http.Handler, contact string) http.Handler {
 	mux := http.NewServeMux()
+	pages(mux, contact, time.Now)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		_, _ = io.WriteString(w, "ok\n")
