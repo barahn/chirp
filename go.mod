@@ -9,6 +9,7 @@ require github.com/gorilla/websocket v1.5.3
 require (
 	github.com/barahn/remotekit v0.6.1-0.20261013080612-20e7c3cf88d0
 	github.com/barahn/remotekit/signal/nostr v0.1.0
+	golang.org/x/sys v0.48.0
 )
 
 require (
@@ -72,6 +73,5 @@ require (
 	github.com/yuin/goldmark v1.8.2 // indirect
 	golang.org/x/image v0.46.0 // indirect
 	golang.org/x/net v0.60.0 // indirect
-	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/text v0.42.0 // indirect
 )
