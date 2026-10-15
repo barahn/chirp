@@ -108,6 +108,12 @@ Chirp is not yet a runnable product.
   Written for Chirp — no multi-tenancy, no RBAC — rather than taken from the
   proprietary Barahn control plane. [docs/relay.md](docs/relay.md) runs it
   behind TLS in a Proxmox LXC container, with Podman, or on any Linux host.
+- **A test relay** — `https://relay-test.usechirp.app`, run by Fabrintek so
+  two machines can try Chirp without hosting a relay first. A session
+  between two Chirps has run through it. It is not the public server below:
+  it may be reset or taken down, and on the default path it sees the whole
+  code and the signalling, as any relay does. Signal over Nostr if that
+  matters to you.
 - **The session layer** — codes, share links, the consent rules, and
   per-network limits on guessing codes. Codes, links and the throttle are
   remotekit's `rendezvous` package; the state machine, consent rules and
@@ -147,6 +153,17 @@ Ubuntu). Start a relay, then two Chirps, and type one's code into the other:
 go run ./cmd/chirp-relay
 CHIRP_RELAY=http://localhost:8080 go run ./cmd/chirp
 ```
+
+To try it between two machines without running a relay, point both Chirps
+at the test relay:
+
+```sh
+CHIRP_RELAY=https://relay-test.usechirp.app go run ./cmd/chirp
+```
+
+The relay only introduces the two Chirps. On different networks they also
+need STUN, and often TURN, given with `CHIRP_ICE`: Chirp uses none by
+default ([docs/stun-turn.md](docs/stun-turn.md)).
 
 To signal over Nostr instead, and get the ten-digit code, give both Chirps
 the same Nostr relays:
