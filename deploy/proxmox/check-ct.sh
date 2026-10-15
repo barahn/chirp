@@ -7,6 +7,10 @@
 #   ./proxmox/check-ct.sh
 #   ./proxmox/check-ct.sh --ctid 105 --domain relay.example.org
 #
+# It also runs inside the relay's container, or on any host install.sh set
+# up, as root. There it checks the same things but those only the node can
+# see: nesting, the bridge, and the Proxmox firewall.
+#
 # It reads, and changes nothing, unless --fix-caddy is given. It reports:
 #
 #   - the container, its addresses, and whether they are public;
@@ -66,9 +70,15 @@ bad() { printf '  FAIL  %s\n' "$*"; problems=$((problems + 1)); }
 section() { printf '\n%s\n' "$*"; }
 die() { printf 'error: %s\n' "$*" >&2; exit 1; }
 
-[ "$(id -u)" -eq 0 ] || die "run as root on a Proxmox VE node"
-command -v pct >/dev/null || die "pct not found: this is not a Proxmox VE node"
-command -v curl >/dev/null || die "curl is needed on the node"
+[ "$(id -u)" -eq 0 ] || die "run as root"
+command -v curl >/dev/null || die "curl is needed: apt-get install curl"
+# On the node, commands run in the container through pct; inside the
+# container, or on a host install.sh set up, they run here.
+INSIDE=false
+if ! command -v pct >/dev/null; then
+	[ -x /usr/local/bin/chirp-relay ] || die "neither a Proxmox VE node nor a host with the relay installed"
+	INSIDE=true
+fi
 
 # is_private ADDRESS: an address the internet cannot reach directly.
 is_private() {
@@ -91,7 +101,14 @@ resolve() {
 
 # --- The container ------------------------------------------------------------
 
-if [ -z "$CTID" ]; then
+in_hint=""
+if $INSIDE; then
+	in_ct() { "$@"; }
+	section "This host ($(hostname))"
+	ok "running the check inside it: nesting, the bridge and the Proxmox firewall are the node's to check"
+	net0="" bridge="eth0"
+fi
+if ! $INSIDE && [ -z "$CTID" ]; then
 	found=()
 	for id in $(pct list | awk 'NR > 1 { print $1 }'); do
 		conf="$(pct config "$id" 2>/dev/null || true)"
@@ -105,24 +122,26 @@ if [ -z "$CTID" ]; then
 	*) die "several candidates (${found[*]}); give --ctid" ;;
 	esac
 fi
-pct config "$CTID" >/dev/null 2>&1 || die "no container $CTID"
-conf="$(pct config "$CTID")"
-in_ct() { pct exec "$CTID" -- "$@"; }
+if ! $INSIDE; then
+	pct config "$CTID" >/dev/null 2>&1 || die "no container $CTID"
+	conf="$(pct config "$CTID")"
+	in_ct() { pct exec "$CTID" -- "$@"; }
+	in_hint="pct exec $CTID -- "
 
-section "Container $CTID ($(sed -n 's/^hostname: //p' <<<"$conf"))"
-if [ "$(pct status "$CTID" | awk '{ print $2 }')" != running ]; then
-	bad "it is not running: pct start $CTID"
-	exit 1
+	section "Container $CTID ($(sed -n 's/^hostname: //p' <<<"$conf"))"
+	if [ "$(pct status "$CTID" | awk '{ print $2 }')" != running ]; then
+		bad "it is not running: pct start $CTID"
+		exit 1
+	fi
+	ok "running"
+	if grep -q '^features:.*nesting=1' <<<"$conf"; then
+		ok "nesting is on"
+	else
+		bad "nesting is off; the relay's sandbox needs it: pct set $CTID --features nesting=1 && pct reboot $CTID"
+	fi
+	net0="$(sed -n 's/^net0: //p' <<<"$conf")"
+	bridge="$(sed -n 's/.*bridge=\([^,]*\).*/\1/p' <<<"$net0")"
 fi
-ok "running"
-if grep -q '^features:.*nesting=1' <<<"$conf"; then
-	ok "nesting is on"
-else
-	bad "nesting is off; the relay's sandbox needs it: pct set $CTID --features nesting=1 && pct reboot $CTID"
-fi
-
-net0="$(sed -n 's/^net0: //p' <<<"$conf")"
-bridge="$(sed -n 's/.*bridge=\([^,]*\).*/\1/p' <<<"$net0")"
 ct_ip4="$(in_ct hostname -I 2>/dev/null | tr ' ' '\n' | grep -E '^[0-9]+\.' | head -n 1 || true)"
 ct_ip6="$(in_ct hostname -I 2>/dev/null | tr ' ' '\n' | grep ':' | grep -v '^fe80' | head -n 1 || true)"
 [ -n "$ct_ip4" ] || bad "it has no IPv4 address (net0: $net0)"
@@ -135,7 +154,7 @@ section "Relay and Caddy"
 if [ "$(in_ct systemctl is-active chirp-relay 2>/dev/null || true)" = active ]; then
 	ok "chirp-relay is active"
 else
-	bad "chirp-relay is not active: pct exec $CTID -- journalctl -u chirp-relay -n 50"
+	bad "chirp-relay is not active: ${in_hint}journalctl -u chirp-relay -n 50"
 fi
 if in_ct sh -c 'set -a; . /etc/chirp-relay/relay.env 2>/dev/null; exec /usr/local/bin/chirp-relay -healthcheck' >/dev/null 2>&1; then
 	ok "the relay answers /healthz on its socket"
@@ -144,7 +163,7 @@ else
 fi
 
 caddy_domain="$(in_ct sh -c 'cat /etc/systemd/system/caddy.service.d/chirp-relay.conf 2>/dev/null' |
-	sed -n 's/^[[:space:]]*Environment=CHIRP_RELAY_DOMAIN=//p' | head -n 1)"
+	sed -n 's/^[[:space:]]*Environment=CHIRP_RELAY_DOMAIN=//p' | head -n 1 || true)"
 [ -n "$DOMAIN" ] || DOMAIN="$caddy_domain"
 caddy_ok=true
 if ! in_ct sh -c 'command -v caddy' >/dev/null 2>&1; then
@@ -179,9 +198,9 @@ if $caddy_ok && [ -n "$DOMAIN" ]; then
 	if [ "$(in_ct systemctl is-active caddy 2>/dev/null || true)" = active ]; then
 		ok "caddy is active"
 	else
-		bad "caddy is not active: pct exec $CTID -- journalctl -u caddy -n 50"
+		bad "caddy is not active: ${in_hint}journalctl -u caddy -n 50"
 	fi
-	listening="$(in_ct ss -Hltn 2>/dev/null | awk '{ print $4 }')"
+	listening="$(in_ct ss -Hltn 2>/dev/null | awk '{ print $4 }' || true)"
 	for port in 80 443; do
 		if grep -qE "[:.]$port\$" <<<"$listening"; then
 			ok "something listens on TCP $port"
@@ -223,7 +242,7 @@ if [ -n "$ct_ip4" ] && [ -n "$public4" ] && [ "$ct_ip4" != "$public4" ]; then
 	nat=router
 	# A bridge with no physical port behind it is private to this node:
 	# the node itself must be doing the NAT.
-	if [ -d "/sys/class/net/$bridge/brif" ]; then
+	if ! $INSIDE && [ -d "/sys/class/net/$bridge/brif" ]; then
 		nat=node
 		for port in "/sys/class/net/$bridge/brif"/*; do
 			case "${port##*/}" in
@@ -236,10 +255,16 @@ fi
 case "$nat" in
 none) ok "the container's own address is the public one: no port forwarding needed" ;;
 node) warn "$bridge has no physical port: this node NATs the container" ;;
-router) warn "the container is behind NAT: a router forwards to it" ;;
+router)
+	if $INSIDE; then
+		warn "it is behind NAT: a router, or the Proxmox node if its bridge is private, forwards to it"
+	else
+		warn "the container is behind NAT: a router forwards to it"
+	fi
+	;;
 esac
 
-if command -v pve-firewall >/dev/null && pve-firewall status 2>/dev/null | grep -q 'enabled/running'; then
+if ! $INSIDE && command -v pve-firewall >/dev/null && pve-firewall status 2>/dev/null | grep -q 'enabled/running'; then
 	if grep -q 'firewall=1' <<<"$net0" && grep -qE '^enable: *1' "/etc/pve/firewall/$CTID.fw" 2>/dev/null; then
 		if grep -qiE 'dport[ =]?80|dport[ =]?443|HTTPS|HTTP' "/etc/pve/firewall/$CTID.fw" 2>/dev/null; then
 			ok "the Proxmox firewall is on for it, with rules for HTTP(S)"
@@ -295,6 +320,8 @@ node)
         iptables -t nat -A PREROUTING -i ${ext:-<public interface>} -p udp --dport 443 -j DNAT --to-destination $ct_ip4")
 	;;
 router)
+	! $INSIDE || todo+=("Find out who NATs it: run this script on the Proxmox node. If the node does,
+      it prints the iptables rules to forward the ports there instead of on the router.")
 	todo+=("On the router in front of this network, forward to $ct_ip4 (docs/relay.md, \"Let traffic reach it\"):
         TCP 80  → $ct_ip4:80
         TCP 443 → $ct_ip4:443
