@@ -22,6 +22,7 @@
     navFree: "Grátis para sempre",
     navDownload: "Baixar",
     langLabel: "Idioma",
+    githubLabel: "Código-fonte no GitHub",
     h1a: "Baixe.",
     h1b: "Abra.",
     h1c: "Mande seu <span class=\"chirp\">chirp</span>.",
@@ -121,6 +122,8 @@
       downloadChirp: "Download Chirp",
       phone: "Chirp runs on computers: Windows, macOS and Linux. Open this page on the computer that needs help.",
       copied: "Link copied",
+      toDark: "Switch to dark theme",
+      toLight: "Switch to light theme",
       selected: "Selected. Copy it with Ctrl+C or ⌘C."
     },
     "pt-BR": {
@@ -128,6 +131,8 @@
       downloadChirp: "Baixar o Chirp",
       phone: "O Chirp roda em computadores: Windows, macOS e Linux. Abra esta página no computador que precisa de ajuda.",
       copied: "Link copiado",
+      toDark: "Mudar para o tema escuro",
+      toLight: "Mudar para o tema claro",
       selected: "Selecionado. Copie com Ctrl+C ou ⌘C."
     }
   };
@@ -255,8 +260,38 @@
       b.setAttribute("aria-pressed", String(b.getAttribute("data-lang") === lang));
     });
     applyOS();
+    labelTheme();
     if (remember) store.set("chirp-site-lang", lang);
   }
+
+  // The theme: the visitor's choice, saved, or the system's. theme.js applies
+  // a saved choice before the page is drawn; this draws the toggle. Choosing
+  // the system's own theme forgets the choice, so the page follows the system
+  // again.
+  var darkQuery = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
+  function systemTheme() { return darkQuery && darkQuery.matches ? "dark" : "light"; }
+  function currentTheme() { return document.documentElement.getAttribute("data-theme") || systemTheme(); }
+  function labelTheme() {
+    var label = currentTheme() === "dark" ? JS[lang].toLight : JS[lang].toDark;
+    document.querySelectorAll("[data-theme-toggle]").forEach(function (b) {
+      b.setAttribute("aria-label", label);
+      b.setAttribute("title", label);
+    });
+  }
+  document.querySelectorAll("[data-theme-toggle]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var next = currentTheme() === "dark" ? "light" : "dark";
+      if (next === systemTheme()) {
+        document.documentElement.removeAttribute("data-theme");
+        try { localStorage.removeItem("chirp-site-theme"); } catch (e) {}
+      } else {
+        document.documentElement.setAttribute("data-theme", next);
+        store.set("chirp-site-theme", next);
+      }
+      labelTheme();
+    });
+  });
+  if (darkQuery && darkQuery.addEventListener) darkQuery.addEventListener("change", labelTheme);
   document.querySelectorAll("[data-lang]").forEach(function (b) {
     b.addEventListener("click", function () { setLang(b.getAttribute("data-lang"), true); });
   });
