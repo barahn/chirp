@@ -13,8 +13,9 @@ import (
 	"github.com/barahn/chirp/client"
 )
 
+// started opens the bar for a session that was allowed everything.
 func started(w *Window, name string) {
-	w.ApplyOwner(client.OwnerEvent{Started: &client.ActiveSession{ID: "s1", Name: name}})
+	w.ApplyOwner(client.OwnerEvent{Started: &client.ActiveSession{ID: "s1", Name: name, Permissions: allFour}})
 }
 
 func TestTheBarOpensWhenASessionStarts(t *testing.T) {
@@ -49,11 +50,14 @@ func TestTheBarCountsAndCleansTheName(t *testing.T) {
 	if w.bar.clock.Text != "60:02" {
 		t.Errorf("after an hour with one tick the clock says %q", w.bar.clock.Text)
 	}
-	if got := barText("Ana\nVerified by your bank"); strings.Contains(got, "\n") {
+	if got := barText("Ana\nVerified by your bank", allFour); strings.Contains(got, "\n") {
 		t.Errorf("the bar shows a line break: %q", got)
 	}
-	if got := barText(""); got != "Someone is controlling this computer" {
+	if got := barText("", allFour); got != "Someone is controlling this computer" {
 		t.Errorf("an empty name shows %q", got)
+	}
+	if got := barText("Ana", []string{"screen_view"}); got != "“Ana” is seeing this screen" {
+		t.Errorf("without remote_control the bar says %q", got)
 	}
 }
 

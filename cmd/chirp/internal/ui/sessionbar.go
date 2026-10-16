@@ -5,6 +5,7 @@ package ui
 
 import (
 	"fmt"
+	"slices"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -22,6 +23,11 @@ import (
 // brand word. End acts at once, without asking, and closing the bar ends the
 // session too: a bar the owner wants gone is a session they want over.
 //
+// Under that line, each permission allowed besides Screen view is a switch
+// that only turns off (barahn/chirp#52): the owner can take one back at any
+// moment, and it stops at once, but turning one on again needs a new
+// request. Taking Screen view back is End.
+//
 // Fyne cannot keep a window above every other one; until a per-OS shim does
 // (#77), the bar opens as its own small window and asks for focus.
 
@@ -31,8 +37,11 @@ type sessionBar struct {
 	session client.ActiveSession
 	start   time.Time
 	now     func() time.Time
+	who     *widget.Label
 	clock   *widget.Label
 	end     *widget.Button
+	perms   []*permSwitch
+	granted []string
 	closed  func()
 	done    bool
 	stop    chan struct{}
@@ -49,13 +58,40 @@ func (w *Window) showSessionBar(s client.ActiveSession) {
 
 	dot := canvas.NewCircle(theme.Color(theme.ColorNameError))
 	dot.Resize(fyne.NewSize(10, 10))
-	who := widget.NewLabelWithStyle(barText(s.Name), fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+	b.granted = append([]string(nil), s.Permissions...)
+	b.who = widget.NewLabelWithStyle(barText(s.Name, b.granted), fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 	b.clock = widget.NewLabel(elapsedText(0))
 	b.end = widget.NewButton(tr(barEnd), b.endNow)
 	b.end.Importance = widget.DangerImportance
-	b.win.SetContent(container.NewPadded(container.NewHBox(
-		container.NewGridWrap(fyne.NewSize(10, 10), dot), who, b.clock, b.end,
-	)))
+	top := container.NewHBox(container.NewGridWrap(fyne.NewSize(10, 10), dot), b.who, b.clock, b.end)
+	content := container.NewVBox(top)
+	for _, name := range s.Permissions {
+		if name == permScreenView {
+			continue
+		}
+		sw := newPermSwitch(name, true, nil)
+		sw.offOnly = true
+		sw.changed = func(on bool) {
+			if on {
+				return
+			}
+			b.granted = slices.DeleteFunc(b.granted, func(p string) bool { return p == sw.name })
+			b.who.SetText(barText(s.Name, b.granted))
+			if w.OnRevoke != nil {
+				w.OnRevoke(s.ID, sw.name)
+			}
+		}
+		b.perms = append(b.perms, sw)
+	}
+	if len(b.perms) > 0 {
+		hint := widget.NewLabel(tr(barRevokeHint))
+		hint.Importance = widget.LowImportance
+		content.Add(hint)
+		for _, sw := range b.perms {
+			content.Add(sw)
+		}
+	}
+	b.win.SetContent(container.NewPadded(content))
 	b.closed = b.endNow
 	b.win.SetCloseIntercept(b.closed)
 	b.win.SetFixedSize(true)
@@ -114,12 +150,27 @@ func (b *sessionBar) dismiss() {
 	}
 }
 
-// barText says who is in, as a claim.
-func barText(name string) string {
-	if c := claim(name); c != "" {
-		return trf("“%s” is controlling this computer", c)
+// recolor redraws the switches in the theme's current colours.
+func (b *sessionBar) recolor() {
+	for _, sw := range b.perms {
+		sw.Refresh()
 	}
-	return tr("Someone is controlling this computer")
+}
+
+// barText says who is in, as a claim, and whether they can use the computer
+// or only see it.
+func barText(name string, granted []string) string {
+	c := claim(name)
+	control := slices.Contains(granted, "remote_control")
+	switch {
+	case control && c != "":
+		return trf("“%s” is controlling this computer", c)
+	case control:
+		return tr("Someone is controlling this computer")
+	case c != "":
+		return trf("“%s” is seeing this screen", c)
+	}
+	return tr("Someone is seeing this screen")
 }
 
 // elapsedText is the bar's clock, as minutes and seconds.
@@ -128,6 +179,7 @@ func elapsedText(seconds int) string {
 }
 
 const (
-	barTitle = "Session in progress"
-	barEnd   = "End"
+	barTitle      = "Session in progress"
+	barEnd        = "End"
+	barRevokeHint = "Turn one off to take it back. It stays off until the next request."
 )

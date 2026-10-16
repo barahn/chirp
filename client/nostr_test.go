@@ -267,7 +267,7 @@ func TestASessionIsSignalledOverNostr(t *testing.T) {
 	}
 	await(t, helped, "the helper to be asking", func(ev HelperEvent) bool { return ev.Phase == HelperAsking })
 
-	if _, err := o.Answer(context.Background(), req.SessionID, true); err != nil {
+	if _, err := o.Answer(context.Background(), req.SessionID, req.Permissions); err != nil {
 		t.Fatal(err)
 	}
 	await(t, helped, "the helper to be let in", func(ev HelperEvent) bool { return ev.Phase == HelperAllowed })
@@ -318,7 +318,7 @@ func TestADeclineOverNostrReachesTheHelper(t *testing.T) {
 
 	helped := helpWith(t, newNostrClient(t, r, nr), shown.LinkFragment(), "Ana")
 	req := await(t, events, "the request", asked).Consent
-	s, err := o.Answer(context.Background(), req.SessionID, false)
+	s, err := o.Answer(context.Background(), req.SessionID, nil)
 	if err != nil || s.State != StateConsentDenied {
 		t.Fatalf("Answer = %+v, %v", s, err)
 	}
@@ -329,7 +329,7 @@ func TestADeclineOverNostrReachesTheHelper(t *testing.T) {
 	case <-time.After(200 * time.Millisecond):
 	}
 	// A declined request cannot be allowed afterwards.
-	if _, err := o.Answer(context.Background(), req.SessionID, true); err == nil {
+	if _, err := o.Answer(context.Background(), req.SessionID, req.Permissions); err == nil {
 		select {
 		case <-served:
 			t.Fatal("allowing a declined request served it")
@@ -403,7 +403,7 @@ func TestAnOwnerOnNostrCanStillBeHelpedThroughTheRelay(t *testing.T) {
 
 	helped := helpWith(t, newClient(t, r), shown.Spoken(), "Ana")
 	req := await(t, events, "the request", asked).Consent
-	if _, err := o.Answer(context.Background(), req.SessionID, true); err != nil {
+	if _, err := o.Answer(context.Background(), req.SessionID, req.Permissions); err != nil {
 		t.Fatal(err)
 	}
 	await(t, helped, "the helper to be let in", func(ev HelperEvent) bool { return ev.Phase == HelperAllowed })
@@ -468,7 +468,7 @@ func TestTheHelperSeesTheOwnersScreenOverNostr(t *testing.T) {
 	helpWith(t, cc, shown.Spoken(), "Ana")
 
 	req := await(t, events, "the request", asked).Consent
-	if _, err := o.Answer(context.Background(), req.SessionID, true); err != nil {
+	if _, err := o.Answer(context.Background(), req.SessionID, req.Permissions); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -510,7 +510,7 @@ func TestThePAKEProvesTheKeysTheSessionUses(t *testing.T) {
 	}
 	helpWith(t, cc, shown.Spoken(), "Ana")
 	req, _ := askedAndReplaced(t, events, shown.Code)
-	if _, err := o.Answer(context.Background(), req.SessionID, true); err != nil {
+	if _, err := o.Answer(context.Background(), req.SessionID, req.Permissions); err != nil {
 		t.Fatal(err)
 	}
 	owner := await(t, served, "the owner's session", func(*SessionConn) bool { return true })

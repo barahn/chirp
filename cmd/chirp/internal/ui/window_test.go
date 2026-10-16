@@ -248,6 +248,8 @@ func labels(o fyne.CanvasObject) []string {
 	switch v := o.(type) {
 	case *widget.Label:
 		return []string{v.Text}
+	case *permSwitch:
+		return []string{v.label.Text}
 	case *fyne.Container:
 		var out []string
 		for _, c := range v.Objects {

@@ -40,11 +40,15 @@ type Window struct {
 	// OnCancel is called when the person stops waiting, or ends a session.
 	OnCancel func()
 	// OnConsent is called with this machine's user's answer to a consent
-	// request: the button they pressed in the prompt, or false when the
-	// prompt was closed or ran out of time. It is never called otherwise.
-	OnConsent func(sessionID string, granted bool)
+	// request: what they allowed, with the switches the prompt had on when
+	// they pressed Allow, or nothing when they pressed Decline, closed the
+	// prompt or let it run out of time. It is never called otherwise.
+	OnConsent func(sessionID string, grant []string)
 	// OnEndSession is called when the user ends a session they allowed.
 	OnEndSession func()
+	// OnRevoke is called when the user turns a permission off in the
+	// session bar, mid-session. It cannot be turned on again there.
+	OnRevoke func(sessionID, permission string)
 
 	// The header: the bird, whose pose says how this machine stands, and
 	// the wordmark.
@@ -281,10 +285,11 @@ func (w *Window) ApplyOwner(ev client.OwnerEvent) {
 
 // consentDecided records the user's answer in the main window and passes it
 // on. Only the prompt calls it.
-func (w *Window) consentDecided(req *client.ConsentRequest, granted bool) {
+func (w *Window) consentDecided(req *client.ConsentRequest, grant []string) {
 	defer w.relayout()
+	granted := len(grant) > 0
 	w.request.Importance = widget.MediumImportance
-	w.request.SetText(decidedNote(req.Name, granted))
+	w.request.SetText(decidedNote(req.Name, grant))
 	w.request.Show()
 	if granted {
 		w.endSession.Show()
@@ -292,7 +297,7 @@ func (w *Window) consentDecided(req *client.ConsentRequest, granted bool) {
 		w.endSession.Hide()
 	}
 	if w.OnConsent != nil {
-		w.OnConsent(req.SessionID, granted)
+		w.OnConsent(req.SessionID, grant)
 	}
 }
 
@@ -480,6 +485,9 @@ func (w *Window) recolor() {
 	w.code.Refresh()
 	if w.prompt != nil {
 		w.prompt.recolor()
+	}
+	if w.bar != nil {
+		w.bar.recolor()
 	}
 }
 

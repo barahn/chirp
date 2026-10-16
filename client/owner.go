@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"errors"
+	"slices"
 	"sync"
 	"time"
 )
@@ -61,6 +62,9 @@ type ActiveSession struct {
 	ID string
 	// Name is what the controller typed: a claim, as in the prompt.
 	Name string
+	// Permissions are what the owner allowed, in the order they were asked
+	// for, spelled as remotekit spells them.
+	Permissions []string
 }
 
 // Owner keeps this machine registered and reachable, reports what to show,
@@ -73,11 +77,13 @@ type Owner struct {
 
 	// peerID is the registration Answer speaks for. Run sets it; Answer,
 	// called from the window, reads it. asked is the consent request shown
-	// last, and sock the owner socket while it is up.
-	mu     sync.Mutex
-	peerID string
-	asked  *ConsentRequest
-	sock   *Socket
+	// last, granted what the owner allowed of it, and sock the owner socket
+	// while it is up.
+	mu      sync.Mutex
+	peerID  string
+	asked   *ConsentRequest
+	granted []string
+	sock    *Socket
 	// nostr is this registration's end over Nostr, when the client has
 	// Nostr set, and nostrAsk the request that came over it (nostr.go).
 	nostr    *nostrOwner
@@ -379,12 +385,29 @@ func (o *Owner) refresh(ctx context.Context, shown *Peer) error {
 // getting the next. The request it answered is gone with it.
 var ErrNotRegistered = errors.New("client: not registered")
 
-// Answer gives this machine's user's decision on a consent request. It is
-// the one way consent is given, and only the window calls it, when its user
-// has pressed Allow or Decline in Chirp's own prompt.
-func (o *Owner) Answer(ctx context.Context, sessionID string, granted bool) (Session, error) {
+// Answer gives this machine's user's decision on a consent request: grant is
+// what they allowed, and none declines. It is the one way consent is given,
+// and only the window calls it, when its user has pressed Allow or Decline in
+// Chirp's own prompt.
+//
+// Only permissions the request asked for are granted, whatever grant says.
+// The session is then served with those alone: the runner enforces them on
+// this machine (newSessionConn, and Grant in cmd/chirp), so what the owner
+// did not allow never reaches the controller, whatever the relay or the
+// controller's Chirp do.
+func (o *Owner) Answer(ctx context.Context, sessionID string, grant []string) (Session, error) {
 	o.mu.Lock()
 	id := o.peerID
+	var allowed []string
+	if o.asked != nil && o.asked.SessionID == sessionID {
+		for _, p := range o.asked.Permissions {
+			if slices.Contains(grant, p) {
+				allowed = append(allowed, p)
+			}
+		}
+	}
+	granted := len(allowed) > 0
+	o.granted = allowed
 	o.mu.Unlock()
 	if id == "" {
 		return Session{}, ErrNotRegistered
@@ -411,8 +434,9 @@ func (o *Owner) Answer(ctx context.Context, sessionID string, granted bool) (Ses
 func (o *Owner) startSession(ctx context.Context, sessionID string) {
 	o.mu.Lock()
 	req := o.asked
+	granted := o.granted
 	o.mu.Unlock()
-	if req == nil || req.SessionID != sessionID || o.Serve == nil {
+	if req == nil || req.SessionID != sessionID || len(granted) == 0 || o.Serve == nil {
 		return
 	}
 	// An approval can sit queued while the controller leaves or the code is
@@ -446,13 +470,13 @@ func (o *Owner) startSession(ctx context.Context, sessionID string) {
 	if s, key := o.nostrSender(sessionID); s != nil {
 		send, viaNostr, peerKey = s, true, key
 	}
-	conn := newSessionConn(req.SessionID, req.Permissions, send)
+	conn := newSessionConn(req.SessionID, granted, send)
 	conn.Nostr = viaNostr
 	if peerKey != nil {
 		conn.SigningKey, conn.PeerKey = o.signKey, peerKey
 	}
 	o.active = conn
-	o.emit(OwnerEvent{Started: &ActiveSession{ID: req.SessionID, Name: req.Name}})
+	o.emit(OwnerEvent{Started: &ActiveSession{ID: req.SessionID, Name: req.Name, Permissions: granted}})
 	o.serving.Add(1)
 	go func() {
 		defer o.serving.Done()
@@ -541,6 +565,7 @@ func (o *Owner) setSocket(s *Socket) {
 func (o *Owner) setAsked(req *ConsentRequest) {
 	o.mu.Lock()
 	o.asked = req
+	o.granted = nil
 	o.mu.Unlock()
 }
 

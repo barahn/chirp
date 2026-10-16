@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"unicode"
 
@@ -48,6 +49,25 @@ func remoteNotice(kind string) string {
 		return tr("They haven't allowed you to see their screen.")
 	case "capture_unavailable":
 		return tr("Their computer can't share its screen right now. Ask them whether it allows screen recording.")
+	}
+	return ""
+}
+
+// limitsText is what the remote screen says about what the other person has
+// not allowed, or "" when nothing they could allow is held back. Screen view
+// is not named: without it there is no picture, and remoteNotice says why.
+// Nor is the clipboard: the other Chirp withholds it from every session for
+// now (barahn/chirp#79), so it is not theirs to allow.
+func limitsText(granted []string) string {
+	control := slices.Contains(granted, "remote_control")
+	files := slices.Contains(granted, "file_transfer")
+	switch {
+	case !control && !files:
+		return tr("View only: they haven't allowed their mouse and keyboard or files.")
+	case !control:
+		return tr("View only: they haven't allowed their mouse and keyboard.")
+	case !files:
+		return tr("They haven't allowed their files.")
 	}
 	return ""
 }
@@ -95,6 +115,7 @@ const (
 	promptUnnamed = "They didn't give a name."
 	promptNoCheck = "Chirp can't check names."
 	promptAsking  = "They're asking to:"
+	promptChoose  = "Turn on only what this call needs. Allow lets in what is on."
 	promptWarning = "Allow only if you asked this person for help just now. Banks, government agencies and big tech companies never ask for this."
 	promptDecline = "Decline"
 	promptAllow   = "Allow"
@@ -178,18 +199,23 @@ func allowLabel(locked int) string {
 	return tr(promptAllow)
 }
 
-// decidedNote tells the owner, in the main window, what they decided.
-func decidedNote(name string, granted bool) string {
+// decidedNote tells the owner, in the main window, what they decided: who
+// they let in and whether that person can use the computer or only see it.
+func decidedNote(name string, grant []string) string {
 	c := claim(name)
 	switch {
-	case granted && c == "":
-		return tr("You let them in. They can see your screen and use your computer until you end the session.")
-	case granted:
-		return trf("You let “%s” in. They can see your screen and use your computer until you end the session.", c)
-	case c == "":
+	case len(grant) == 0 && c == "":
 		return tr("You declined them. Nobody got in.")
+	case len(grant) == 0:
+		return trf("You declined “%s”. Nobody got in.", c)
+	case !slices.Contains(grant, "remote_control") && c == "":
+		return tr("You let them see your screen, without using your computer, until you end the session.")
+	case !slices.Contains(grant, "remote_control"):
+		return trf("You let “%s” see your screen, without using your computer, until you end the session.", c)
+	case c == "":
+		return tr("You let them in. They can see your screen and use your computer until you end the session.")
 	}
-	return trf("You declined “%s”. Nobody got in.", c)
+	return trf("You let “%s” in. They can see your screen and use your computer until you end the session.", c)
 }
 
 // sessionOverNote is the main window's line once a session has ended.
