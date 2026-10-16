@@ -35,8 +35,8 @@ not CLA acceptance, and that external pull requests are not merged yet.
 | `secret-scan.yml` | push and PR, weekly | gitleaks over the PR commit range, or the tree and full history |
 | `dependency-review.yml` | PR — **when `CODE_SCANNING` is set** | what the PR adds: advisories at `low` and above, denied licences |
 | `sbom.yml` | release tags | SPDX SBOM attached to the release |
-| `pages.yml` | push to `main` touching the site | website check, then publishes usechirp.app |
-| `site-live.yml` | after each deploy, weekly | usechirp.app serves the pages, scripts and headers the repository has |
+| `pages.yml` | push to `main` touching the site | website check, then publishes and verifies usechirp.app |
+| `site-live.yml` | weekly, manual dispatch | usechirp.app serves the pages, scripts and headers the repository has |
 
 ### CodeQL and dependency review are gated on `CODE_SCANNING`
 
@@ -221,8 +221,8 @@ response, so no hash or nonce could allow it, and allowing it would take
 `'unsafe-inline'`, which would undo the policy. Blocked, it never runs; the
 cost is an error in the console. The Pro plan makes it optional.
 
-`scripts/check-live-site.sh`, run by `site-live.yml` after each deploy and
-weekly, fetches the pages and scripts from usechirp.app and fails unless they
+`scripts/check-live-site.sh`, run by `pages.yml` after each deploy and
+weekly by `site-live.yml`, fetches the pages and scripts from usechirp.app and fails unless they
 match what `scripts/build-site.sh` makes of the repository byte for byte (the
 pages with a content hash on each asset reference), with that one snippet as
 the only exception, and unless every header in `response-headers.json` comes

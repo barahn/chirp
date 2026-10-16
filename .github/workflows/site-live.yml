@@ -3,13 +3,12 @@ name: Website (live)
 # Checks that usechirp.app serves the site as the repository has it: pages and
 # scripts byte for byte, and the headers in .cloudflare/rulesets/. Cloudflare
 # sits in front of GitHub Pages, and a dashboard setting can start rewriting
-# the pages without any change here (email obfuscation did, on 2026-10-12). So
-# this runs after each deploy, and weekly for the settings nobody deployed.
+# the pages without any change here (email obfuscation did, on 2026-10-12).
+#
+# This runs weekly for settings nobody deployed, and manually on demand.
+# Post-deploy verification runs directly in pages.yml.
 # See docs/devsecops.md.
 on:
-  workflow_run:
-    workflows: [ Website ]
-    types: [ completed ]
   schedule:
     - cron: '17 6 * * 1'
   workflow_dispatch:
@@ -20,25 +19,17 @@ permissions:
 jobs:
   check:
     name: usechirp.app matches the repository
-    # After a deploy, only one that succeeded.
-    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 5
     steps:
       - uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
         continue-on-error: true
         with:
           egress-policy: audit
 
-      # The deployed commit, so the site is compared with what was published.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
           persist-credentials: false
 
-      # Right after a deploy GitHub Pages' cache can serve the previous
-      # version for up to ten minutes, so that run retries for fifteen.
       - name: Check
-        env:
-          WAIT: ${{ github.event_name == 'workflow_run' && '900' || '0' }}
-        run: ./scripts/check-live-site.sh --wait "$WAIT"
+        run: ./scripts/check-live-site.sh

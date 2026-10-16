@@ -1,8 +1,9 @@
 name: Website
 
 # Publishes usechirp.app (product-model decision 6) to GitHub Pages from the
-# default branch. The pages are in site/; scripts/build-site.sh adds the
-# fonts and icon cmd/chirp embeds, so a change to either republishes.
+# default branch, then verifies what is served. The pages are in site/;
+# scripts/build-site.sh adds the fonts and icon cmd/chirp embeds, so a change
+# to either republishes.
 on:
   push:
     branches: [ main ]
@@ -70,3 +71,23 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+
+  verify:
+    name: Verify usechirp.app
+    needs: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
+        continue-on-error: true
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Right after a deploy GitHub Pages' cache can serve the previous
+      # version for up to ten minutes, so that run retries for fifteen.
+      - name: Check
+        run: ./scripts/check-live-site.sh --wait 900
