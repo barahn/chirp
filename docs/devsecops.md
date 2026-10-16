@@ -152,6 +152,7 @@ the headers, from
 | Header | Value | Why |
 | --- | --- | --- |
 | `Content-Security-Policy` | the pages' policy, plus `frame-ancestors 'none'` | no framing, so no clickjacking of the link page |
+| `Strict-Transport-Security` | `max-age=31536000; includeSubDomains; preload` | browser enforces HTTPS across the domain and all subdomains |
 | `X-Frame-Options` | `DENY` | the same, for browsers that predate `frame-ancestors` |
 | `X-Content-Type-Options` | `nosniff` | a file is only ever what its type says |
 | `Referrer-Policy` | `no-referrer` | as the `<meta>` tag already says |
@@ -165,8 +166,10 @@ policy there with the same one plus `connect-src https://status.usechirp.app`.
 Every other page, the link page above all, still connects to nothing.
 `scripts/check-site.sh` fails if the two policies differ by anything else.
 
-HSTS is not among them: `.app` is on the browsers' HSTS preload list, so a
-browser never asks for it over plain HTTP in the first place.
+`Strict-Transport-Security` is set with `includeSubDomains` and `preload` for a
+year (`max-age=31536000`). While `.app` is already on the browsers' HSTS preload
+list, the explicit header enforces the requirement at the origin and satisfies
+security scans (such as Aikido).
 
 Both policies are enforced, the header's and the `<meta>` tag's, so a page
 served without Cloudflare (a misconfigured DNS, a preview) keeps every rule but
