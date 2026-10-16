@@ -59,7 +59,7 @@ func ownerProcess() int {
 			fmt.Println("CONSENT", ev.Consent.Name, ev.Consent.NameVerified)
 			req := ev.Consent
 			go func() {
-				if _, err := o.Answer(ctx, req.SessionID, true); err != nil {
+				if _, err := o.Answer(ctx, req.SessionID, req.Permissions); err != nil {
 					fmt.Println("ERROR", err)
 					return
 				}

@@ -29,6 +29,10 @@ import (
 //     the prompt's own words.
 //   - Closing the window declines, and so does the deadline.
 //   - No bird and no brand words: nothing that sounds like Chirp vouching.
+//   - Each permission is a switch, and only Screen view starts on (it is
+//     fixed on: no session goes without it). Allow lets in what is on and
+//     nothing else, so a hurried Allow gives away the picture alone
+//     (barahn/chirp#52).
 //
 // Nothing here can answer on its own. An answer is only ever the user
 // pressing a button, or the absence of one.
@@ -45,6 +49,7 @@ type prompt struct {
 	allow    *widget.Button
 	decline  *widget.Button
 	count    *widget.Label
+	switches []*permSwitch
 	answered bool
 	stop     chan struct{}
 	// closed is what closing the window does, from the window manager.
@@ -73,7 +78,7 @@ func (w *Window) showPrompt(req *client.ConsentRequest) {
 	p.decline = widget.NewButton(tr(promptDecline), func() { p.answer(false) })
 	p.decline.Importance = widget.HighImportance
 	p.allow = widget.NewButton(allowLabel(p.locked), func() {
-		if p.locked == 0 {
+		if p.locked == 0 && len(p.chosen()) > 0 {
 			p.answer(true)
 		}
 	})
@@ -86,7 +91,13 @@ func (w *Window) showPrompt(req *client.ConsentRequest) {
 	title.Wrapping = fyne.TextWrapWord
 	perms := container.NewVBox()
 	for _, name := range req.Permissions {
-		perms.Add(container.NewHBox(widget.NewIcon(permissionIcon(name)), widget.NewLabel(permissionText(name))))
+		s := newPermSwitch(name, false, func(bool) { p.updateAllow() })
+		s.tapped = func() { p.win.Canvas().Focus(p.decline) }
+		if name == permScreenView {
+			s.fix()
+		}
+		p.switches = append(p.switches, s)
+		perms.Add(s)
 	}
 	who := wrapped(promptName(req.Name))
 	who.TextStyle = fyne.TextStyle{Bold: true}
@@ -97,6 +108,7 @@ func (w *Window) showPrompt(req *client.ConsentRequest) {
 		wrapped(tr(promptNoCheck)),
 		widget.NewLabel(tr(promptAsking)),
 		perms,
+		wrapped(tr(promptChoose)),
 		p.warningBox(tr(promptWarning)),
 		container.NewHBox(p.count, layout.NewSpacer(), p.allow, p.decline),
 	)))
@@ -137,9 +149,7 @@ func (p *prompt) tick() {
 	if p.locked > 0 {
 		p.locked--
 		p.allow.SetText(allowLabel(p.locked))
-		if p.locked == 0 {
-			p.allow.Enable()
-		}
+		p.updateAllow()
 	}
 	if p.left > 0 {
 		p.left--
@@ -158,13 +168,39 @@ func (p *prompt) showCountdown() {
 	}
 }
 
-// answer closes the prompt with the user's decision, once.
+// chosen is what the switches have on, in the order asked for.
+func (p *prompt) chosen() []string {
+	var on []string
+	for _, s := range p.switches {
+		if s.on {
+			on = append(on, s.name)
+		}
+	}
+	return on
+}
+
+// updateAllow enables Allow once it is unlocked and something is on to
+// allow: with every switch off, there is nothing to let anyone in to.
+func (p *prompt) updateAllow() {
+	if p.locked == 0 && len(p.chosen()) > 0 {
+		p.allow.Enable()
+	} else {
+		p.allow.Disable()
+	}
+}
+
+// answer closes the prompt with the user's decision, once: what the switches
+// have on, or nothing.
 func (p *prompt) answer(granted bool) {
 	if p.answered {
 		return
 	}
+	var grant []string
+	if granted {
+		grant = p.chosen()
+	}
 	p.dismiss()
-	p.w.consentDecided(p.req, granted)
+	p.w.consentDecided(p.req, grant)
 }
 
 // dismiss closes the prompt without deciding anything.
@@ -190,9 +226,13 @@ func warnBackground() color.Color {
 	return color.Transparent
 }
 
+// permScreenView is the permission no session goes without, as remotekit
+// names it: the prompt shows it fixed on.
+const permScreenView = "screen_view"
+
 func permissionIcon(p string) fyne.Resource {
 	switch p {
-	case "screen_view":
+	case permScreenView:
 		return theme.VisibilityIcon()
 	case "remote_control":
 		return theme.ComputerIcon()
@@ -219,4 +259,7 @@ func (p *prompt) warningBox(text string) fyne.CanvasObject {
 func (p *prompt) recolor() {
 	p.warnBg.FillColor = warnBackground()
 	p.warnBg.Refresh()
+	for _, s := range p.switches {
+		s.Refresh()
+	}
 }

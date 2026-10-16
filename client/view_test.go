@@ -51,7 +51,7 @@ func TestAnAllowedHelperViewsOverItsSocket(t *testing.T) {
 		t.Fatal("the helper started viewing before the owner allowed it")
 	case <-time.After(100 * time.Millisecond):
 	}
-	if _, err := o.Answer(context.Background(), asked.SessionID, true); err != nil {
+	if _, err := o.Answer(context.Background(), asked.SessionID, asked.Permissions); err != nil {
 		t.Fatal(err)
 	}
 	owner := await(t, served, "the owner's session", func(*SessionConn) bool { return true })
@@ -110,7 +110,7 @@ func TestTheHelperSeesTheOwnersScreenThroughTheRelay(t *testing.T) {
 	help(t, cc, shown)
 
 	asked := await(t, events, "the request", func(ev OwnerEvent) bool { return ev.Consent != nil }).Consent
-	if _, err := o.Answer(context.Background(), asked.SessionID, true); err != nil {
+	if _, err := o.Answer(context.Background(), asked.SessionID, asked.Permissions); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -148,7 +148,7 @@ func TestTheRunnersFirstSignalsReachTheView(t *testing.T) {
 	}
 	help(t, cc, shown)
 	asked := await(t, events, "the request", func(ev OwnerEvent) bool { return ev.Consent != nil }).Consent
-	if _, err := o.Answer(context.Background(), asked.SessionID, true); err != nil {
+	if _, err := o.Answer(context.Background(), asked.SessionID, asked.Permissions); err != nil {
 		t.Fatal(err)
 	}
 	view := await(t, viewed, "the helper's session", func(*SessionConn) bool { return true })
@@ -169,7 +169,7 @@ func TestHelpEndsWhenItsViewDoes(t *testing.T) {
 	cc.View = func(context.Context, *SessionConn) {} // fails at once
 	helped := help(t, cc, shown)
 	asked := await(t, events, "the request", func(ev OwnerEvent) bool { return ev.Consent != nil }).Consent
-	if _, err := o.Answer(context.Background(), asked.SessionID, true); err != nil {
+	if _, err := o.Answer(context.Background(), asked.SessionID, asked.Permissions); err != nil {
 		t.Fatal(err)
 	}
 	await(t, helped, "Help to end", func(ev HelperEvent) bool { return ev.Phase == HelperEnded })

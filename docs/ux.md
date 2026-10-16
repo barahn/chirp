@@ -157,12 +157,25 @@ written to make an unexpected request easy to decline. It is built in
   characters, no double quotes that could close its own quotation, and at
   most 40 characters. A name like `Ana\nVerified by your bank` cannot pass
   for a line of the prompt.
-- **The permissions are listed** in words, from `session.DefaultPermissions`.
-  A permission Chirp does not know is shown as it came, so nothing is asked
-  for unseen.
-  Granting only some of them is not possible today: remotekit's
-  `bark.ConsentResponsePayload` carries a single `Granted`. Per-permission
-  consent is open decision 4 (barahn/chirp#52).
+- **Each permission is a switch, and only *See your screen* starts on**
+  (open decision 4, barahn/chirp#52). The permissions are listed in words, from
+  `session.DefaultPermissions`, each as a row that changes colour and shows a
+  check mark when on, so the state never rests on colour alone. *See your
+  screen* is fixed on, marked *Always*: no session goes without it, and
+  remotekit's runner requires it. Mouse and keyboard and files start off
+  (the clipboard is withheld until barahn/chirp#79, so it is not offered);
+  the owner turns on what the call needs, and *Allow* lets in
+  what is on and nothing else. A hurried *Allow* during a scam call
+  therefore gives away the picture alone. Tab reaches the rows and Space
+  turns one; a click on a row hands the focus back to *Decline*, so Enter
+  still declines. A permission Chirp does not know is shown as it came,
+  off, so nothing is asked for unseen. With everything off, *Allow* stays
+  disabled.
+- **What is allowed is enforced on the owner's machine.** The owner's Chirp
+  grants its runner only what was switched on, whatever the relay or the
+  controller's Chirp do, and the runner tells the controller's Chirp what it
+  may do (barahn/remotekit#118), so a refused permission shows as such
+  rather than as a bug.
 - **A fixed warning** against the usual scam script.
 - **A countdown** to the session's deadline, after which the prompt declines
   by itself. The consent request carries only a timestamp, so the owner asks
@@ -185,7 +198,8 @@ written to make an unexpected request easy to decline. It is built in
 | --- | --- | --- |
 | Title | Someone wants to control this computer | Alguém quer controlar este computador |
 | Name | They say they're "João da TI". Chirp can't check names. | Diz se chamar "João da TI". O Chirp não verifica nomes. |
-| Permissions | See your screen · use your mouse and keyboard · send and receive files (the clipboard is withheld until barahn/chirp#79: *share your clipboard*) | Ver sua tela · usar seu mouse e teclado · enviar e receber arquivos (área de transferência retida até barahn/chirp#79: *compartilhar a área de transferência*) |
+| Permissions | See your screen *(Always)* · use your mouse and keyboard · send and receive files (the clipboard is withheld until barahn/chirp#79: *share your clipboard*) | Ver sua tela *(Sempre)* · usar seu mouse e teclado · enviar e receber arquivos (área de transferência retida até barahn/chirp#79: *compartilhar a área de transferência*) |
+| Under the permissions | Turn on only what this call needs. Allow lets in what is on. | Ligue só o que este atendimento precisa. Permitir libera o que estiver ligado. |
 | Warning | Allow only if you asked this person for help just now. Banks, government agencies and big tech companies never ask for this. | Só permita se você pediu ajuda a essa pessoa agora. Bancos, órgãos do governo e grandes empresas de tecnologia nunca pedem isso. |
 | Countdown | Declines by itself in 1:40 | Recusa sozinho em 1:40 |
 | Buttons | Decline · Allow (3) | Recusar · Permitir (3) |
@@ -197,7 +211,13 @@ in. A translation is reviewed as a change to the prompt, not as a string.
 
 **On the owner's machine,** a bar stays on top of every window for as long as
 the session lasts: *"João da TI" is controlling this computer · 04:12 ·
-End*. *End* acts at once, without asking for confirmation. The tray icon
+End* — or *is seeing this screen*, when the mouse and keyboard were not
+allowed. *End* acts at once, without asking for confirmation. Under that
+line, each permission allowed besides *See your screen* is the same switch
+as in the prompt, and it only turns off: the owner takes one back at any
+moment, it stops at once, and it stays off (*Taken back*) until a new
+request. Turning one on mid-session is what a scammer asks for, so the bar
+cannot. Taking the screen back is *End*. The tray icon
 changes shape as well as colour, so the state does not depend on telling
 colours apart. When the session ends the bar goes, and the main window says
 the code has been replaced.
@@ -298,7 +318,8 @@ The help centre follows TunnelBear's four sections:
   chirp*, plus the system warnings above. None mentions installing, because
   there is nothing to install.
 - **FAQ** — What does Chirp do? How do I know nobody is on my screen? I got a
-  request I wasn't expecting: what now? Which systems does Chirp run on?
+  request I wasn't expecting: what now? What can the other person do, and
+  how do I choose? Which systems does Chirp run on?
 - **Privacy and security** — Why should I trust Chirp? What does the server
   see (today's relay, and decision 5's blind lookup)? What Chirp never does.
 - **Features** — Homing, Pigeon Post, running your own server.
@@ -310,6 +331,20 @@ The help centre follows TunnelBear's four sections:
 - lets anyone in without you pressing *Allow* on your own screen;
 - puts screen sharing, control, files, clipboard or multiple monitors behind
   a payment.
+
+**You choose what they can do**, the article every setup guide links to:
+
+- When someone asks to help you, Chirp lists what they want to do. Each item
+  is a switch: coloured with a check mark when on, grey when off.
+- Only *See your screen* is on at first, and it always is: helping starts
+  with seeing. If they need to click or type for you, turn on *Use your
+  mouse and keyboard*; files work the same way. Turn on only what the call
+  needs.
+- *Allow* lets in what is on, and nothing else. If you did not ask for
+  help, press *Decline*: switching everything off is not the way to say no.
+- During the session, the bar on your screen shows the same switches. Turn
+  one off and it stops at once. To give it back they have to ask again.
+- *End*, on the bar, stops everything.
 
 It does not promise that a code dies the moment Chirp quits. Quitting
 releases the code and link at once, but a Chirp that cannot reach its server
@@ -388,7 +423,8 @@ The canvas is private until it is shared from its page.
 
 ## Open decisions
 
-Each has an issue, on the roadmap project. The fifth is decided.
+Each has an issue, on the roadmap project. The fourth and fifth are
+decided.
 
 1. **Does Chirp write anything to disk** — a name, a self-hosted server
    address, a muted sound? Decision 4 treats a URL handler as installation by
@@ -400,8 +436,10 @@ Each has an issue, on the roadmap project. The fifth is decided.
    product model rejects (barahn/chirp#50).
 3. **When does Chirp ask for macOS permissions?** At start, before the code
    is shared, if Screen Recording does require a relaunch (barahn/chirp#51).
-4. **Per-permission consent.** Needs a change to remotekit's `bark`
-   consent response. Out of the first runnable Chirp (barahn/chirp#52).
+4. **Per-permission consent — decided: the owner chooses each permission**
+   (§ Consent, § During a session, barahn/chirp#52). Only *See your screen*
+   starts on and it is fixed; the bar takes permissions back but does not
+   give them.
 5. **Which visual direction — decided: A · Warm** (§ Visual direction,
    barahn/chirp#53).
 

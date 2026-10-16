@@ -5,7 +5,9 @@ package ui
 
 import (
 	"image"
+	"slices"
 	"sync"
+	"sync/atomic"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -26,9 +28,14 @@ type Remote struct {
 	win    fyne.Window
 	view   *remoteView
 	notice *widget.Label
-	stop   *widget.Button
-	frames frameMailbox
-	closed bool
+	// limits says what the other person has not allowed; it stays while
+	// the picture plays, unlike notice. control is whether they allow the
+	// mouse and keyboard, read on Fyne's goroutine as input arrives.
+	limits  *widget.Label
+	control atomic.Bool
+	stop    *widget.Button
+	frames  frameMailbox
+	closed  bool
 }
 
 // OpenRemote opens the remote screen. input receives what the user does over
@@ -45,13 +52,24 @@ func (w *Window) OpenRemote(input func(bark.InputEvent), end func()) *Remote {
 		ended = true
 		end()
 	}
-	r.view = newRemoteView(input)
+	// Until the other computer says what it allows, input is sent: an older
+	// Chirp never says, and its runner drops what it does not allow anyway.
+	r.control.Store(true)
+	r.view = newRemoteView(func(ev bark.InputEvent) {
+		if r.control.Load() {
+			input(ev)
+		}
+	})
 	r.notice = widget.NewLabel("")
 	r.notice.Wrapping = fyne.TextWrapWord
 	r.notice.Hide()
+	r.limits = widget.NewLabel("")
+	r.limits.Wrapping = fyne.TextWrapWord
+	r.limits.Importance = widget.WarningImportance
+	r.limits.Hide()
 	r.stop = widget.NewButton(tr(remoteEnd), finish)
 	r.stop.Importance = widget.DangerImportance
-	bar := container.NewBorder(nil, nil, nil, r.stop, r.notice)
+	bar := container.NewBorder(nil, nil, nil, r.stop, container.NewVBox(r.limits, r.notice))
 	r.win.SetContent(container.NewBorder(bar, nil, nil, nil, r.view))
 	r.win.SetCloseIntercept(finish)
 	r.win.Resize(fyne.NewSize(1024, 640))
@@ -88,6 +106,27 @@ func (r *Remote) Notice(kind string) {
 			r.notice.Show()
 			r.win.Content().Refresh()
 		}
+	})
+}
+
+// Granted takes what the other person allows, as their runner announces it:
+// at the start and whenever they take a permission back. Without the mouse
+// and keyboard the window says so and sends no input. It may be called from
+// any goroutine.
+func (r *Remote) Granted(permissions []string) {
+	control := slices.Contains(permissions, "remote_control")
+	r.control.Store(control)
+	fyne.Do(func() {
+		if r.closed {
+			return
+		}
+		if text := limitsText(permissions); text != "" {
+			r.limits.SetText(text)
+			r.limits.Show()
+		} else {
+			r.limits.Hide()
+		}
+		r.win.Content().Refresh()
 	})
 }
 

@@ -19,23 +19,32 @@ import (
 var allFour = []string{"screen_view", "remote_control", "clipboard", "file_transfer"}
 
 // asked opens the prompt for a request, as an owner event would, and returns
-// the window and the answers it passes on.
+// the window and the answers it passes on: whether each let anyone in.
 func asked(t *testing.T, req *client.ConsentRequest) (*Window, *[]bool) {
+	t.Helper()
+	w, answers, _ := askedGrants(t, req)
+	return w, answers
+}
+
+// askedGrants is asked, with what each answer granted.
+func askedGrants(t *testing.T, req *client.ConsentRequest) (*Window, *[]bool, *[][]string) {
 	t.Helper()
 	w := newWindow(t)
 	var answers []bool
-	w.OnConsent = func(sessionID string, granted bool) {
+	var grants [][]string
+	w.OnConsent = func(sessionID string, grant []string) {
 		if sessionID != req.SessionID {
 			t.Errorf("answer for session %q, want %q", sessionID, req.SessionID)
 		}
-		answers = append(answers, granted)
+		answers = append(answers, len(grant) > 0)
+		grants = append(grants, grant)
 	}
 	w.ApplyOwner(client.OwnerEvent{Phase: client.OwnerReady, Peer: shown})
 	w.ApplyOwner(client.OwnerEvent{Phase: client.OwnerReady, Peer: shown, Consent: req})
 	if w.prompt == nil {
 		t.Fatal("no prompt")
 	}
-	return w, &answers
+	return w, &answers, &grants
 }
 
 func request() *client.ConsentRequest {
@@ -83,7 +92,7 @@ func TestDeclineHasTheFocusAndAllowStartsLocked(t *testing.T) {
 	if len(*answers) != 1 || !(*answers)[0] {
 		t.Fatalf("answers = %v, want one Allow", *answers)
 	}
-	if w.prompt != nil || !w.endSession.Visible() || !strings.Contains(w.request.Text, "You let “João da TI” in") {
+	if w.prompt != nil || !w.endSession.Visible() || !strings.Contains(w.request.Text, "You let “João da TI” see your screen, without using your computer") {
 		t.Errorf("after Allow: prompt %v, end visible %v, note %q", w.prompt != nil, w.endSession.Visible(), w.request.Text)
 	}
 }
@@ -134,7 +143,7 @@ func TestANewRequestReplacesAnOpenPrompt(t *testing.T) {
 	first := w.prompt
 	second := request()
 	second.SessionID = "s2"
-	w.OnConsent = func(string, bool) { t.Error("replacing a prompt answered it") }
+	w.OnConsent = func(string, []string) { t.Error("replacing a prompt answered it") }
 	w.ApplyOwner(client.OwnerEvent{Phase: client.OwnerReady, Peer: shown, Consent: second})
 	if w.prompt == first || w.prompt.req.SessionID != "s2" || !first.answered {
 		t.Error("the new request did not replace the open prompt")

@@ -135,7 +135,7 @@
             <div class="mini-row"><span class="chip off" data-i18n="miniAllow">Allow (3)</span><span class="chip go" data-i18n="miniDecline">Decline</span></div>
           </div>
           <h3 data-i18n="s3Title">You decide</h3>
-          <p data-i18n="s3Text">Your Chirp asks you, on your own screen, who is asking and for what. Nothing starts until you press Allow, and you can end the session at any moment.</p>
+          <p data-i18n="s3Text">Your Chirp asks you, on your own screen, who is asking and for what, and you choose what they can do. Nothing starts until you press Allow, and you can end the session at any moment.</p>
         </li>
       </ol>
       <div class="whose">
@@ -155,19 +155,19 @@
       <div class="grid">
         <div>
           <div class="frame" data-lang-only="en">
-            <img class="shot-light" src="/assets/images/consent-light.webp" width="720" height="634" alt="Chirp's consent prompt: Someone wants to control this computer. They say they're “João da TI”. Chirp can't check names. They're asking to see your screen, use your mouse and keyboard, share your clipboard, and send and receive files. A warning: allow only if you asked this person for help just now; banks, government agencies and big tech companies never ask for this. Declines by itself in 1:40. Allow (3), still locked, and Decline.">
-            <img class="shot-dark" src="/assets/images/consent-dark.webp" width="720" height="634" alt="The same consent prompt in dark mode.">
+            <img class="shot-light" src="/assets/images/consent-light.webp" width="720" height="635" alt="Chirp's consent prompt: Someone wants to control this computer. They say they're “João da TI”. Chirp can't check names. They're asking to see your screen, which is on and always is, and to use your mouse and keyboard and send and receive files, each a switch that is off. Turn on only what this call needs. A warning: allow only if you asked this person for help just now; banks, government agencies and big tech companies never ask for this. Declines by itself in 1:40. Allow (3), still locked, and Decline.">
+            <img class="shot-dark" src="/assets/images/consent-dark.webp" width="720" height="635" alt="The same consent prompt in dark mode.">
           </div>
           <div class="frame" data-lang-only="pt-BR" lang="pt-BR" hidden>
-            <img class="shot-light" src="/assets/images/consent-light-pt.webp" width="720" height="664" loading="lazy" alt="A janela de consentimento do Chirp: Alguém quer controlar este computador. Diz se chamar “João da TI”. O Chirp não verifica nomes. Está pedindo para ver sua tela, usar seu mouse e teclado, compartilhar a área de transferência e enviar e receber arquivos. Um aviso: só permita se você pediu ajuda a essa pessoa agora; bancos, órgãos do governo e grandes empresas de tecnologia nunca pedem isso. Recusa sozinho em 1:40. Permitir (3), ainda bloqueado, e Recusar.">
-            <img class="shot-dark" src="/assets/images/consent-dark-pt.webp" width="720" height="664" loading="lazy" alt="A mesma janela de consentimento no modo escuro.">
+            <img class="shot-light" src="/assets/images/consent-light-pt.webp" width="720" height="692" loading="lazy" alt="A janela de consentimento do Chirp: Alguém quer controlar este computador. Diz se chamar “João da TI”. O Chirp não verifica nomes. Está pedindo para ver sua tela, que está ligada e sempre fica, e para usar seu mouse e teclado e enviar e receber arquivos, cada um uma chave desligada. Ligue só o que este atendimento precisa. Um aviso: só permita se você pediu ajuda a essa pessoa agora; bancos, órgãos do governo e grandes empresas de tecnologia nunca pedem isso. Recusa sozinho em 1:40. Permitir (3), ainda bloqueado, e Recusar.">
+            <img class="shot-dark" src="/assets/images/consent-dark-pt.webp" width="720" height="692" loading="lazy" alt="A mesma janela de consentimento no modo escuro.">
           </div>
         </div>
         <div>
           <ul class="points">
             <li><svg aria-hidden="true"><use href="#i-check"/></svg><div data-i18n="p1"><b>Decline has the focus.</b><span>Allow only becomes clickable after three seconds, so neither a reflexive Enter nor a stray click lets anyone in.</span></div></li>
             <li><svg aria-hidden="true"><use href="#i-check"/></svg><div data-i18n="p2"><b>The name is a claim.</b><span>“They say they're João da TI.” Chirp can't check names, says so, and cleans the name so it can't pass for a line of the prompt.</span></div></li>
-            <li><svg aria-hidden="true"><use href="#i-check"/></svg><div data-i18n="p3"><b>Every permission is spelled out.</b><span>Under a fixed warning: banks, government agencies and big tech companies never ask for this.</span></div></li>
+            <li><svg aria-hidden="true"><use href="#i-check"/></svg><div data-i18n="p3"><b>You choose each permission.</b><span>Only See your screen starts on. The mouse and keyboard and files stay off unless you turn them on, and you can take them back during the session.</span></div></li>
             <li><svg aria-hidden="true"><use href="#i-check"/></svg><div data-i18n="p4"><b>Doing nothing declines.</b><span>Closing the prompt, or letting it run out of time, says no.</span></div></li>
           </ul>
           <p class="surprise" data-i18n="surprise">Didn't expect a request? Press Decline. Nobody gets in without you.</p>

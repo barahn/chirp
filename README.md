@@ -29,7 +29,7 @@ account, and nothing happens on your screen until you press *Allow*.
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/chirp-dark.png">
-    <img src="docs/images/chirp-light.png" width="720" alt="Chirp's window, showing its code 482-913-5071 and a hint to read it only to someone you called. Over it, the prompt Chirp opens when someone types that code: Someone wants to control this computer. They say they're “João da TI”. Chirp can't check names. The four permissions asked for, a warning that banks, government agencies and big tech companies never ask for this, a countdown, Allow still locked and Decline highlighted.">
+    <img src="docs/images/chirp-light.png" width="720" alt="Chirp's window, showing its code 482-913-5071 and a hint to read it only to someone you called. Over it, the prompt Chirp opens when someone types that code: Someone wants to control this computer. They say they're “João da TI”. Chirp can't check names. The permissions asked for, as switches, with only See your screen on, a warning that banks, government agencies and big tech companies never ask for this, a countdown, Allow still locked and Decline highlighted.">
   </picture>
   <br>
   <sub>The current build: a machine's code, and the prompt it shows when someone types that code. Shown signalling over Nostr, where the last four digits are known only to the two Chirps; with a relay alone, the code is the first six.</sub>
@@ -45,7 +45,9 @@ account, and nothing happens on your screen until you press *Allow*.
    use of the link makes a fresh single-use code, so a code that leaks after it
    was used opens nothing.
 3. **You decide.** Your Chirp asks you, on your own screen, who is asking and
-   for what. Nothing starts until you press *Allow*.
+   for what, and you choose what they can do: see your screen only, or also
+   use your mouse and keyboard, or send and receive files. Nothing starts
+   until you press *Allow*.
 
 Whoever types the code controls; whoever shared it decides. Chirp is for
 one-off help — a relative, a friend, a customer on the phone — not for
@@ -63,8 +65,13 @@ built so that an unexpected request is easy to decline:
 - The caller's name is shown as a claim — *They say they're…* — because Chirp
   cannot check names, and it is cleaned so it cannot pose as a line of the
   prompt.
-- Every permission is spelled out, under a fixed warning that banks,
-  government agencies and big tech companies never ask for this.
+- Every permission is spelled out, and each is a switch: only *See your
+  screen* starts on, and *Allow* lets in what is on and nothing else, so a
+  hurried *Allow* gives away the picture alone. The person being helped
+  turns on the mouse and keyboard, or files, only if the call needs them,
+  and can take either back from the session bar.
+- A fixed warning says that banks, government agencies and big tech
+  companies never ask for this.
 - Closing the prompt, or letting it run out of time, declines.
 
 ## What you can count on

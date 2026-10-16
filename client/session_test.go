@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"slices"
 	"testing"
 	"time"
 
@@ -107,7 +108,7 @@ func TestAnAllowedSessionIsServedOverTheOwnerSocket(t *testing.T) {
 	case <-time.After(100 * time.Millisecond):
 	}
 
-	if _, err := o.Answer(context.Background(), asked.SessionID, true); err != nil {
+	if _, err := o.Answer(context.Background(), asked.SessionID, asked.Permissions); err != nil {
 		t.Fatal(err)
 	}
 	conn := await(t, served, "the allowed session", func(*SessionConn) bool { return true })
@@ -145,7 +146,7 @@ func TestADeclinedSessionIsNotServed(t *testing.T) {
 
 	controller(t, c, shown)
 	asked := await(t, events, "the request", func(ev OwnerEvent) bool { return ev.Consent != nil }).Consent
-	if _, err := o.Answer(context.Background(), asked.SessionID, false); err != nil {
+	if _, err := o.Answer(context.Background(), asked.SessionID, nil); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -164,7 +165,7 @@ func TestEndingTheSessionStopsServingIt(t *testing.T) {
 
 	controller(t, c, shown)
 	asked := await(t, events, "the request", func(ev OwnerEvent) bool { return ev.Consent != nil }).Consent
-	if _, err := o.Answer(context.Background(), asked.SessionID, true); err != nil {
+	if _, err := o.Answer(context.Background(), asked.SessionID, asked.Permissions); err != nil {
 		t.Fatal(err)
 	}
 	conn := await(t, served, "the allowed session", func(*SessionConn) bool { return true })
@@ -178,7 +179,7 @@ func TestEndingTheSessionStopsServingIt(t *testing.T) {
 	shown = await(t, events, "the new registration", func(ev OwnerEvent) bool { return ready(ev) && ev.Peer.ID != shown.ID }).Peer
 	controller(t, c, shown)
 	asked = await(t, events, "the second request", func(ev OwnerEvent) bool { return ev.Consent != nil }).Consent
-	if _, err := o.Answer(context.Background(), asked.SessionID, true); err != nil {
+	if _, err := o.Answer(context.Background(), asked.SessionID, asked.Permissions); err != nil {
 		t.Fatal(err)
 	}
 	conn = await(t, served, "the second session", func(*SessionConn) bool { return true })
@@ -205,7 +206,7 @@ func TestRemotekitsRunnerServesOverTheOwnerSocket(t *testing.T) {
 
 	sess, ctrl := controller(t, c, shown)
 	asked := await(t, events, "the request", func(ev OwnerEvent) bool { return ev.Consent != nil }).Consent
-	if _, err := o.Answer(context.Background(), asked.SessionID, true); err != nil {
+	if _, err := o.Answer(context.Background(), asked.SessionID, asked.Permissions); err != nil {
 		t.Fatal(err)
 	}
 
@@ -241,7 +242,7 @@ func TestAForgedLeaveNoticeDoesNotEndTheSession(t *testing.T) {
 
 	_, ctrl := controller(t, c, shown)
 	asked := await(t, events, "the request", func(ev OwnerEvent) bool { return ev.Consent != nil }).Consent
-	if _, err := o.Answer(context.Background(), asked.SessionID, true); err != nil {
+	if _, err := o.Answer(context.Background(), asked.SessionID, asked.Permissions); err != nil {
 		t.Fatal(err)
 	}
 	conn := await(t, served, "the allowed session", func(*SessionConn) bool { return true })
@@ -308,7 +309,7 @@ func TestAFloodOfSignalsDoesNotHoldTheSessionOpen(t *testing.T) {
 
 	_, ctrl := controller(t, c, shown)
 	asked := await(t, events, "the request", func(ev OwnerEvent) bool { return ev.Consent != nil }).Consent
-	if _, err := o.Answer(context.Background(), asked.SessionID, true); err != nil {
+	if _, err := o.Answer(context.Background(), asked.SessionID, asked.Permissions); err != nil {
 		t.Fatal(err)
 	}
 	conn := await(t, served, "the allowed session", func(*SessionConn) bool { return true })
@@ -319,4 +320,32 @@ func TestAFloodOfSignalsDoesNotHoldTheSessionOpen(t *testing.T) {
 	}
 	o.NewCode()
 	ended(t, conn, "the owner ended it under a flood")
+}
+
+// The session is served with what the owner allowed and nothing else: a
+// permission they left off is not granted, and one the request never asked
+// for cannot be slipped in by the answer.
+func TestOnlyWhatTheOwnerAllowedIsGranted(t *testing.T) {
+	r := newRelay(t)
+	c := newClient(t, r)
+	serve, served := serving()
+	o, events, _, _ := runOwnerServing(t, c, serve)
+	shown := await(t, events, "a code", ready).Peer
+
+	controller(t, c, shown)
+	asked := await(t, events, "the request", func(ev OwnerEvent) bool { return ev.Consent != nil }).Consent
+	if !slices.Contains(asked.Permissions, "remote_control") {
+		t.Fatalf("the request asked for %v, without remote_control", asked.Permissions)
+	}
+	if _, err := o.Answer(context.Background(), asked.SessionID, []string{"screen_view", "reverse_stream"}); err != nil {
+		t.Fatal(err)
+	}
+	conn := await(t, served, "the allowed session", func(*SessionConn) bool { return true })
+	if !slices.Equal(conn.Permissions, []string{"screen_view"}) {
+		t.Errorf("served with %v, want only screen_view", conn.Permissions)
+	}
+	started := await(t, events, "the session start", func(ev OwnerEvent) bool { return ev.Started != nil }).Started
+	if !slices.Equal(started.Permissions, []string{"screen_view"}) {
+		t.Errorf("the bar was told %v, want only screen_view", started.Permissions)
+	}
 }

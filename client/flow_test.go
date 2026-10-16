@@ -173,7 +173,7 @@ func TestHelpFollowsTheOwnersDecision(t *testing.T) {
 			t.Errorf("the request arrived without its deadline: %+v", asked)
 		}
 		await(t, helped, "asking", func(ev HelperEvent) bool { return ev.Phase == HelperAsking })
-		s, err := o.Answer(context.Background(), asked.SessionID, tc.granted)
+		s, err := o.Answer(context.Background(), asked.SessionID, grantIf(tc.granted, asked))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -182,7 +182,7 @@ func TestHelpFollowsTheOwnersDecision(t *testing.T) {
 		}
 		await(t, helped, "the decision", func(ev HelperEvent) bool { return ev.Phase == tc.want })
 		// A decision is final: the relay refuses a second one.
-		if _, err := o.Answer(context.Background(), asked.SessionID, !tc.granted); err == nil {
+		if _, err := o.Answer(context.Background(), asked.SessionID, grantIf(!tc.granted, asked)); err == nil {
 			t.Error("a second answer was accepted")
 		}
 		cancel()
@@ -193,7 +193,7 @@ func TestAnswerNeedsARegistration(t *testing.T) {
 	r := newRelay(t)
 	c := newClient(t, r)
 	o := NewOwner(c, "", func(OwnerEvent) {})
-	if _, err := o.Answer(context.Background(), "s", true); !errors.Is(err, ErrNotRegistered) {
+	if _, err := o.Answer(context.Background(), "s", []string{"screen_view"}); !errors.Is(err, ErrNotRegistered) {
 		t.Errorf("Answer before Run = %v, want ErrNotRegistered", err)
 	}
 }
@@ -208,7 +208,7 @@ func TestAnAnswerToAnotherSessionIsRefused(t *testing.T) {
 	defer cancel()
 	go c.Help(ctx, shown.Code, "Ana", func(HelperEvent) {})
 	await(t, events, "the request", func(ev OwnerEvent) bool { return ev.Consent != nil })
-	if _, err := o.Answer(context.Background(), "not-this-session", true); !errors.Is(err, ErrBusy) {
+	if _, err := o.Answer(context.Background(), "not-this-session", []string{"screen_view"}); !errors.Is(err, ErrBusy) {
 		t.Errorf("answering another session = %v, want ErrBusy (409)", err)
 	}
 }
@@ -282,7 +282,7 @@ func TestTheOwnerIsToldWhenASessionStartsAndEnds(t *testing.T) {
 	defer cancel()
 	go c.Help(ctx, shown.Code, "Ana", func(HelperEvent) {})
 	asked := await(t, events, "the request", func(ev OwnerEvent) bool { return ev.Consent != nil }).Consent
-	if _, err := o.Answer(context.Background(), asked.SessionID, true); err != nil {
+	if _, err := o.Answer(context.Background(), asked.SessionID, asked.Permissions); err != nil {
 		t.Fatal(err)
 	}
 	started := await(t, events, "the session starting", func(ev OwnerEvent) bool { return ev.Started != nil }).Started
@@ -302,6 +302,7 @@ func TestAQueuedApprovalForASessionThatIsGoneStartsNothing(t *testing.T) {
 	// The request the owner answered, for a session the relay does not hold
 	// (the controller left, or the code was replaced, before it was served).
 	o.setAsked(&ConsentRequest{SessionID: "gone", Name: "Ana"})
+	o.granted = []string{"screen_view"} // as Answer records it
 	o.startSession(context.Background(), "gone")
 	if o.active != nil || len(events) != 0 {
 		t.Errorf("active %v, events %+v", o.active, events)
@@ -329,6 +330,7 @@ func TestAFailedLookupKeepsTheApprovalPendingInsteadOfDecidingOnIt(t *testing.T)
 	o.Retry = 10 * time.Millisecond
 	o.Serve = func(context.Context, *SessionConn) { t.Error("served a session the relay never confirmed") }
 	o.setAsked(&ConsentRequest{SessionID: "s1", Name: "Ana"})
+	o.granted = []string{"screen_view"} // as Answer records it
 
 	o.startSession(context.Background(), "s1")
 	if o.active != nil || len(events) != 0 {
@@ -350,4 +352,12 @@ func TestAFailedLookupKeepsTheApprovalPendingInsteadOfDecidingOnIt(t *testing.T)
 	if len(o.allowed) != 0 {
 		t.Error("a retry brought back an approval for a session that ended")
 	}
+}
+
+// grantIf is an answer to req: everything it asked for, or nothing.
+func grantIf(allow bool, req *ConsentRequest) []string {
+	if allow {
+		return req.Permissions
+	}
+	return nil
 }

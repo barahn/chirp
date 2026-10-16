@@ -42,6 +42,7 @@ import (
 	"flag"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -84,8 +85,12 @@ func main() {
 	owner := client.NewOwner(c, "", func(ev client.OwnerEvent) {
 		fyne.Do(func() { w.ApplyOwner(ev) })
 	})
+	var serving runners
 	owner.Serve = func(ctx context.Context, s *client.SessionConn) {
-		serveSession(ctx, s, ice)
+		r := newRunner(s, ice)
+		serving.add(s.ID, r)
+		defer serving.remove(s.ID, r)
+		_ = r.Serve(ctx, s)
 	}
 	ownerDone := make(chan struct{})
 	go func() {
@@ -95,13 +100,16 @@ func main() {
 	w.OnNewCode = owner.NewCode
 	// Consent is given here and nowhere else: the user's own answer, from
 	// Chirp's own prompt, sent as this machine (barahn/chirp#11).
-	w.OnConsent = func(sessionID string, granted bool) {
+	w.OnConsent = func(sessionID string, grant []string) {
 		go func() {
-			if _, err := owner.Answer(ctx, sessionID, granted); err != nil {
-				fyne.Do(func() { w.AnswerFailed(granted) })
+			if _, err := owner.Answer(ctx, sessionID, grant); err != nil {
+				fyne.Do(func() { w.AnswerFailed(len(grant) > 0) })
 			}
 		}()
 	}
+	// A permission turned off in the session bar stops at once, on this
+	// machine, whatever the other end does (barahn/chirp#52).
+	w.OnRevoke = serving.revoke
 	// The relay ends a session only when its owner gives the registration
 	// up, so ending one replaces the code and link too.
 	w.OnEndSession = owner.NewCode
@@ -137,9 +145,39 @@ func main() {
 	}
 }
 
-// serveSession serves a session its owner has allowed, until it ends.
-func serveSession(ctx context.Context, s *client.SessionConn, ice webrtc.PeerConfig) {
-	_ = newRunner(s, ice).Serve(ctx, s)
+// runners are the sessions being served, by ID, so that a permission the
+// owner turns off reaches the runner enforcing it.
+type runners struct {
+	mu sync.Mutex
+	m  map[string]*stream.Runner
+}
+
+func (rs *runners) add(id string, r *stream.Runner) {
+	rs.mu.Lock()
+	defer rs.mu.Unlock()
+	if rs.m == nil {
+		rs.m = make(map[string]*stream.Runner)
+	}
+	rs.m[id] = r
+}
+
+func (rs *runners) remove(id string, r *stream.Runner) {
+	rs.mu.Lock()
+	defer rs.mu.Unlock()
+	if rs.m[id] == r {
+		delete(rs.m, id)
+	}
+}
+
+// revoke withdraws permission from the session id, if it is still served.
+// The runner stops it at once and tells the controller's Chirp.
+func (rs *runners) revoke(id, permission string) {
+	rs.mu.Lock()
+	r := rs.m[id]
+	rs.mu.Unlock()
+	if r != nil {
+		r.Revoke(permission)
+	}
 }
 
 // newRunner builds the runner for a session its owner has allowed.
@@ -229,5 +267,6 @@ func viewSession(ctx context.Context, conn *client.SessionConn, ice webrtc.PeerC
 	defer fyne.Do(remote.Close)
 	v.OnFrame(remote.Show)
 	v.OnNotice(func(n stream.Notice) { remote.Notice(n.Type) })
+	v.OnPermissions(remote.Granted)
 	_ = v.Serve(ctx, conn)
 }
