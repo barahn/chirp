@@ -2,7 +2,7 @@
 
 `cmd/chirp-status` probes every server in [`network/servers.json`](../network/servers.json)
 each 30 seconds and serves the figures the status page at
-[usechirp.app/status/](https://usechirp.app/status/) shows. What it measures
+[status.usechirp.app](https://status.usechirp.app/) shows. What it measures
 and why is in [`status-page-proposal.md`](status-page-proposal.md). This page
 is how to run it.
 
@@ -71,7 +71,7 @@ curl -s https://status.usechirp.app/v1/servers
 ```
 
 It answers JSON with `generated_at` a few seconds old and one entry per
-server. `https://usechirp.app/status/` then shows them, once the site's
+server. `https://status.usechirp.app/` then shows them, once the site's
 `/status/` policy is loaded (`scripts/apply-cloudflare.sh`).
 
 On the machine: `systemctl status chirp-status`, and `journalctl -u
