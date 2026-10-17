@@ -1,11 +1,10 @@
 name: SBOM
 
 # An SBOM is only useful if it describes something that was actually shipped,
-# so this runs on release tags and attaches the result to the release. A
-# release ships source only, with no built binaries yet (see README), so the
-# SBOM describes the module graph that cmd/chirp and cmd/chirp-relay both
-# build from. Once releases carry binaries, scan those too: each one records
-# the exact modules linked into it.
+# so this runs on release tags and attaches the result to the release. It
+# describes the module graph that cmd/chirp and cmd/chirp-relay both build
+# from. The binaries release.yml attaches record the exact modules linked into
+# each (go version -m); scanning those too is still to do.
 on:
   push:
     tags: [ 'v*.*.*' ]
