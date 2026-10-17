@@ -48,7 +48,7 @@
   "Someone wants to control this computer": "Alguém quer controlar este computador",
   "Something Chirp doesn't know: %s": "Algo que o Chirp não conhece: %s",
   "Something went wrong. Try again.": "Algo deu errado. Tente de novo.",
-  "Start Chirp with -relay and the address of your server, or set CHIRP_RELAY. There is no public Chirp server yet.": "Abra o Chirp com -relay e o endereço do seu servidor, ou defina CHIRP_RELAY. Ainda não há um servidor público do Chirp.",
+  "Start Chirp with -relay and the address of a Chirp server, or set CHIRP_RELAY. Without either, Chirp uses relay.usechirp.app.": "Abra o Chirp com -relay e o endereço de um servidor do Chirp, ou defina CHIRP_RELAY. Sem nenhum dos dois, o Chirp usa relay.usechirp.app.",
   "Starting": "Iniciando",
   "Taken back": "Retirada",
   "That code doesn't exist or was already used. Ask for a new one.": "Esse código não existe ou já foi usado. Peça um novo.",

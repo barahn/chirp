@@ -35,7 +35,7 @@ const (
 	waitText       = "Nothing starts without their OK. They're seeing your request on their own screen now."
 	noCode         = "––– –––"
 	noServerTitle  = "No Chirp server is set"
-	noServerText   = "Start Chirp with -relay and the address of your server, or set CHIRP_RELAY. There is no public Chirp server yet."
+	noServerText   = "Start Chirp with -relay and the address of a Chirp server, or set CHIRP_RELAY. Without either, Chirp uses relay.usechirp.app."
 	badServerTitle = "That server address doesn't work"
 	remoteTitle    = "Their screen"
 	remoteEnd      = "End"

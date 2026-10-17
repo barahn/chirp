@@ -16,14 +16,14 @@
 //
 //	chirp -relay https://chirp.example.org -ice stun:turn.example.org:3478
 //
-// There is no public relay yet (docs/product-model.md, decision 5), so the
-// address of one its users run or trust must be given, with -relay or in
-// CHIRP_RELAY. The STUN and TURN servers are given the same way, with -ice or
-// in CHIRP_ICE, and a TURN credential only in CHIRP_TURN_USERNAME and
-// CHIRP_TURN_PASSWORD, never on the command line other users can read
-// (docs/stun-turn.md). Without any, the screen reaches only a controller on
-// the same network. Nothing is written to disk to remember them
-// (barahn/chirp#49).
+// With no server given, with -relay or in CHIRP_RELAY, Chirp uses Fabrintek's
+// relay, relay.usechirp.app, and its STUN server; anyone may run their own
+// instead (docs/product-model.md, decision 5; docs/relay.md). The STUN and
+// TURN servers are given with -ice or in CHIRP_ICE, and a TURN credential only
+// in CHIRP_TURN_USERNAME and CHIRP_TURN_PASSWORD, never on the command line
+// other users can read (docs/stun-turn.md). With a server of one's own and no
+// -ice, the screen reaches only a controller on the same network. Nothing is
+// written to disk to remember any of it (barahn/chirp#49).
 //
 // With -nostr, or CHIRP_NOSTR, a comma-separated list of Nostr relays
 // (wss://...), sessions are signalled over those relays instead of through
@@ -62,11 +62,12 @@ import (
 )
 
 func main() {
-	relay := flag.String("relay", os.Getenv("CHIRP_RELAY"), "address of the Chirp server, http or https (default $CHIRP_RELAY)")
-	iceList := flag.String("ice", os.Getenv("CHIRP_ICE"), "STUN and TURN servers, comma-separated (default $CHIRP_ICE)")
+	relay := flag.String("relay", os.Getenv("CHIRP_RELAY"), "address of the Chirp server, http or https (default $CHIRP_RELAY, else "+defaultRelay+")")
+	iceList := flag.String("ice", os.Getenv("CHIRP_ICE"), "STUN and TURN servers, comma-separated (default $CHIRP_ICE, else "+defaultICE+" with the default server)")
 	nostrList := flag.String("nostr", os.Getenv("CHIRP_NOSTR"), "Nostr relays to signal sessions over, comma-separated (default $CHIRP_NOSTR)")
 	allowElevated := flag.Bool("allow-elevated", false, "run as administrator anyway, giving whoever is let in full control of this computer")
 	flag.Parse()
+	*relay, *iceList = withDefaults(*relay, *iceList)
 	ice := iceConfig(*iceList, os.Getenv("CHIRP_TURN_USERNAME"), os.Getenv("CHIRP_TURN_PASSWORD"))
 
 	if err := ui.UseLanguage(chooseLanguage(displayLanguages(), lang.SystemLocale().String())); err != nil {
@@ -266,6 +267,30 @@ func nostrConfig(list string) *client.NostrConfig {
 // iceConfig builds the STUN and TURN servers sessions use. It is always
 // explicit, and empty when none are given: remotekit's default would tell a
 // third party about every session (docs/stun-turn.md).
+// Fabrintek's public network: the relay a downloaded Chirp uses when it is
+// given none, and the STUN server that goes with it (network/servers.json,
+// docs/relay.md). There is no TURN by default: a TURN credential baked into
+// every binary would work for anyone who unpacks one (docs/stun-turn.md,
+// Credentials).
+const (
+	defaultRelay = "https://relay.usechirp.app"
+	defaultICE   = "stun:relay.usechirp.app:3478"
+)
+
+// withDefaults fills in the public network for what was not given. The STUN
+// server comes only with the default relay: someone who runs their own relay
+// chose not to depend on Fabrintek, and a STUN server tells its operator
+// that a session exists and from which addresses.
+func withDefaults(relay, ice string) (string, string) {
+	if strings.TrimSpace(relay) != "" {
+		return relay, ice
+	}
+	if strings.TrimSpace(ice) == "" {
+		ice = defaultICE
+	}
+	return defaultRelay, ice
+}
+
 func iceConfig(list, username, password string) webrtc.PeerConfig {
 	return webrtc.PeerConfig{ICEServers: splitList(list), TURNUsername: username, TURNPassword: password}
 }
