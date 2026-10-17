@@ -586,7 +586,7 @@ SOFTWARE.
 
 ### github.com/barahn/remotekit
 
-- Version: `v0.6.1-0.20261015033650-91628b4c93aa`
+- Version: `v0.6.1`
 - License: Apache-2.0
 - Homepage: https://github.com/barahn/remotekit
 
