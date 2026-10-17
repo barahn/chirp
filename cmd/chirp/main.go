@@ -40,9 +40,11 @@ import (
 	"context"
 	"crypto/ed25519"
 	"flag"
+	"log"
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -50,6 +52,7 @@ import (
 	"fyne.io/fyne/v2/lang"
 
 	"github.com/barahn/chirp/client"
+	"github.com/barahn/chirp/cmd/chirp/internal/alert"
 	"github.com/barahn/chirp/cmd/chirp/internal/ui"
 	"github.com/barahn/chirp/cmd/chirp/internal/warm"
 	"github.com/barahn/remotekit/bark"
@@ -67,6 +70,25 @@ func main() {
 	if err := ui.UseLanguage(chooseLanguage(displayLanguages(), lang.SystemLocale().String())); err != nil {
 		fyne.LogError("Chirp's translation could not be read; using English", err)
 	}
+	// If Fyne cannot open a window it says so only in its log, and then
+	// neither shows anything nor exits (barahn/chirp#108). Chirp says why in
+	// a message box, gives its code up, and exits.
+	var release atomic.Pointer[func()]
+	log.SetOutput(&windowFailure{out: os.Stderr, fatal: func(cause string) {
+		released := make(chan struct{})
+		go func() {
+			defer close(released)
+			if f := release.Load(); f != nil {
+				(*f)()
+			}
+		}()
+		alert.Show(ui.WindowFailure(cause))
+		select {
+		case <-released:
+		case <-time.After(6 * time.Second):
+		}
+		os.Exit(1)
+	}})
 	a := app.New()
 	a.Settings().SetTheme(warm.New())
 	a.SetIcon(warm.AppIcon)
@@ -97,6 +119,11 @@ func main() {
 		defer close(ownerDone)
 		_ = owner.Run(ctx)
 	}()
+	giveUp := func() {
+		stop()
+		<-ownerDone
+	}
+	release.Store(&giveUp)
 	w.OnNewCode = owner.NewCode
 	// Consent is given here and nowhere else: the user's own answer, from
 	// Chirp's own prompt, sent as this machine (barahn/chirp#11).
