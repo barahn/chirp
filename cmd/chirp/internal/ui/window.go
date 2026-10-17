@@ -46,6 +46,10 @@ type Window struct {
 	OnConsent func(sessionID string, grant []string)
 	// OnEndSession is called when the user ends a session they allowed.
 	OnEndSession func()
+	// Elevated says Chirp runs with administrator rights, which the consent
+	// prompt then states (GHSA-r385-j539-p738). Set it before the first
+	// prompt.
+	Elevated bool
 	// OnRevoke is called when the user turns a permission off in the
 	// session bar, mid-session. It cannot be turned on again there.
 	OnRevoke func(sessionID, permission string)
@@ -399,6 +403,17 @@ func (w *Window) ApplyHelper(ev client.HelperEvent) {
 
 // ShowNoServer replaces the window's content when there is no usable relay
 // address. addr is what was given, if anything.
+// ShowElevated replaces the window's content with why Chirp will not run as
+// administrator (barahn/chirp#117, option 1). It is shown instead of a code:
+// nothing is registered with the relay.
+func (w *Window) ShowElevated() {
+	w.win.SetContent(container.NewPadded(container.NewVBox(
+		container.NewCenter(birdImage(warm.Asleep, 96)),
+		widget.NewLabelWithStyle(tr("Chirp is running as administrator"), fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+		wrapped(tr("Anyone you let in would have full control of this computer. Close Chirp and open it normally, not with \"Run as administrator\". To share an administrator session anyway, start it with -allow-elevated.")),
+	)))
+}
+
 func (w *Window) ShowNoServer(addr string) {
 	title := tr(noServerTitle)
 	if addr != "" {

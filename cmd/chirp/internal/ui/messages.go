@@ -117,6 +117,13 @@ const (
 	promptAsking  = "They're asking to:"
 	promptChoose  = "Turn on only what this call needs. Allow lets in what is on."
 	promptWarning = "Allow only if you asked this person for help just now. Banks, government agencies and big tech companies never ask for this."
+	// promptActsAsYou says what any session grants on top of the switches:
+	// the helper's mouse and keys act with this account's rights
+	// (GHSA-r385-j539-p738).
+	promptActsAsYou = "They'll act as you on this computer, with your account's permissions."
+	// promptAdmin is added when Chirp itself runs elevated, which only
+	// -allow-elevated permits.
+	promptAdmin   = "Chirp is running as administrator: they'll have full control of this computer, and can change anything on it."
 	promptDecline = "Decline"
 	promptAllow   = "Allow"
 )
