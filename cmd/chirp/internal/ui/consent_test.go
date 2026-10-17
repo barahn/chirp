@@ -226,3 +226,30 @@ func TestTheWarningFollowsTheTheme(t *testing.T) {
 		t.Errorf("after switching to dark the warning background is %v, want %v", got, want)
 	}
 }
+
+// The prompt always says the helper acts with this account's rights, and adds
+// that they get full control only when Chirp runs as administrator
+// (GHSA-r385-j539-p738).
+func TestThePromptSaysWhoseRightsTheHelperGets(t *testing.T) {
+	for _, elevated := range []bool{false, true} {
+		w := newWindow(t)
+		w.Elevated = elevated
+		w.showPrompt(request())
+		got := strings.Join(labels(w.prompt.win.Content()), " | ")
+		if !strings.Contains(got, promptActsAsYou) {
+			t.Errorf("elevated=%v: the prompt does not say whose rights the helper gets: %q", elevated, got)
+		}
+		if strings.Contains(got, promptAdmin) != elevated {
+			t.Errorf("elevated=%v: administrator line shown=%v", elevated, !elevated)
+		}
+		w.prompt.dismiss()
+	}
+}
+
+func TestElevatedChirpShowsNoCode(t *testing.T) {
+	w := newWindow(t)
+	w.ShowElevated()
+	if got := strings.Join(labels(w.win.Content()), " | "); !strings.Contains(got, "-allow-elevated") {
+		t.Errorf("ShowElevated shows %q", got)
+	}
+}

@@ -53,6 +53,7 @@ import (
 
 	"github.com/barahn/chirp/client"
 	"github.com/barahn/chirp/cmd/chirp/internal/alert"
+	"github.com/barahn/chirp/cmd/chirp/internal/privilege"
 	"github.com/barahn/chirp/cmd/chirp/internal/ui"
 	"github.com/barahn/chirp/cmd/chirp/internal/warm"
 	"github.com/barahn/remotekit/bark"
@@ -64,6 +65,7 @@ func main() {
 	relay := flag.String("relay", os.Getenv("CHIRP_RELAY"), "address of the Chirp server, http or https (default $CHIRP_RELAY)")
 	iceList := flag.String("ice", os.Getenv("CHIRP_ICE"), "STUN and TURN servers, comma-separated (default $CHIRP_ICE)")
 	nostrList := flag.String("nostr", os.Getenv("CHIRP_NOSTR"), "Nostr relays to signal sessions over, comma-separated (default $CHIRP_NOSTR)")
+	allowElevated := flag.Bool("allow-elevated", false, "run as administrator anyway, giving whoever is let in full control of this computer")
 	flag.Parse()
 	ice := iceConfig(*iceList, os.Getenv("CHIRP_TURN_USERNAME"), os.Getenv("CHIRP_TURN_PASSWORD"))
 
@@ -93,6 +95,19 @@ func main() {
 	a.Settings().SetTheme(warm.New())
 	a.SetIcon(warm.AppIcon)
 	w := ui.New(a)
+
+	// Whoever is let in acts with this process's rights. As administrator,
+	// that is full control of the machine, past every UAC prompt, so Chirp
+	// will not show a code unless told to on purpose (barahn/chirp#117,
+	// option 1; GHSA-r385-j539-p738); and then the prompt says so.
+	if privilege.Elevated() {
+		if !*allowElevated {
+			w.ShowElevated()
+			w.Window().ShowAndRun()
+			return
+		}
+		w.Elevated = true
+	}
 
 	c, err := client.New(*relay)
 	if err != nil {

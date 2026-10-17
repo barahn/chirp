@@ -130,6 +130,10 @@ cmd/chirp/fatal_test.go
 cmd/chirp/internal/alert/alert.go
 cmd/chirp/internal/alert/alert_other.go
 cmd/chirp/internal/alert/alert_windows.go
+cmd/chirp/internal/privilege/privilege.go
+cmd/chirp/internal/privilege/privilege_other.go
+cmd/chirp/internal/privilege/privilege_test.go
+cmd/chirp/internal/privilege/privilege_windows.go
 cmd/chirp/internal/ui/consent.go
 cmd/chirp/internal/ui/consent_test.go
 cmd/chirp/internal/ui/keys.go
@@ -260,6 +264,7 @@ status/uptime_test.go
 github.com/barahn/chirp/client
 github.com/barahn/chirp/cmd/chirp
 github.com/barahn/chirp/cmd/chirp/internal/alert
+github.com/barahn/chirp/cmd/chirp/internal/privilege
 github.com/barahn/chirp/cmd/chirp/internal/ui
 github.com/barahn/chirp/cmd/chirp/internal/warm
 github.com/barahn/chirp/cmd/chirp-relay
@@ -275,6 +280,7 @@ github.com/barahn/chirp/status
 ok  	github.com/barahn/chirp/client
 ok  	github.com/barahn/chirp/cmd/chirp
 ?   	github.com/barahn/chirp/cmd/chirp/internal/alert	[no test files]
+ok  	github.com/barahn/chirp/cmd/chirp/internal/privilege
 ok  	github.com/barahn/chirp/cmd/chirp/internal/ui
 ok  	github.com/barahn/chirp/cmd/chirp/internal/warm
 ok  	github.com/barahn/chirp/cmd/chirp-relay

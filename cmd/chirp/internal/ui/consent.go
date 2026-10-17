@@ -108,7 +108,9 @@ func (w *Window) showPrompt(req *client.ConsentRequest) {
 		wrapped(tr(promptNoCheck)),
 		widget.NewLabel(tr(promptAsking)),
 		perms,
+		wrapped(tr(promptActsAsYou)),
 		wrapped(tr(promptChoose)),
+		p.adminBox(),
 		p.warningBox(tr(promptWarning)),
 		container.NewHBox(p.count, layout.NewSpacer(), p.allow, p.decline),
 	)))
@@ -245,6 +247,15 @@ func permissionIcon(p string) fyne.Resource {
 }
 
 // warningBox is the fixed warning, on the warning background.
+// adminBox says, when Chirp runs elevated, that the helper gets full control;
+// it is empty otherwise.
+func (p *prompt) adminBox() fyne.CanvasObject {
+	if !p.w.Elevated {
+		return layout.NewSpacer()
+	}
+	return p.warningBox(tr(promptAdmin))
+}
+
 func (p *prompt) warningBox(text string) fyne.CanvasObject {
 	p.warnBg = canvas.NewRectangle(warnBackground())
 	p.warnBg.CornerRadius = theme.Size(theme.SizeNameInputRadius)
