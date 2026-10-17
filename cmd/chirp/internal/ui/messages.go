@@ -280,3 +280,14 @@ func countdown(seconds int) string {
 	}
 	return trf("Expires in %d:%02d", seconds/60, seconds%60)
 }
+
+// WindowFailure is what Chirp says when it cannot open its window at all
+// (barahn/chirp#108): a message box shows it, not the window.
+func WindowFailure(cause string) (title, text string) {
+	title = tr("Chirp can't open its window")
+	text = tr("This computer's graphics driver doesn't offer what Chirp needs (OpenGL 2.1). It happens on many virtual machines and remote desktops. Nothing was shared.")
+	if cause != "" {
+		text += "\n\n" + cause
+	}
+	return title, text
+}
