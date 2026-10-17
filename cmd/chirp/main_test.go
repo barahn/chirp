@@ -213,3 +213,20 @@ func TestTheRunnerIsNeverGrantedTheClipboard(t *testing.T) {
 		t.Fatal("the runner lost what it may be granted")
 	}
 }
+
+// A Chirp given no server uses the public network, STUN included; one given a
+// server of its own gets no Fabrintek STUN server it did not ask for.
+func TestThePublicNetworkIsTheDefault(t *testing.T) {
+	for _, tc := range []struct{ relay, ice, wantRelay, wantICE string }{
+		{"", "", defaultRelay, defaultICE},
+		{"  ", "", defaultRelay, defaultICE},
+		{"", "stun:mine.example:3478", defaultRelay, "stun:mine.example:3478"},
+		{"https://relay.example", "", "https://relay.example", ""},
+		{"https://relay.example", "stun:mine.example:3478", "https://relay.example", "stun:mine.example:3478"},
+	} {
+		relay, ice := withDefaults(tc.relay, tc.ice)
+		if relay != tc.wantRelay || ice != tc.wantICE {
+			t.Errorf("withDefaults(%q, %q) = %q, %q; want %q, %q", tc.relay, tc.ice, relay, ice, tc.wantRelay, tc.wantICE)
+		}
+	}
+}

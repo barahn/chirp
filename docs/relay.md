@@ -672,6 +672,32 @@ why, and gives a coturn configuration. Some notes for these deployments:
 - **TURN carries every byte of a relayed session.** Size the container's
   network accordingly. The relay itself does not need it.
 
+### Fabrintek's network: STUN only, for now
+
+A Chirp given no relay uses `relay.usechirp.app` and the STUN server
+`stun:relay.usechirp.app:3478` (`cmd/chirp`, `withDefaults`). That server is
+coturn in STUN-only mode, from [`deploy/coturn/`](../deploy/coturn/):
+`turnserver.conf` answers binding requests and ignores every TURN request,
+and `install.sh` installs it, starts it and checks that it answers.
+
+On `pve-dc` it runs in the proxy container, where the node's forwards already
+land. The name is the relay's, a DNS-only record to the node's public
+address. It needs one more forward, for both protocols, at each NAT:
+
+| Where | Forward | To |
+| --- | --- | --- |
+| ONT (public address) | `3478/udp`, `3478/tcp` | the MikroTik |
+| MikroTik | `3478/udp`, `3478/tcp` | the proxy container |
+
+From outside, `turnutils_stunclient relay.usechirp.app` prints the address it
+was seen from.
+
+TURN stays off until the relay hands out per-session credentials
+(barahn/remotekit#64; [`docs/stun-turn.md`](stun-turn.md), *Credentials*):
+one credential built into every binary would let anyone who unpacks one relay
+through the node. Until then, two Chirps that are both behind a symmetric NAT
+or a carrier-grade NAT do not connect.
+
 ## Operations
 
 ### Logs

@@ -180,6 +180,8 @@ cmd/chirp/main.go
 cmd/chirp/main_test.go
 deploy/caddy/Caddyfile
 deploy/container/Containerfile
+deploy/coturn/install.sh
+deploy/coturn/turnserver.conf
 deploy/install.sh
 deploy/podman/caddy.container
 deploy/podman/chirp-relay.container
