@@ -400,12 +400,15 @@ Consequences to know about:
 
 ### 4.3 Still open
 
-Three bugs reported on 2026-10-14 are open, each with its issue:
+Three bugs were reported on 2026-10-14, each with its issue; two are open:
 
 - **Chirp does not start on Windows without OpenGL 2.1** — virtual machines,
   Windows Server, some RDP sessions (barahn/chirp#107).
-- **Chirp keeps running with no window when Fyne cannot create one**
-  (barahn/chirp#108).
+- ~~**Chirp keeps running with no window when Fyne cannot create one**
+  (barahn/chirp#108).~~ Fixed: Fyne reports the failure only in its log, so
+  Chirp watches the log for it (`cmd/chirp/fatal.go`), gives its code up,
+  says why in a native message box on Windows or on standard error, and
+  exits with status 1.
 - **Stale ICE candidates during a session** ("doesn't match the current
   ufrags", barahn/chirp#109).
 
