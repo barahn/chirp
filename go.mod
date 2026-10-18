@@ -85,4 +85,4 @@ require (
 	golang.org/x/text v0.43.0 // indirect
 )
 
-replace fyne.io/systray => github.com/barahn/systray v1.12.3-0.20261018144600-58a1288869fe
+replace fyne.io/systray => github.com/barahn/systray v1.12.3-0.20261018185004-9ca6c640949d
