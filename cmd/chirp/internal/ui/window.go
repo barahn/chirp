@@ -209,6 +209,14 @@ func (w *Window) helpArea() fyne.CanvasObject {
 	w.target = widget.NewEntry()
 	w.target.SetPlaceHolder(tr("482 913 5071 or a link"))
 	w.target.OnSubmitted = func(string) { w.tryConnect() }
+	// A code gets its dashes as it is typed (formatCode).
+	w.target.OnChanged = func(text string) {
+		if f := formatCode(text); f != text {
+			w.target.SetText(f)
+			w.target.CursorColumn = len([]rune(f))
+			w.target.Refresh()
+		}
+	}
 	w.connect = widget.NewButton(tr("Connect"), w.tryConnect)
 	w.connect.Importance = widget.HighImportance
 	w.problem = wrapped("")
