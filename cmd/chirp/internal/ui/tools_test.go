@@ -273,3 +273,50 @@ func TestTheRemoteSendsFilesWhileAllowedAndShowsWhatArrived(t *testing.T) {
 	r.Granted([]string{"screen_view"})
 	waitOnFyne(t, func() bool { return r.tools.sendFile.Disabled() })
 }
+
+// Once a session starts, the main window goes to the tray, leaving the
+// session's own window -- the owner's bar, or the helper's view of the other
+// screen -- and comes back when the session ends.
+func TestTheMainWindowGoesToTheTrayDuringASession(t *testing.T) {
+	w, _, _ := alertWindow(t)
+	if w.mainHidden {
+		t.Fatal("the main window is hidden with no session")
+	}
+	started(w, "Ana")
+	if !w.mainHidden {
+		t.Fatal("the main window stayed open during the owner's session")
+	}
+	w.ApplyOwner(client.OwnerEvent{Ended: true})
+	if w.mainHidden {
+		t.Fatal("the main window did not come back after the session")
+	}
+
+	r := w.OpenRemote(func(bark.InputEvent) {}, func() {})
+	if !w.mainHidden {
+		t.Fatal("the main window stayed open while helping")
+	}
+	r.Close()
+	if w.mainHidden {
+		t.Fatal("the main window did not come back after helping")
+	}
+}
+
+// Without a tray to go to, the main window stays where it is.
+func TestWithoutATrayTheMainWindowStays(t *testing.T) {
+	inPlace(t)
+	w := newWindow(t)
+	started(w, "Ana")
+	if w.mainHidden {
+		t.Fatal("the main window was hidden with no tray to bring it back from")
+	}
+}
+
+// Open Chirp in the tray brings the main window back during a session.
+func TestOpenChirpBringsTheWindowBack(t *testing.T) {
+	w, _, tray := alertWindow(t)
+	started(w, "Ana")
+	tray.menu.Items[0].Action()
+	if w.mainHidden {
+		t.Fatal("Open Chirp left the main window hidden")
+	}
+}

@@ -126,21 +126,32 @@ type Tray interface {
 func (w *Window) inSession() bool { return w.bar != nil || w.remote != nil }
 
 // updateTray shows the tray icon while a session is on, and hides it after.
+// The main window goes to the tray when a session starts, leaving the
+// session's own window, and comes back when it ends.
 func (w *Window) updateTray() {
 	if w.Tray == nil {
 		return
 	}
 	if !w.inSession() {
 		w.Tray.Hide()
+		if w.mainHidden {
+			w.mainHidden = false
+			w.win.Show()
+		}
 		return
 	}
 	w.Tray.Show(fyne.NewMenu("Chirp",
 		fyne.NewMenuItem(tr("Open Chirp"), func() {
+			w.mainHidden = false
 			w.win.Show()
 			w.win.RequestFocus()
 		}),
 		fyne.NewMenuItem(tr("End session"), w.endFromTray),
 	))
+	if !w.mainHidden {
+		w.mainHidden = true
+		w.win.Hide()
+	}
 }
 
 // endFromTray ends whatever session is on, as End does where it is.
@@ -157,7 +168,8 @@ func (w *Window) endFromTray() {
 // the window, to the tray; otherwise it quits, giving the code and link up
 // at once (#50).
 func (w *Window) closeMain() {
-	if w.inSession() {
+	if w.inSession() && w.Tray != nil {
+		w.mainHidden = true
 		w.win.Hide()
 		return
 	}
