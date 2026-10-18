@@ -173,8 +173,11 @@ func main() {
 	w.OnSendFile = func(id, name string, f io.ReadSeeker, progress func(sent, total int64)) error {
 		return serving.sendFile(ctx, id, name, f, progress)
 	}
-	// The tray icon shows only while a session is on.
-	w.Tray = newSystemTray(a)
+	// The tray icon shows only while a session is on. Fyne starts its
+	// tray only as the app starts running, so it is set up now, hidden.
+	tray := newSystemTray(a)
+	tray.prepare()
+	w.Tray = tray
 	// The relay ends a session only when its owner gives the registration
 	// up, so ending one replaces the code and link too.
 	w.OnEndSession = owner.NewCode

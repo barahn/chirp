@@ -12,13 +12,15 @@ import (
 )
 
 // systemTray is the tray icon, there only while a session is on
-// (barahn/chirp#134). Fyne starts its tray on the first menu it is given and
-// cannot take it down again, so the icon is hidden between sessions with
-// SetVisible, from Barahn's fork of fyne.io/systray until upstream has it.
-// No tray is started before the first session.
+// (barahn/chirp#134).
+//
+// Fyne starts its tray only when the app starts running, and cannot take it
+// down afterwards. So prepare sets the tray up before ShowAndRun, hidden
+// first, and sessions show and hide it with SetVisible, from Barahn's fork
+// of fyne.io/systray until upstream has it.
 type systemTray struct {
-	app     desktop.App
-	started bool
+	app        desktop.App
+	setVisible func(bool)
 }
 
 // newSystemTray returns the tray for a, or nil where the system has none.
@@ -27,24 +29,30 @@ func newSystemTray(a fyne.App) *systemTray {
 	if !ok {
 		return nil
 	}
-	return &systemTray{app: d}
+	return &systemTray{app: d, setVisible: systray.SetVisible}
+}
+
+// prepare sets the tray up, hidden. Call it before the app runs.
+func (t *systemTray) prepare() {
+	if t == nil {
+		return
+	}
+	t.setVisible(false)
+	t.app.SetSystemTrayIcon(warm.AppIcon)
+	t.app.SetSystemTrayMenu(fyne.NewMenu("Chirp"))
 }
 
 func (t *systemTray) Show(m *fyne.Menu) {
 	if t == nil {
 		return
 	}
-	if !t.started {
-		t.app.SetSystemTrayIcon(warm.AppIcon)
-		t.started = true
-	}
 	t.app.SetSystemTrayMenu(m)
-	systray.SetVisible(true)
+	t.setVisible(true)
 }
 
 func (t *systemTray) Hide() {
-	if t == nil || !t.started {
+	if t == nil {
 		return
 	}
-	systray.SetVisible(false)
+	t.setVisible(false)
 }
