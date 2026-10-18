@@ -13,7 +13,7 @@ import (
 // trayCalls records what systemTray does, in order.
 type trayCalls struct{ calls []string }
 
-func (c *trayCalls) SetSystemTrayMenu(m *fyne.Menu) { c.calls = append(c.calls, "menu:"+m.Label) }
+func (c *trayCalls) SetSystemTrayMenu(m *fyne.Menu)  { c.calls = append(c.calls, "menu:"+m.Label) }
 func (c *trayCalls) SetSystemTrayIcon(fyne.Resource) { c.calls = append(c.calls, "icon") }
 func (c *trayCalls) SetSystemTrayWindow(fyne.Window) {}
 func (c *trayCalls) visible(v bool) {
