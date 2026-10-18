@@ -3,9 +3,8 @@
 
 package main
 
-import "time"
-
-// alertTimeout is how long an alert stays on screen (barahn/chirp#134).
-// Long enough to read a sentence, short enough not to pile up while the
-// person helping copies and pastes.
-const alertTimeout = 6 * time.Second
+// alertTimeoutMS is how long an alert stays on screen, in milliseconds, as
+// the notification service takes it (barahn/chirp#134). Long enough to read
+// a sentence, short enough not to pile up while the person helping copies
+// and pastes.
+const alertTimeoutMS int32 = 6000

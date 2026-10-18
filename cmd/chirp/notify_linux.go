@@ -53,7 +53,7 @@ func (n *desktopNotifier) send(no *fyne.Notification) {
 	if icon, ok := birdImageData(); ok {
 		hints["image-data"] = dbus.MakeVariant(icon)
 	}
-	id, err := n.notify(n.last, no.Title, no.Content, hints, int32(alertTimeout.Milliseconds()))
+	id, err := n.notify(n.last, no.Title, no.Content, hints, alertTimeoutMS)
 	if err != nil {
 		n.last = 0
 		return
@@ -82,12 +82,13 @@ func birdImageData() (imageData, bool) {
 		if err != nil {
 			return
 		}
-		const size = 64
+		const size, channels = 64, 4
 		img := image.NewNRGBA(image.Rect(0, 0, size, size))
 		draw.Draw(img, img.Bounds(), image.Transparent, image.Point{}, draw.Src)
 		icon.SetTarget(0, 0, size, size)
 		icon.Draw(rasterx.NewDasher(size, size, rasterx.NewScannerGV(size, size, img, img.Bounds())), 1)
-		birdIcon = imageData{Width: size, Height: size, RowStride: int32(img.Stride), HasAlpha: true, BitsPerSample: 8, Channels: 4, Data: img.Pix}
+		// NRGBA rows are size*channels bytes, with no padding.
+		birdIcon = imageData{Width: size, Height: size, RowStride: size * channels, HasAlpha: true, BitsPerSample: 8, Channels: channels, Data: img.Pix}
 		birdOK = true
 	})
 	return birdIcon, birdOK
