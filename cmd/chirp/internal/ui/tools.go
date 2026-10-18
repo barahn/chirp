@@ -62,14 +62,14 @@ func (w *Window) Alert(sessionID string, a Alert) {
 	if b == nil || b.session.ID != sessionID || b.done {
 		return
 	}
-	text := alertText(b.session.Name, a)
-	if text == "" {
-		return
-	}
-	w.notify(fyne.NewNotification("Chirp", text))
 	if a.Kind == AlertFileIn {
 		b.tools.received(a.Name, a.Folder)
 	}
+	text := alertText(b.session.Name, a)
+	if text == "" || w.alertsOff {
+		return
+	}
+	w.notify(fyne.NewNotification("Chirp", text))
 }
 
 // alertText is what the owner is told, naming the person helping as a claim.
@@ -140,11 +140,19 @@ func (w *Window) updateTray() {
 		}
 		return
 	}
+	alerts := tr("Turn alerts off")
+	if w.alertsOff {
+		alerts = tr("Turn alerts on")
+	}
 	w.Tray.Show(fyne.NewMenu("Chirp",
 		fyne.NewMenuItem(tr("Open Chirp"), func() {
 			w.mainHidden = false
 			w.win.Show()
 			w.win.RequestFocus()
+		}),
+		fyne.NewMenuItem(alerts, func() {
+			w.alertsOff = !w.alertsOff
+			w.updateTray()
 		}),
 		fyne.NewMenuItem(tr("End session"), w.endFromTray),
 	))

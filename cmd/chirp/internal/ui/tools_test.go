@@ -146,12 +146,12 @@ func TestTheTrayMenuOpensChirpAndEnds(t *testing.T) {
 	for _, it := range tray.menu.Items {
 		labels = append(labels, it.Label)
 	}
-	if !slices.Equal(labels, []string{"Open Chirp", "End session"}) {
+	if !slices.Equal(labels, []string{"Open Chirp", "Turn alerts off", "End session"}) {
 		t.Fatalf("tray menu %v", labels)
 	}
 	w.win.Hide()
 	tray.menu.Items[0].Action()
-	tray.menu.Items[1].Action()
+	tray.menu.Items[2].Action()
 	if ended != 1 || w.bar != nil {
 		t.Errorf("End session from the tray: ended %d times, bar %v", ended, w.bar)
 	}
@@ -318,5 +318,33 @@ func TestOpenChirpBringsTheWindowBack(t *testing.T) {
 	tray.menu.Items[0].Action()
 	if w.mainHidden {
 		t.Fatal("Open Chirp left the main window hidden")
+	}
+}
+
+// The owner can turn the alerts off from the tray, and on again; the item
+// says what it will do. A file that arrives still shows in the session bar.
+func TestTheTrayTurnsAlertsOffAndOn(t *testing.T) {
+	w, sent, tray := alertWindow(t)
+	started(w, "Ana")
+	item := func() *fyne.MenuItem { return tray.menu.Items[1] }
+	if item().Label != "Turn alerts off" {
+		t.Fatalf("tray item %q, want Turn alerts off", item().Label)
+	}
+	item().Action()
+	if item().Label != "Turn alerts on" {
+		t.Fatalf("after turning them off the item says %q", item().Label)
+	}
+	w.Alert("s1", Alert{Kind: AlertPastedIn})
+	w.Alert("s1", Alert{Kind: AlertFileIn, Name: "a.txt", Folder: "/d/Downloads/Chirp"})
+	if len(*sent) != 0 {
+		t.Fatalf("%d notifications with alerts off", len(*sent))
+	}
+	if !strings.Contains(w.bar.tools.status.Text, "“a.txt”") {
+		t.Errorf("with alerts off the bar does not show the file: %q", w.bar.tools.status.Text)
+	}
+	item().Action()
+	w.Alert("s1", Alert{Kind: AlertPastedIn})
+	if len(*sent) != 1 {
+		t.Fatalf("%d notifications after turning alerts on, want 1", len(*sent))
 	}
 }

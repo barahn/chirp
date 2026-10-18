@@ -71,6 +71,9 @@ type Window struct {
 	remote *Remote
 	// mainHidden is set while the main window is in the tray for a session.
 	mainHidden bool
+	// alertsOff is set while the owner has turned the alerts off from the
+	// tray, for as long as Chirp runs: nothing is written to disk (#49).
+	alertsOff bool
 
 	// The header: the bird, whose pose says how this machine stands, and
 	// the wordmark.
@@ -129,6 +132,9 @@ func New(a fyne.App) *Window {
 	a.Settings().AddListener(func(fyne.Settings) { fyne.Do(w.recolor) })
 	return w
 }
+
+// SetNotify replaces how alerts are shown, Fyne's notifications by default.
+func (w *Window) SetNotify(fn func(*fyne.Notification)) { w.notify = fn }
 
 // Window returns the Fyne window, to show and run.
 func (w *Window) Window() fyne.Window { return w.win }
