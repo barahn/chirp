@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/barahn/chirp/client"
+	"github.com/barahn/chirp/cmd/chirp/internal/ui"
 	"github.com/barahn/remotekit/stream"
 	"github.com/barahn/remotekit/webrtc"
 )
@@ -199,34 +200,32 @@ func TestTheViewerPinsTheProvedKeys(t *testing.T) {
 	}
 }
 
-// Granted, remotekit's runner reads the owner's clipboard on its own and sends
-// every change to the controller (decision 4 forbids it): no session conn,
-// however it was built, gets the runner to grant it.
-func TestTheRunnerIsNeverGrantedTheClipboard(t *testing.T) {
+// The runner gets what the owner allowed and nothing else; the clipboard,
+// once allowed, syncs on its own (barahn/chirp#134).
+func TestTheRunnerGetsWhatTheOwnerAllowed(t *testing.T) {
 	r := newRunner(&client.SessionConn{ID: "session", Permissions: []string{
-		stream.PermissionScreenView, stream.PermissionRemoteControl, stream.PermissionClipboard,
+		stream.PermissionScreenView, stream.PermissionClipboard,
 	}}, webrtc.PeerConfig{})
-	if r.Granted(stream.PermissionClipboard) {
-		t.Fatal("the runner was granted the clipboard")
-	}
-	if !r.Granted(stream.PermissionRemoteControl) {
-		t.Fatal("the runner lost what it may be granted")
+	if !r.Granted(stream.PermissionClipboard) || r.Granted(stream.PermissionRemoteControl) {
+		t.Fatal("the runner was not granted exactly what the owner allowed")
 	}
 }
 
-// A Chirp given no server uses the public network, STUN included; one given a
-// server of its own gets no Fabrintek STUN server it did not ask for.
-func TestThePublicNetworkIsTheDefault(t *testing.T) {
-	for _, tc := range []struct{ relay, ice, wantRelay, wantICE string }{
-		{"", "", defaultRelay, defaultICE},
-		{"  ", "", defaultRelay, defaultICE},
-		{"", "stun:mine.example:3478", defaultRelay, "stun:mine.example:3478"},
-		{"https://relay.example", "", "https://relay.example", ""},
-		{"https://relay.example", "stun:mine.example:3478", "https://relay.example", "stun:mine.example:3478"},
+// Every clipboard sync is told to the owner, a held-back password included.
+func TestEveryClipboardSyncBecomesAnAlert(t *testing.T) {
+	for _, tc := range []struct {
+		ev   stream.ClipboardEvent
+		want ui.AlertKind
+	}{
+		{stream.ClipboardEvent{Direction: stream.ClipboardToHost, Size: 3}, ui.AlertPastedIn},
+		{stream.ClipboardEvent{Direction: stream.ClipboardFromHost, Size: 3}, ui.AlertCopiedOut},
+		{stream.ClipboardEvent{Direction: stream.ClipboardFromHost, Concealed: true}, ui.AlertPasswordHeld},
 	} {
-		relay, ice := withDefaults(tc.relay, tc.ice)
-		if relay != tc.wantRelay || ice != tc.wantICE {
-			t.Errorf("withDefaults(%q, %q) = %q, %q; want %q, %q", tc.relay, tc.ice, relay, ice, tc.wantRelay, tc.wantICE)
+		if a, ok := clipboardAlert(tc.ev); !ok || a.Kind != tc.want {
+			t.Errorf("%+v alerts %+v, %v; want kind %v", tc.ev, a, ok, tc.want)
 		}
+	}
+	if _, ok := clipboardAlert(stream.ClipboardEvent{}); ok {
+		t.Error("an event with no direction alerted")
 	}
 }

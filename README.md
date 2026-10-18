@@ -90,7 +90,7 @@ features to be traded away:
 And Chirp never:
 
 - installs itself, or starts with your computer;
-- reads your clipboard unless you paste.
+- reads your clipboard unless you paste, or allowed it for a session.
 
 Quitting Chirp cancels your code and link at once. If it can't reach its
 server as it closes, the server drops them on its own, within about two

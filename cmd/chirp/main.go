@@ -40,8 +40,10 @@ import (
 	"context"
 	"crypto/ed25519"
 	"flag"
+	"io"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -57,6 +59,7 @@ import (
 	"github.com/barahn/chirp/cmd/chirp/internal/ui"
 	"github.com/barahn/chirp/cmd/chirp/internal/warm"
 	"github.com/barahn/remotekit/bark"
+	"github.com/barahn/remotekit/clipboard"
 	"github.com/barahn/remotekit/stream"
 	"github.com/barahn/remotekit/webrtc"
 )
@@ -126,6 +129,19 @@ func main() {
 	var serving runners
 	owner.Serve = func(ctx context.Context, s *client.SessionConn) {
 		r := newRunner(s, ice)
+		id := s.ID
+		alert := func(a ui.Alert) { fyne.Do(func() { w.Alert(id, a) }) }
+		// The owner is told of everything the person helping does with
+		// the clipboard and files (barahn/chirp#134).
+		r.OnClipboardEvent(func(ev stream.ClipboardEvent) {
+			if a, ok := clipboardAlert(ev); ok {
+				alert(a)
+			}
+		})
+		r.OnFileSaved(func(f stream.ReceivedFile) {
+			alert(ui.Alert{Kind: ui.AlertFileIn, Name: f.Name, Size: f.Size, Folder: filepath.Dir(f.Path)})
+		})
+		r.OnViewer(func(ev stream.ViewerEvent) { serving.viewer(id, r, ev) })
 		serving.add(s.ID, r)
 		defer serving.remove(s.ID, r)
 		_ = r.Serve(ctx, s)
@@ -153,6 +169,12 @@ func main() {
 	// A permission turned off in the session bar stops at once, on this
 	// machine, whatever the other end does (barahn/chirp#52).
 	w.OnRevoke = serving.revoke
+	// Files the owner sends from the session bar go to whoever is helping.
+	w.OnSendFile = func(id, name string, f io.ReadSeeker, progress func(sent, total int64)) error {
+		return serving.sendFile(ctx, id, name, f, progress)
+	}
+	// The tray icon shows only while a session is on.
+	w.Tray = newSystemTray(a)
 	// The relay ends a session only when its owner gives the registration
 	// up, so ending one replaces the code and link too.
 	w.OnEndSession = owner.NewCode
@@ -193,6 +215,8 @@ func main() {
 type runners struct {
 	mu sync.Mutex
 	m  map[string]*stream.Runner
+	// viewers is who is connected to each session, for the owner's files.
+	viewers map[string]string
 }
 
 func (rs *runners) add(id string, r *stream.Runner) {
@@ -209,6 +233,7 @@ func (rs *runners) remove(id string, r *stream.Runner) {
 	defer rs.mu.Unlock()
 	if rs.m[id] == r {
 		delete(rs.m, id)
+		delete(rs.viewers, id)
 	}
 }
 
@@ -221,6 +246,52 @@ func (rs *runners) revoke(id, permission string) {
 	if r != nil {
 		r.Revoke(permission)
 	}
+}
+
+// viewer follows who is connected to the session id, so the owner's files
+// go to the person helping now.
+func (rs *runners) viewer(id string, r *stream.Runner, ev stream.ViewerEvent) {
+	rs.mu.Lock()
+	defer rs.mu.Unlock()
+	if rs.m[id] != r {
+		return
+	}
+	if rs.viewers == nil {
+		rs.viewers = make(map[string]string)
+	}
+	switch ev.Kind {
+	case stream.ViewerJoined, stream.ViewerStreaming:
+		rs.viewers[id] = ev.ViewerID
+	case stream.ViewerLeft:
+		if rs.viewers[id] == ev.ViewerID {
+			delete(rs.viewers, id)
+		}
+	}
+}
+
+// sendFile sends a file to whoever is helping in the session id.
+func (rs *runners) sendFile(ctx context.Context, id, name string, f io.ReadSeeker, progress func(sent, total int64)) error {
+	rs.mu.Lock()
+	r, viewer := rs.m[id], rs.viewers[id]
+	rs.mu.Unlock()
+	if r == nil || viewer == "" {
+		return stream.ErrNotConnected
+	}
+	_, err := r.SendFile(ctx, viewer, name, f, progress)
+	return err
+}
+
+// clipboardAlert is what the owner is told of a clipboard sync.
+func clipboardAlert(ev stream.ClipboardEvent) (ui.Alert, bool) {
+	switch {
+	case ev.Direction == stream.ClipboardToHost:
+		return ui.Alert{Kind: ui.AlertPastedIn, Size: int64(ev.Size)}, true
+	case ev.Direction == stream.ClipboardFromHost && ev.Concealed:
+		return ui.Alert{Kind: ui.AlertPasswordHeld}, true
+	case ev.Direction == stream.ClipboardFromHost:
+		return ui.Alert{Kind: ui.AlertCopiedOut, Size: int64(ev.Size)}, true
+	}
+	return ui.Alert{}, false
 }
 
 // newRunner builds the runner for a session its owner has allowed.
@@ -240,8 +311,13 @@ func (rs *runners) revoke(id, permission string) {
 // can then take part in the session. Through the trusted relay there is no
 // PAKE, and so no keys: signed viewers stay off there (docs/product-model.md,
 // decision 5).
+//
+// With the clipboard allowed, the runner syncs it both ways on its own, and
+// never sends what a password manager marked as secret (barahn/chirp#134);
+// main tells the owner of each sync. Files the person helping sends land in
+// the Chirp folder in the owner's Downloads.
 func newRunner(s *client.SessionConn, ice webrtc.PeerConfig) *stream.Runner {
-	r := stream.New(stream.Config{ID: s.ID, PeerConfig: &ice, SigningKey: s.SigningKey})
+	r := stream.New(stream.Config{ID: s.ID, PeerConfig: &ice, SigningKey: s.SigningKey, DownloadDir: receivedDir()})
 	r.RequireScreenViewConsent(true)
 	r.DisableRelayFallback(true)
 	r.RequireDataChannel(s.Nostr)
@@ -311,7 +387,7 @@ func splitList(list string) []string {
 // answers only from the owner's (barahn/chirp#21); it goes by the name the
 // owner's runner addresses it by, which its signed answers carry.
 func viewerConfig(conn *client.SessionConn, ice webrtc.PeerConfig) stream.ViewerConfig {
-	cfg := stream.ViewerConfig{ID: "chirp-controller", AgentID: conn.ID, PeerConfig: &ice}
+	cfg := stream.ViewerConfig{ID: "chirp-controller", AgentID: conn.ID, PeerConfig: &ice, DownloadDir: receivedDir()}
 	if conn.PeerKey != nil {
 		cfg.ID, cfg.SigningKey, cfg.AgentKey = conn.ViewerID, conn.SigningKey, conn.PeerKey
 	}
@@ -320,20 +396,35 @@ func viewerConfig(conn *client.SessionConn, ice webrtc.PeerConfig) stream.Viewer
 
 // viewSession shows a session this machine was let into, until it ends: the
 // other computer's screen through remotekit's viewer, and the user's mouse and
-// keyboard sent back over it. Whether input is applied is the other side's
-// runner's decision, from what its user allowed.
+// keyboard sent back over it, the clipboard synced both ways while the other
+// person allows it, and files both ways. Whether any of it is applied is the
+// other side's runner's decision, from what its user allowed.
 func viewSession(ctx context.Context, conn *client.SessionConn, ice webrtc.PeerConfig, w *ui.Window) {
 	v := stream.NewViewer(viewerConfig(conn, ice))
 	opened := make(chan *ui.Remote, 1)
 	fyne.Do(func() {
 		// End closes this session's conn, which ends this Help and no
 		// other; the viewer failing does the same.
-		opened <- w.OpenRemote(func(ev bark.InputEvent) { _ = v.SendInput(ev) }, func() { _ = conn.Close() })
+		r := w.OpenRemote(func(ev bark.InputEvent) { _ = v.SendInput(ev) }, func() { _ = conn.Close() })
+		r.SendFile = func(name string, f io.ReadSeeker, progress func(sent, total int64)) error {
+			_, err := v.SendFile(ctx, name, f, progress)
+			return err
+		}
+		opened <- r
 	})
 	remote := <-opened
 	defer fyne.Do(remote.Close)
 	v.OnFrame(remote.Show)
 	v.OnNotice(func(n stream.Notice) { remote.Notice(n.Type) })
-	v.OnPermissions(remote.Granted)
+	sync := newClipSync(clipboard.NewManager(), 500*time.Millisecond, v.SendClipboard)
+	v.OnPermissions(func(granted []string) {
+		remote.Granted(granted)
+		sync.granted(granted)
+	})
+	v.OnClipboard(sync.received)
+	// Files the other person sends land in the Chirp folder in Downloads.
+	v.OnFileOffer(func(stream.FileOffer) bool { return true })
+	v.OnFileSaved(func(f stream.ReceivedFile) { remote.FileReceived(f.Name, filepath.Dir(f.Path)) })
+	go sync.run(ctx)
 	_ = v.Serve(ctx, conn)
 }

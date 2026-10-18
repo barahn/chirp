@@ -53,12 +53,15 @@ is really deciding is whether they are expecting this connection right now.
 
 Permissions requested by default: viewing the screen, remote control and file
 transfer. They are the free core and are never gated behind a licence or a
-tier. The clipboard is part of that core too, but it is withheld for now:
-granted, remotekit's runner reads the owner's clipboard on its own and sends
-every change to the controller, which decision 4 rules out. It comes back when
-it moves only on an explicit action at either end (barahn/chirp#79), and until
-then the owner's Chirp drops it from any request, whatever the relay asks
-for.
+tier. The clipboard is part of that core too. It is a switch in the prompt,
+off until the owner turns it on, worded so they know that what either of them
+copies during the session goes to the other. Once on, it syncs both ways on
+its own, as the tools people know do, and the owner is told of each paste into
+their computer and each copy that leaves it (barahn/chirp#134). What a
+password manager marks as secret never leaves, and nothing copied before the
+session does (barahn/remotekit#130). From v0.3.1 until then the owner's Chirp
+withheld the clipboard altogether, because it went to the controller without
+the owner being asked or told (GHSA-8jh9-jw95-3v27).
 
 ## What follows for security
 
@@ -121,7 +124,8 @@ Decided by the maintainer:
      hash and signature, and the site never has to be trusted to personalise
      a binary.
    - **Chirp reads the clipboard only when the user pastes.** It never looks
-     at the clipboard on its own, at start or at any other time.
+     at the clipboard on its own, at start or at any other time, outside a
+     session whose owner turned the clipboard on (barahn/chirp#134).
    - **Chirp registers no URL handler.** A handler is a change to the system
      that outlives the program, which is installation by another name, and it
      would not help the first link anyway.

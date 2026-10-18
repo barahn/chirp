@@ -56,8 +56,7 @@ func remoteNotice(kind string) string {
 // limitsText is what the remote screen says about what the other person has
 // not allowed, or "" when nothing they could allow is held back. Screen view
 // is not named: without it there is no picture, and remoteNotice says why.
-// Nor is the clipboard: the other Chirp withholds it from every session for
-// now (barahn/chirp#79), so it is not theirs to allow.
+// Nor is the clipboard: its buttons, greyed out, say enough.
 func limitsText(granted []string) string {
 	control := slices.Contains(granted, "remote_control")
 	files := slices.Contains(granted, "file_transfer")
@@ -67,7 +66,7 @@ func limitsText(granted []string) string {
 	case !control:
 		return tr("View only: they haven't allowed their mouse and keyboard.")
 	case !files:
-		return tr("They haven't allowed their files.")
+		return tr(filesNotAllowed)
 	}
 	return ""
 }
@@ -183,7 +182,7 @@ func permissionText(p string) string {
 	case "remote_control":
 		return tr("Use your mouse and keyboard")
 	case "clipboard":
-		return tr("Share your clipboard")
+		return tr("Share what you copy, both ways, while the session lasts")
 	case "file_transfer":
 		return tr("Send and receive files")
 	}

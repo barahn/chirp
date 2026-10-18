@@ -162,9 +162,8 @@ written to make an unexpected request easy to decline. It is built in
   `session.DefaultPermissions`, each as a row that changes colour and shows a
   check mark when on, so the state never rests on colour alone. *See your
   screen* is fixed on, marked *Always*: no session goes without it, and
-  remotekit's runner requires it. Mouse and keyboard and files start off
-  (the clipboard is withheld until barahn/chirp#79, so it is not offered);
-  the owner turns on what the call needs, and *Allow* lets in
+  remotekit's runner requires it. Mouse and keyboard, the clipboard and
+  files start off; the owner turns on what the call needs, and *Allow* lets in
   what is on and nothing else. A hurried *Allow* during a scam call
   therefore gives away the picture alone. Tab reaches the rows and Space
   turns one; a click on a row hands the focus back to *Decline*, so Enter
@@ -198,7 +197,7 @@ written to make an unexpected request easy to decline. It is built in
 | --- | --- | --- |
 | Title | Someone wants to control this computer | Alguém quer controlar este computador |
 | Name | They say they're "João da TI". Chirp can't check names. | Diz se chamar "João da TI". O Chirp não verifica nomes. |
-| Permissions | See your screen *(Always)* · use your mouse and keyboard · send and receive files (the clipboard is withheld until barahn/chirp#79: *share your clipboard*) | Ver sua tela *(Sempre)* · usar seu mouse e teclado · enviar e receber arquivos (área de transferência retida até barahn/chirp#79: *compartilhar a área de transferência*) |
+| Permissions | See your screen *(Always)* · use your mouse and keyboard · share what you copy, both ways, while the session lasts · send and receive files | Ver sua tela *(Sempre)* · usar seu mouse e teclado · compartilhar o que vocês copiarem, nos dois sentidos, durante a sessão · enviar e receber arquivos |
 | Under the permissions | Turn on only what this call needs. Allow lets in what is on. | Ligue só o que este atendimento precisa. Permitir libera o que estiver ligado. |
 | Warning | Allow only if you asked this person for help just now. Banks, government agencies and big tech companies never ask for this. | Só permita se você pediu ajuda a essa pessoa agora. Bancos, órgãos do governo e grandes empresas de tecnologia nunca pedem isso. |
 | Countdown | Declines by itself in 1:40 | Recusa sozinho em 1:40 |
@@ -217,7 +216,17 @@ line, each permission allowed besides *See your screen* is the same switch
 as in the prompt, and it only turns off: the owner takes one back at any
 moment, it stops at once, and it stays off (*Taken back*) until a new
 request. Turning one on mid-session is what a scammer asks for, so the bar
-cannot. Taking the screen back is *End*. The tray icon
+cannot. Taking the screen back is *End*. While files are allowed, the bar has
+*Send a file*; when a file arrives it names it, with *Open folder*. Files land
+in a Chirp folder in Downloads at either end, never replacing one already
+there. Everything the person helping does with the clipboard and files --
+each paste into the computer, each copy that leaves it, each file, a password
+that was held back -- is told in a system notification (barahn/chirp#134).
+
+While a session is on, Chirp has an icon in the tray, at either end, with
+*Open Chirp* and *End session*; closing the main window then hides it there
+instead of quitting. With no session there is no icon, and closing the window
+quits (#50). When a session is over, the main window is the only one left. The tray icon
 changes shape as well as colour, so the state does not depend on telling
 colours apart. When the session ends the bar goes, and the main window says
 the code has been replaced.
@@ -231,17 +240,24 @@ that waits on a small per-OS shim, which the consent prompt needs too.
 
 **On the controller's machine,** the remote screen fills the window, with a
 toolbar for monitors, clipboard, files and *End*. So far the toolbar has
-*End*, and a line for what the other computer says instead of its picture.
-Closing the window ends the session too. The mouse and keyboard over the
+*Send a file* and *End*, and lines for what the other person has not allowed,
+what the other computer says instead of its picture, and how the last file
+went; the monitor picker is still to come (#79). *Send a file* (Pigeon Post)
+sends one file, or several dropped on the window, one at a time, with the
+progress as the owner's Chirp acknowledges it, while the owner allows files.
+The clipboard needs no button: while the owner allows it, it syncs both ways
+on its own. Closing the window ends the session too. The mouse and keyboard over the
 picture go to the other computer, keys as the physical keys they are, so its
 own layout decides what they type.
 
 ## The tray
 
-The tray icon exists only while Chirp runs. It has three shapes: idle (the
-bird's outline), asked (outline with a dot), in a session (a distinct, filled
-shape). Its menu: *Show Chirp*, *Copy code*, *Copy link*, *New code*,
-*End session* (only during one), *Quit*.
+The tray icon exists only while a session is on (barahn/chirp#134), at either
+end. Its menu: *Open Chirp* and *End session*. Fyne cannot take its tray icon
+down once shown, so Chirp hides it between sessions with `SetVisible`, from
+Barahn's fork of `fyne.io/systray` until upstream has it. The shapes for a
+waiting request and a session (#78) and the bird's balloons (#136) build on
+it.
 
 ## Messages
 
@@ -327,7 +343,7 @@ The help centre follows TunnelBear's four sections:
 **What Chirp never does**, the counterpart of TunnelBear's "will NEVER":
 
 - installs itself, or starts with your computer;
-- reads your clipboard unless you paste;
+- reads your clipboard unless you paste, or allowed it for a session;
 - lets anyone in without you pressing *Allow* on your own screen;
 - puts screen sharing, control, files, clipboard or multiple monitors behind
   a payment.

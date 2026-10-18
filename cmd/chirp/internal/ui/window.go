@@ -13,6 +13,7 @@ package ui
 import (
 	"context"
 	"image/color"
+	"io"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -53,6 +54,21 @@ type Window struct {
 	// OnRevoke is called when the user turns a permission off in the
 	// session bar, mid-session. It cannot be turned on again there.
 	OnRevoke func(sessionID, permission string)
+	// OnSendFile sends a file the owner picked in the session bar to whoever
+	// is in the session sessionID, and returns once they saved or refused
+	// it. It is called off Fyne's goroutine.
+	OnSendFile func(sessionID, name string, f io.ReadSeeker, progress func(sent, total int64)) error
+	// Tray is the system tray icon, shown only during a session. Set it
+	// before the first session; without it there is none.
+	Tray Tray
+
+	// notify shows a system notification, and quit quits Chirp; tests
+	// replace them.
+	notify func(*fyne.Notification)
+	quit   func()
+	// remote is the window onto a computer this machine is helping, while
+	// one is open.
+	remote *Remote
 
 	// The header: the bird, whose pose says how this machine stands, and
 	// the wordmark.
@@ -98,7 +114,8 @@ type Window struct {
 
 // New builds the window, not yet shown.
 func New(a fyne.App) *Window {
-	w := &Window{app: a, win: a.NewWindow("Chirp")}
+	w := &Window{app: a, win: a.NewWindow("Chirp"), notify: a.SendNotification, quit: a.Quit}
+	w.win.SetCloseIntercept(w.closeMain)
 	header := w.header()
 	card := w.ownerCard()
 	help := w.helpArea()

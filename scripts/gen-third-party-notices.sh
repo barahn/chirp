@@ -158,7 +158,7 @@ modules_file="$(mktemp)"
 trap 'rm -f "$modules_file"' EXIT
 for goos in "${PLATFORMS[@]}"; do
 	GOOS="$goos" CGO_ENABLED=1 go list -deps -f \
-		'{{if and .Module (not .Standard)}}{{.Module.Path}}|{{.Module.Version}}|{{.Module.Dir}}{{end}}' \
+		'{{if and .Module (not .Standard)}}{{.Module.Path}}|{{if .Module.Replace}}{{.Module.Replace.Version}}{{else}}{{.Module.Version}}{{end}}|{{.Module.Dir}}|{{if .Module.Replace}}{{.Module.Replace.Path}}{{end}}{{end}}' \
 		./... 2>/dev/null
 done | grep -v '^github.com/barahn/chirp|' | LC_ALL=C sort -u | grep -v '^$' >"$modules_file"
 
@@ -181,11 +181,15 @@ trap 'rm -f "$modules_file" "$embeds_file" "$body"' EXIT
 declare -A module_version=()
 
 emit() {
-	local name="$1" version="$2" spdx="$3" url="$4" license_file="$5"
+	local name="$1" version="$2" spdx="$3" url="$4" license_file="$5" replaced_by="${6:-}"
 	{
 		echo "### $name"
 		echo
 		echo "- Version: \`$version\`"
+		if [ -n "$replaced_by" ]; then
+			# A go.mod replace: the binary carries the fork, not the original.
+			echo "- Built from: \`$replaced_by\`, a modified fork of $name"
+		fi
 		echo "- License: $spdx"
 		echo "- Homepage: $url"
 		echo
@@ -197,7 +201,7 @@ emit() {
 }
 
 count=0
-while IFS='|' read -r path version dir; do
+while IFS='|' read -r path version dir replaced_by; do
 	[ -n "$path" ] || continue
 	license_file="$(find_license_file "$dir")"
 	[ -n "$license_file" ] || die "$path@$version: no license file found in $dir"
@@ -209,7 +213,9 @@ while IFS='|' read -r path version dir; do
 		;;
 	esac
 
-	emit "$path" "$version" "$spdx" "https://$path" "$license_file"
+	url="https://$path"
+	[ -z "$replaced_by" ] || url="https://$replaced_by"
+	emit "$path" "$version" "$spdx" "$url" "$license_file" "$replaced_by"
 	module_version["$path"]="$version"
 	count=$((count + 1))
 done <"$modules_file"

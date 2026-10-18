@@ -58,7 +58,7 @@ func TestThePromptSaysWhoAndWhat(t *testing.T) {
 		promptTitle,
 		"They say they're “João da TI”.",
 		promptNoCheck,
-		"See your screen", "Use your mouse and keyboard", "Share your clipboard", "Send and receive files",
+		"See your screen", "Use your mouse and keyboard", "Share what you copy, both ways, while the session lasts", "Send and receive files",
 		promptWarning,
 		"Declines by itself in 1:40",
 	} {

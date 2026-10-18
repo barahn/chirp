@@ -23,7 +23,7 @@ AGPL-3.0-only; see LICENSING.md.
 
 ## Contents
 
-- 65 Go modules
+- 66 Go modules
 - 7 embedded font(s)
 - 0 vendored source tree(s)
 
@@ -104,9 +104,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### fyne.io/systray
 
-- Version: `v1.12.3-0.20260810170012-af4e8e793ec4`
+- Version: `v1.12.3-0.20261018144600-58a1288869fe`
+- Built from: `github.com/barahn/systray`, a modified fork of fyne.io/systray
 - License: Apache-2.0
-- Homepage: https://fyne.io/systray
+- Homepage: https://github.com/barahn/systray
 
 ```
 
@@ -341,6 +342,41 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
+```
+
+### github.com/FyshOS/fancyfs
+
+- Version: `v0.0.1`
+- License: BSD-3-Clause
+- Homepage: https://github.com/FyshOS/fancyfs
+
+```
+Copyright (C) 2025 FyshOS developers (see AUTHORS)
+All rights reserved.
+
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+    * Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+    * Neither the name of Fyne.io nor the
+      names of its contributors may be used to endorse or promote products
+      derived from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY
+DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
 ```
 
 ### github.com/anthonynsimon/bild
@@ -586,7 +622,7 @@ SOFTWARE.
 
 ### github.com/barahn/remotekit
 
-- Version: `v0.6.1`
+- Version: `v0.7.0`
 - License: Apache-2.0
 - Homepage: https://github.com/barahn/remotekit
 
@@ -1262,7 +1298,7 @@ For more information, please refer to <https://unlicense.org/>
 
 ### github.com/godbus/dbus/v5
 
-- Version: `v5.2.2`
+- Version: `v5.2.4`
 - License: BSD-2-Clause
 - Homepage: https://github.com/godbus/dbus/v5
 
@@ -1867,7 +1903,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 ### github.com/pion/dtls/v3
 
-- Version: `v3.1.9`
+- Version: `v3.1.10`
 - License: MIT
 - Homepage: https://github.com/pion/dtls/v3
 
@@ -1885,7 +1921,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 ### github.com/pion/ice/v4
 
-- Version: `v4.4.4`
+- Version: `v4.4.7`
 - License: MIT
 - Homepage: https://github.com/pion/ice/v4
 
@@ -1939,7 +1975,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 ### github.com/pion/mdns/v2
 
-- Version: `v2.2.1`
+- Version: `v2.2.2`
 - License: MIT
 - Homepage: https://github.com/pion/mdns/v2
 
@@ -2035,7 +2071,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 ### github.com/pion/sctp
 
-- Version: `v1.11.3`
+- Version: `v1.12.0`
 - License: MIT
 - Homepage: https://github.com/pion/sctp
 
@@ -2071,7 +2107,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 ### github.com/pion/srtp/v3
 
-- Version: `v3.1.0`
+- Version: `v3.1.3`
 - License: MIT
 - Homepage: https://github.com/pion/srtp/v3
 
@@ -2143,7 +2179,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 ### github.com/pion/webrtc/v4
 
-- Version: `v4.2.22`
+- Version: `v4.2.23`
 - License: MIT
 - Homepage: https://github.com/pion/webrtc/v4
 
@@ -2586,7 +2622,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### golang.org/x/image
 
-- Version: `v0.46.0`
+- Version: `v0.47.0`
 - License: BSD-3-Clause
 - Homepage: https://golang.org/x/image
 
@@ -2658,7 +2694,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### golang.org/x/sys
 
-- Version: `v0.48.0`
+- Version: `v0.49.0`
 - License: BSD-3-Clause
 - Homepage: https://golang.org/x/sys
 
@@ -2694,7 +2730,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### golang.org/x/text
 
-- Version: `v0.42.0`
+- Version: `v0.43.0`
 - License: BSD-3-Clause
 - Homepage: https://golang.org/x/text
 
