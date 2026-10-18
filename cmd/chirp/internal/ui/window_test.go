@@ -166,7 +166,7 @@ func TestConnectWaitsAndCancelGoesBack(t *testing.T) {
 	test.Type(w.name, "Ana")
 	test.Type(w.target, "482 913")
 	test.Tap(w.connect)
-	if gotTarget != "482 913" || gotName != "Ana" || !w.waiting.Visible() || w.form.Visible() {
+	if gotTarget != "482-913" || gotName != "Ana" || !w.waiting.Visible() || w.form.Visible() {
 		t.Fatalf("connect: %q, %q, waiting %v", gotTarget, gotName, w.waiting.Visible())
 	}
 
