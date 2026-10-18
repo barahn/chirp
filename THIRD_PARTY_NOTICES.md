@@ -104,7 +104,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### fyne.io/systray
 
-- Version: `v1.12.3-0.20261018185004-9ca6c640949d`
+- Version: `v1.12.3-0.20261018211529-cdee0ff04a4d`
 - Built from: `github.com/barahn/systray`, a modified fork of fyne.io/systray
 - License: Apache-2.0
 - Homepage: https://github.com/barahn/systray
