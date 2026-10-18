@@ -28,6 +28,10 @@ import (
 // moment, and it stops at once, but turning one on again needs a new
 // request. Taking Screen view back is End.
 //
+// While files are allowed, the bar has Send a file, and it says when a file
+// arrives, with Open folder (#134). Everything else the person helping does
+// with the clipboard and files is told in system notifications (Alert).
+//
 // Fyne cannot keep a window above every other one; until a per-OS shim does
 // (#77), the bar opens as its own small window and asks for focus.
 
@@ -41,6 +45,7 @@ type sessionBar struct {
 	clock   *widget.Label
 	end     *widget.Button
 	perms   []*permSwitch
+	tools   *ownerTools
 	granted []string
 	closed  func()
 	done    bool
@@ -77,6 +82,7 @@ func (w *Window) showSessionBar(s client.ActiveSession) {
 			}
 			b.granted = slices.DeleteFunc(b.granted, func(p string) bool { return p == sw.name })
 			b.who.SetText(barText(s.Name, b.granted))
+			b.tools.granted(b.granted)
 			if w.OnRevoke != nil {
 				w.OnRevoke(s.ID, sw.name)
 			}
@@ -91,12 +97,15 @@ func (w *Window) showSessionBar(s client.ActiveSession) {
 			content.Add(sw)
 		}
 	}
+	b.tools = newOwnerTools(b)
+	content.Add(b.tools.content())
 	b.win.SetContent(container.NewPadded(content))
 	b.closed = b.endNow
 	b.win.SetCloseIntercept(b.closed)
 	b.win.SetFixedSize(true)
 	b.win.Show()
 	b.win.RequestFocus()
+	w.updateTray()
 
 	if w.animating {
 		go b.run()
@@ -147,6 +156,7 @@ func (b *sessionBar) dismiss() {
 	b.win.Close()
 	if b.w.bar == b {
 		b.w.bar = nil
+		b.w.updateTray()
 	}
 }
 

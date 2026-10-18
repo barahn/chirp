@@ -5,6 +5,7 @@ package ui
 
 import (
 	"image"
+	"io"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -19,13 +20,25 @@ import (
 )
 
 // Remote is the controller's window onto the other computer (docs/ux.md,
-// During a session): its screen fills the window, under a toolbar with End.
-// Closing the window ends the session too.
+// During a session): its screen fills the window, under a toolbar with Send a
+// file and End. Files dropped on the window are sent too. Closing the window
+// ends the session. The clipboard needs no button: cmd/chirp syncs it both
+// ways while the other person allows it (#134).
 //
-// Show and Notice may be called from any goroutine; everything else from
-// Fyne's.
+// Show, Notice, Granted and FileReceived may be called from any goroutine;
+// everything else from Fyne's.
 type Remote struct {
+	// SendFile is how Send a file reaches the other computer: cmd/chirp
+	// sets it on Fyne's goroutine, right after OpenRemote. It is called off
+	// Fyne's goroutine, and returns once the other end has saved the file or
+	// refused it.
+	SendFile func(name string, f io.ReadSeeker, progress func(sent, total int64)) error
+
+	w      *Window
+	end    func()
+	app    fyne.App
 	win    fyne.Window
+	tools  *remoteTools
 	view   *remoteView
 	notice *widget.Label
 	// limits says what the other person has not allowed; it stays while
@@ -43,7 +56,7 @@ type Remote struct {
 // window, calls end once: it ends this session and no other, so a window
 // still closing from an earlier session cannot cancel a newer attempt.
 func (w *Window) OpenRemote(input func(bark.InputEvent), end func()) *Remote {
-	r := &Remote{win: w.app.NewWindow(tr(remoteTitle))}
+	r := &Remote{w: w, app: w.app, win: w.app.NewWindow(tr(remoteTitle))}
 	ended := false
 	finish := func() {
 		if ended {
@@ -69,12 +82,20 @@ func (w *Window) OpenRemote(input func(bark.InputEvent), end func()) *Remote {
 	r.limits.Hide()
 	r.stop = widget.NewButton(tr(remoteEnd), finish)
 	r.stop.Importance = widget.DangerImportance
-	bar := container.NewBorder(nil, nil, nil, r.stop, container.NewVBox(r.limits, r.notice))
+	r.tools = newRemoteTools(r)
+	bar := container.NewVBox(
+		container.NewBorder(nil, nil, nil, r.stop, r.tools.buttons()),
+		r.limits, r.notice, r.tools.status,
+	)
 	r.win.SetContent(container.NewBorder(bar, nil, nil, nil, r.view))
+	r.win.SetOnDropped(r.tools.dropped)
 	r.win.SetCloseIntercept(finish)
 	r.win.Resize(fyne.NewSize(1024, 640))
 	r.win.Show()
 	r.win.Canvas().Focus(r.view)
+	r.end = finish
+	w.remote = r
+	w.updateTray()
 	return r
 }
 
@@ -111,8 +132,8 @@ func (r *Remote) Notice(kind string) {
 
 // Granted takes what the other person allows, as their runner announces it:
 // at the start and whenever they take a permission back. Without the mouse
-// and keyboard the window says so and sends no input. It may be called from
-// any goroutine.
+// and keyboard the window says so and sends no input; Send a file works only
+// while files are allowed. It may be called from any goroutine.
 func (r *Remote) Granted(permissions []string) {
 	control := slices.Contains(permissions, "remote_control")
 	r.control.Store(control)
@@ -120,6 +141,7 @@ func (r *Remote) Granted(permissions []string) {
 		if r.closed {
 			return
 		}
+		r.tools.granted(permissions)
 		if text := limitsText(permissions); text != "" {
 			r.limits.SetText(text)
 			r.limits.Show()
@@ -130,6 +152,16 @@ func (r *Remote) Granted(permissions []string) {
 	})
 }
 
+// FileReceived says a file the other person sent was saved in folder. It
+// may be called from any goroutine.
+func (r *Remote) FileReceived(name, folder string) {
+	fyne.Do(func() {
+		if !r.closed {
+			r.tools.received(name, folder)
+		}
+	})
+}
+
 // Close closes the window.
 func (r *Remote) Close() {
 	if r.closed {
@@ -137,6 +169,10 @@ func (r *Remote) Close() {
 	}
 	r.closed = true
 	r.win.Close()
+	if r.w.remote == r {
+		r.w.remote = nil
+		r.w.updateTray()
+	}
 }
 
 // frameMailbox hands frames from the decoder's goroutine to Fyne's through

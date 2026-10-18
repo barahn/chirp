@@ -8,15 +8,11 @@ package client
 // owner's side has to decide this itself: a permission dropped here is never
 // shown in the consent prompt, and so never granted.
 //
-// clipboard: once remotekit's runner is granted it, the runner polls the
-// system clipboard and sends every change to the controller -- through the
-// relay, too, while a viewer has no data channel. That reads the owner's
-// clipboard without the owner pasting, which decision 4 in
-// docs/product-model.md rules out. It stays withheld until the clipboard
-// moves only on an explicit action at either end (barahn/chirp#79).
-var withheld = map[string]bool{
-	"clipboard": true,
-}
+// None is withheld now. The clipboard was from v0.3.1, because it went to the
+// controller without the owner being asked or told (GHSA-8jh9-jw95-3v27). It
+// is now a switch in the prompt, off until the owner turns it on, every sync
+// is told to the owner, and passwords never leave (barahn/chirp#134).
+var withheld = map[string]bool{}
 
 // Grantable returns the permissions in requested that this Chirp may grant,
 // in their order: everything but the withheld ones. A name Chirp does not
