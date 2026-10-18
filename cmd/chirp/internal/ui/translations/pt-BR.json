@@ -90,6 +90,8 @@
   "Too many Chirps are running on this network. Close one and try again.": "Há Chirps demais abertos nesta rede. Feche um e tente de novo.",
   "Too many tries from this network. Try again in a few minutes.": "Muitas tentativas a partir desta rede. Tente de novo em alguns minutos.",
   "Try again": "Tentar de novo",
+  "Turn alerts off": "Desligar os alertas",
+  "Turn alerts on": "Ligar os alertas",
   "Turn on only what this call needs. Allow lets in what is on.": "Ligue só o que este atendimento precisa. Permitir libera o que estiver ligado.",
   "Turn one off to take it back. It stays off until the next request.": "Desligue uma para tirar a permissão. Ela fica desligada até o próximo pedido.",
   "Typing their code lets you control their computer, after they allow it.": "Digitar o código da pessoa deixa você controlar o computador dela, depois que ela permitir.",

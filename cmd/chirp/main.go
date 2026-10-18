@@ -178,6 +178,8 @@ func main() {
 	tray := newSystemTray(a)
 	tray.prepare()
 	w.Tray = tray
+	// Alerts go away on their own, one at a time (notify_linux.go).
+	w.SetNotify(newNotifier(a))
 	// The relay ends a session only when its owner gives the registration
 	// up, so ending one replaces the code and link too.
 	w.OnEndSession = owner.NewCode
