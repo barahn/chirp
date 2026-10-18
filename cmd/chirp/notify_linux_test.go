@@ -37,8 +37,8 @@ func TestAlertsExpireAndReplaceEachOther(t *testing.T) {
 		t.Errorf("replaces %d then %d, want 0 then the first's id 42", calls[0].replaces, calls[1].replaces)
 	}
 	for _, c := range calls {
-		if c.timeout != int32(alertTimeout.Milliseconds()) || c.timeout <= 0 {
-			t.Errorf("timeout %d ms, want %d", c.timeout, alertTimeout.Milliseconds())
+		if c.timeout != alertTimeoutMS || c.timeout <= 0 {
+			t.Errorf("timeout %d ms, want %d", c.timeout, alertTimeoutMS)
 		}
 		if _, ok := c.hints["image-data"]; !ok {
 			t.Error("no image-data hint: the bird is sent in memory, not from a file")
