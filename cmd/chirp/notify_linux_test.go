@@ -20,7 +20,7 @@ type notifyCall struct {
 }
 
 // Seen end to end on Xfce: Fyne's notifications never expire, and pile up.
-// Chirp's go away on their own after alertTimeout, and each replaces the one
+// Chirp's go away on their own after alertTimeoutMS, and each replaces the one
 // before, so one alert at a time is on screen.
 func TestAlertsExpireAndReplaceEachOther(t *testing.T) {
 	var calls []notifyCall
