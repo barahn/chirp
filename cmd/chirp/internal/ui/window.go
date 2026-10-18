@@ -69,6 +69,8 @@ type Window struct {
 	// remote is the window onto a computer this machine is helping, while
 	// one is open.
 	remote *Remote
+	// mainHidden is set while the main window is in the tray for a session.
+	mainHidden bool
 
 	// The header: the bird, whose pose says how this machine stands, and
 	// the wordmark.
