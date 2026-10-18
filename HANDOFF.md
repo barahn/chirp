@@ -196,6 +196,7 @@ cmd/chirp/notify.go
 cmd/chirp/notify_linux.go
 cmd/chirp/notify_linux_test.go
 cmd/chirp/notify_other.go
+cmd/chirp/notify_windows.go
 cmd/chirp/tray.go
 cmd/chirp/tray_test.go
 deploy/caddy/Caddyfile
