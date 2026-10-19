@@ -86,8 +86,8 @@ only when all of these hold:
   control, clipboard, files, the tray and its alerts, with the decisions
   behind them recorded in `docs/product-model.md`.
 - **The open decisions are settled:** administrator rights (#117), what
-  Chirp writes to disk (#49), and macOS's permissions (#51) if macOS is in
-  1.0, which the platform list (#132) decides.
+  Chirp writes to disk (#49), and macOS's permissions (#51), since macOS is
+  in 1.0 (#132).
 - **The binaries are signed** (#69).
 - **No security issue of high severity or above is open**, in Chirp or in
   remotekit.
@@ -144,7 +144,7 @@ and it ends when the platform reaches the full program.
 | 2 | Windows on ARM | The x64 build runs under emulation. A native arm64 build is planned. |
 | 2 | Linux arm64 | Planned, on the same glibc 2.35 baseline. |
 | 2 | Linux on wlroots (Sway, Hyprland) | No RemoteDesktop portal, so a helper can see the screen but not control it. |
-| 3 | macOS | Waits for barahn/remotekit#72. A helper-only build before then would be an exception under the rule above. |
+| 1 from 1.0 | macOS | In 1.0, but waits for barahn/remotekit#72 to capture the screen and inject input. A helper-only build before then would be an exception under the rule above. |
 | — | Windows 7 and 8, 32-bit systems | Not supported: Go no longer builds for them. |
 
 ### Signing, for now without paid certificates
