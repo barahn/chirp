@@ -180,8 +180,9 @@ func main() {
 	w.Tray = tray
 	// Alerts go away on their own, one at a time (notify_linux.go).
 	w.SetNotify(newNotifier(a))
-	// During a session only the tray icon shows Chirp runs.
-	w.KeepOffTaskbar = keepOffTaskbar
+	// During a session only the tray icon shows Chirp runs, and the
+	// session bar stays above other windows.
+	w.PinBar = pinBar
 	// The relay ends a session only when its owner gives the registration
 	// up, so ending one replaces the code and link too.
 	w.OnEndSession = owner.NewCode

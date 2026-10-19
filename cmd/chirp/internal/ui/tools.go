@@ -247,7 +247,7 @@ func (t *remoteTools) received(name, folder string) {
 
 // chooseFile asks which file to send.
 func (t *remoteTools) chooseFile() {
-	chooseFile(t.r.app, func(uri fyne.URI) { t.send([]fyne.URI{uri}) })
+	chooseFile(t.r.app, func(uri fyne.URI) { t.send([]fyne.URI{uri}) }, nil)
 }
 
 // dropped sends the files dropped on the window.
@@ -306,8 +306,9 @@ func localPaths(uris []fyne.URI) []string {
 // chooseFile opens the file picker in a window of its own, and hands the file
 // chosen to picked. Fyne draws a dialog inside the window it is given: inside
 // the session bar, small and of fixed size, it did not fit, and as a modal it
-// left the bar's buttons unclickable. Its window closes with it.
-func chooseFile(a fyne.App, picked func(fyne.URI)) {
+// left the bar's buttons unclickable. Its window closes with it. shown, if
+// not nil, gets the window once it shows.
+func chooseFile(a fyne.App, picked func(fyne.URI), shown func(fyne.Window)) {
 	win := a.NewWindow(tr("Choose a file to send"))
 	win.Resize(fyne.NewSize(800, 560))
 	d := dialog.NewFileOpen(func(f fyne.URIReadCloser, err error) {
@@ -322,6 +323,9 @@ func chooseFile(a fyne.App, picked func(fyne.URI)) {
 	d.Resize(fyne.NewSize(800, 560))
 	win.Show()
 	d.Show()
+	if shown != nil {
+		shown(win)
+	}
 }
 
 // sendOneFile sends the file at path and says how it went. progress is
@@ -396,6 +400,7 @@ func (o *ownerTools) say(text string) {
 	o.status.SetText(text)
 	o.status.Show()
 	o.b.win.Content().Refresh()
+	o.b.fit()
 }
 
 // chooseFile asks which file to send to the person helping.
@@ -423,13 +428,18 @@ func (o *ownerTools) chooseFile() {
 				o.say(text)
 			})
 		})
+	}, func(win fyne.Window) {
+		// The bar stays above other windows; the picker goes above it.
+		if pin := o.b.w.PinBar; pin != nil {
+			pin(win, o.b.win)
+		}
 	})
 }
 
 // received says a file arrived, and where.
 func (o *ownerTools) received(name, folder string) {
 	o.folder = folder
-	o.open.Show()
+	o.open.Show() // say fits the bar to it
 	o.say(trf("They sent you “%s”. It's in %s.", claim(name), shortFolder(folder)))
 }
 

@@ -61,10 +61,13 @@ type Window struct {
 	// Tray is the system tray icon, shown only during a session. Set it
 	// before the first session; without it there is none.
 	Tray Tray
-	// KeepOffTaskbar takes a shown window off the taskbar, where the system
-	// allows it; cmd/chirp provides it per OS. The session bar uses it, so
-	// that during a session only the tray icon shows Chirp runs.
-	KeepOffTaskbar func(fyne.Window)
+	// PinBar keeps a shown window above every other window and off the
+	// taskbar, owned by owner, where the system allows it; cmd/chirp
+	// provides it per OS. The session bar is pinned, owned by the main
+	// window, so that during a session only the tray icon shows Chirp runs
+	// and the bar cannot be lost behind other windows; the file picker it
+	// opens is pinned above it, owned by it.
+	PinBar func(win, owner fyne.Window)
 
 	// notify shows a system notification, and quit quits Chirp; tests
 	// replace them.
