@@ -2,8 +2,10 @@
 #
 # Checks that usechirp.app serves the site as this repository has it: each page
 # and script byte for byte, and the headers in
-# .cloudflare/rulesets/response-headers.json. scripts/check-site.sh checks the
-# source; this checks what Cloudflare, in front of GitHub Pages, actually
+# .cloudflare/rulesets/response-headers.json, plus Strict-Transport-Security,
+# which Cloudflare sets from the zone's HSTS setting (SSL/TLS > Edge
+# Certificates) and drops from a transform rule. scripts/check-site.sh checks
+# the source; this checks what Cloudflare, in front of GitHub Pages, actually
 # sends, so a dashboard setting that starts rewriting the pages (email
 # obfuscation did, on 2026-10-12, and broke the security contact) fails here.
 #
@@ -32,6 +34,10 @@ base="${SITE_URL:-https://usechirp.app}"
 wait=0
 if [ "${1:-}" = "--wait" ]; then wait="${2:?--wait needs seconds}"; fi
 
+# Strict-Transport-Security as the zone's HSTS setting sends it: a year,
+# includeSubDomains and preload. See docs/devsecops.md.
+hsts="max-age=31536000; includeSubDomains; preload"
+
 # The JavaScript Detections snippet, with r and t emptied.
 jsd="<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML=\"window.__CF\$cv\$params={r:'',t:''};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);\";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>"
 
@@ -44,9 +50,10 @@ trap 'rm -rf "$work"' EXIT
 "$root/scripts/build-site.sh" "$work/site" >/dev/null
 built="$work/site"
 
-# check_headers <label> <headers-file> <path> prints each ruleset header that
-# is missing or different, and returns non-zero if any is. Under status/, the
-# usechirp_status_csp rule's headers replace the first rule's.
+# check_headers <label> <headers-file> <path> prints each ruleset header, and
+# Strict-Transport-Security, that is missing or different, and returns non-zero
+# if any is. Under status/, the usechirp_status_csp rule's headers replace the
+# first rule's.
 check_headers() {
 	local label="$1" file="$2" path="$3" fail=0 name want have status=false
 	case "$path" in status | status/*) status=true ;; esac
@@ -56,10 +63,12 @@ check_headers() {
 			echo "$label: $name is \"$have\", want \"$want\""
 			fail=1
 		fi
-	done < <(jq -r --argjson status "$status" '.rules[0].action_parameters.headers
+	done < <(
+		jq -r --argjson status "$status" '.rules[0].action_parameters.headers
 		+ (if $status then (.rules[] | select(.ref == "usechirp_status_csp") | .action_parameters.headers) else {} end)
 		| to_entries[] | "\(.key)\t\(.value.value)"' \
-		"$root/.cloudflare/rulesets/response-headers.json")
+		"$root/.cloudflare/rulesets/response-headers.json"
+		printf 'Strict-Transport-Security\t%s\n' "$hsts")
 	return "$fail"
 }
 
@@ -121,4 +130,4 @@ until out="$(check_once)"; do
 	fi
 	sleep 30
 done
-echo "$base: pages and scripts as in the repository, headers as in the ruleset"
+echo "$base: pages and scripts as in the repository, headers as in the ruleset, HSTS on"
