@@ -247,7 +247,7 @@ func (t *remoteTools) received(name, folder string) {
 
 // chooseFile asks which file to send.
 func (t *remoteTools) chooseFile() {
-	chooseFile(t.r.win, func(uri fyne.URI) { t.send([]fyne.URI{uri}) })
+	chooseFile(t.r.app, func(uri fyne.URI) { t.send([]fyne.URI{uri}) })
 }
 
 // dropped sends the files dropped on the window.
@@ -303,17 +303,25 @@ func localPaths(uris []fyne.URI) []string {
 	return paths
 }
 
-// chooseFile opens the file picker over win, and hands the file chosen to
-// picked.
-func chooseFile(win fyne.Window, picked func(fyne.URI)) {
-	dialog.NewFileOpen(func(f fyne.URIReadCloser, err error) {
+// chooseFile opens the file picker in a window of its own, and hands the file
+// chosen to picked. Fyne draws a dialog inside the window it is given: inside
+// the session bar, small and of fixed size, it did not fit, and as a modal it
+// left the bar's buttons unclickable. Its window closes with it.
+func chooseFile(a fyne.App, picked func(fyne.URI)) {
+	win := a.NewWindow(tr("Choose a file to send"))
+	win.Resize(fyne.NewSize(800, 560))
+	d := dialog.NewFileOpen(func(f fyne.URIReadCloser, err error) {
 		if err != nil || f == nil {
 			return
 		}
 		uri := f.URI()
 		_ = f.Close()
 		picked(uri)
-	}, win).Show()
+	}, win)
+	d.SetOnClosed(win.Close)
+	d.Resize(fyne.NewSize(800, 560))
+	win.Show()
+	d.Show()
 }
 
 // sendOneFile sends the file at path and says how it went. progress is
@@ -395,7 +403,7 @@ func (o *ownerTools) chooseFile() {
 	if o.sending {
 		return
 	}
-	chooseFile(o.b.win, func(uri fyne.URI) {
+	chooseFile(o.b.w.app, func(uri fyne.URI) {
 		paths := localPaths([]fyne.URI{uri})
 		send, id := o.b.w.OnSendFile, o.b.session.ID
 		if len(paths) == 0 || send == nil {

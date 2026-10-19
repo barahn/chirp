@@ -18,6 +18,7 @@
   "Chirp is running as administrator: they'll have full control of this computer, and can change anything on it.": "O Chirp está rodando como administrador: a pessoa terá controle total deste computador e poderá mudar qualquer coisa nele.",
   "Chirp's server gave an address that can't be used. Nothing was connected.": "O servidor do Chirp passou um endereço que não pode ser usado. Nada foi conectado.",
   "Chirp's server is busy. Try again shortly.": "O servidor do Chirp está ocupado. Tente de novo daqui a pouco.",
+  "Choose a file to send": "Escolha um arquivo para enviar",
   "Code copied.": "Código copiado.",
   "Connect": "Conectar",
   "Copy link": "Copiar link",

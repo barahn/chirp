@@ -348,3 +348,31 @@ func TestTheTrayTurnsAlertsOffAndOn(t *testing.T) {
 		t.Fatalf("%d notifications after turning alerts on, want 1", len(*sent))
 	}
 }
+
+// The file picker opens in a window of its own. Drawn inside the session
+// bar -- a small window of fixed size -- it did not fit, so nothing showed,
+// and as a modal it left Send a file and Open folder unclickable: seen on
+// Windows with v0.5.0-rc.2.
+func TestTheFilePickerLeavesTheBarUsable(t *testing.T) {
+	w, _, _ := alertWindow(t)
+	started(w, "Ana")
+	before := len(w.app.Driver().AllWindows())
+	w.bar.tools.chooseFile()
+	if top := w.bar.win.Canvas().Overlays().Top(); top != nil {
+		t.Fatal("the file picker covers the session bar")
+	}
+	if after := len(w.app.Driver().AllWindows()); after != before+1 {
+		t.Fatalf("%d windows after Send a file, want %d: the picker in a window of its own", after, before+1)
+	}
+}
+
+func TestTheRemotesFilePickerHasItsOwnWindowToo(t *testing.T) {
+	inPlace(t)
+	w := newWindow(t)
+	r := w.OpenRemote(func(bark.InputEvent) {}, func() {})
+	defer r.Close()
+	r.tools.chooseFile()
+	if top := r.win.Canvas().Overlays().Top(); top != nil {
+		t.Fatal("the file picker covers the remote screen")
+	}
+}
