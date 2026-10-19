@@ -366,6 +366,21 @@ func TestTheFilePickerLeavesTheBarUsable(t *testing.T) {
 	}
 }
 
+// The bar stays above other windows, so the picker it opens is pinned above
+// it, owned by it: seen on Windows, it opened behind the bar, half covered,
+// and with a taskbar button of its own.
+func TestTheBarsFilePickerIsPinnedAboveIt(t *testing.T) {
+	w, _, _ := alertWindow(t)
+	started(w, "Ana")
+	type pin struct{ win, owner fyne.Window }
+	var pinned []pin
+	w.PinBar = func(win, owner fyne.Window) { pinned = append(pinned, pin{win, owner}) }
+	w.bar.tools.chooseFile()
+	if len(pinned) != 1 || pinned[0].owner != w.bar.win || pinned[0].win == w.bar.win {
+		t.Fatalf("pinned %+v, want the picker alone, owned by the bar", pinned)
+	}
+}
+
 func TestTheRemotesFilePickerHasItsOwnWindowToo(t *testing.T) {
 	inPlace(t)
 	w := newWindow(t)
@@ -378,14 +393,37 @@ func TestTheRemotesFilePickerHasItsOwnWindowToo(t *testing.T) {
 }
 
 // During a session Chirp keeps to the tray: the session bar asks to stay off
-// the taskbar, so only the tray icon shows that Chirp runs. Seen on Windows
-// with v0.5.0-rc.2: the bar still had its taskbar button.
-func TestTheSessionBarStaysOffTheTaskbar(t *testing.T) {
+// the taskbar, so only the tray icon shows that Chirp runs, and above other
+// windows, so it cannot be lost behind them. Seen on Windows with
+// v0.5.0-rc.2: the bar still had its taskbar button; with rc.3, it was off
+// the taskbar but buried, out of reach.
+func TestTheSessionBarIsPinned(t *testing.T) {
 	w, _, _ := alertWindow(t)
-	var kept []fyne.Window
-	w.KeepOffTaskbar = func(win fyne.Window) { kept = append(kept, win) }
+	type pin struct{ win, owner fyne.Window }
+	var pinned []pin
+	w.PinBar = func(win, owner fyne.Window) { pinned = append(pinned, pin{win, owner}) }
 	started(w, "Ana")
-	if len(kept) != 1 || kept[0] != w.bar.win {
-		t.Fatalf("kept %d windows off the taskbar, want the session bar alone", len(kept))
+	if len(pinned) != 1 || pinned[0].win != w.bar.win || pinned[0].owner != w.win {
+		t.Fatalf("pinned %+v, want the session bar alone, owned by the main window", pinned)
 	}
+}
+
+// The bar is of fixed size; what it says after it opens -- a file sent, a
+// file received and Open folder -- must not fall below its edge, where on
+// Windows the owner never saw it.
+func TestTheBarGrowsToShowWhatHappened(t *testing.T) {
+	w, _, _ := alertWindow(t)
+	started(w, "Ana")
+	b := w.bar
+	fits := func(when string) {
+		t.Helper()
+		if got, need := b.win.Content().Size().Height, b.win.Content().MinSize().Height; got < need {
+			t.Fatalf("%s: the bar is %v tall, its content needs %v", when, got, need)
+		}
+	}
+	fits("opened")
+	b.tools.say("Sent “notes.txt”.")
+	fits("after a file was sent")
+	b.tools.received("photo.jpg", "/home/ana/Downloads/Chirp")
+	fits("after a file arrived")
 }

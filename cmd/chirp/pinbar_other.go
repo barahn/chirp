@@ -7,5 +7,5 @@ package main
 
 import "fyne.io/fyne/v2"
 
-// keepOffTaskbar does nothing on macOS yet: Chirp has no macOS build.
-func keepOffTaskbar(fyne.Window) {}
+// pinBar does nothing on macOS yet: Chirp has no macOS build.
+func pinBar(_, _ fyne.Window) {}

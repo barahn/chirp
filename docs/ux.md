@@ -184,7 +184,7 @@ written to make an unexpected request easy to decline. It is built in
   which both decline.
 - **It asks for attention and carries no bird and no brand word.** It opens
   as its own window and asks for focus. Keeping it above every other window
-  needs the same per-OS shim as the session bar (§ During a session).
+  needs the per-OS shim the session bar uses (§ During a session).
 - **After the answer** the main window says what was decided. A session that
   was let in can be ended there; since the relay ends a session only when its
   owner gives the registration up, ending one also replaces the code and link.
@@ -234,9 +234,13 @@ the code has been replaced.
 The bar is built (`cmd/chirp/internal/ui/sessionbar.go`, barahn/chirp#77):
 it opens as its own window when a session the owner allowed starts being
 served and closes when it ends, whichever end ended it. The name is cleaned
-as in the prompt. Closing the bar ends the session, like *End*. What is
-missing is staying above every other window: Fyne has no portable way, so
-that waits on a small per-OS shim, which the consent prompt needs too.
+as in the prompt. Closing the bar ends the session, like *End*. Fyne has no
+portable way to keep a window above the others, so a small per-OS shim does
+(`cmd/chirp/pinbar_*.go`): on Windows the bar is owned by the main window,
+which keeps it off the taskbar, and topmost; on X11 it asks the window
+manager for `_NET_WM_STATE_ABOVE` and to skip the taskbar. Under Wayland and
+on macOS nothing is done yet. The bar grows to show what it adds after it
+opens. The consent prompt does not use the shim yet.
 
 **On the controller's machine,** the remote screen fills the window, with a
 toolbar for monitors, clipboard, files and *End*. So far the toolbar has

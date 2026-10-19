@@ -32,8 +32,9 @@ import (
 // arrives, with Open folder (#134). Everything else the person helping does
 // with the clipboard and files is told in system notifications (Alert).
 //
-// Fyne cannot keep a window above every other one; until a per-OS shim does
-// (#77), the bar opens as its own small window and asks for focus.
+// Fyne cannot keep a window above every other one, so the bar opens as its
+// own small window, asks for focus, and Window.PinBar -- a per-OS shim in
+// cmd/chirp -- keeps it above the others and off the taskbar.
 
 type sessionBar struct {
 	w       *Window
@@ -103,9 +104,10 @@ func (w *Window) showSessionBar(s client.ActiveSession) {
 	b.closed = b.endNow
 	b.win.SetCloseIntercept(b.closed)
 	b.win.SetFixedSize(true)
+	b.fit()
 	b.win.Show()
-	if w.KeepOffTaskbar != nil {
-		w.KeepOffTaskbar(b.win)
+	if w.PinBar != nil {
+		w.PinBar(b.win, w.win)
 	}
 	b.win.RequestFocus()
 	w.updateTray()
@@ -113,6 +115,19 @@ func (w *Window) showSessionBar(s client.ActiveSession) {
 	if w.animating {
 		go b.run()
 	}
+}
+
+// fit sizes the bar to what it holds. It is of fixed size, so a line added
+// after it opens -- a file sent, a file received, Open folder -- would fall
+// below its edge, out of sight.
+func (b *sessionBar) fit() {
+	need := b.win.Content().MinSize()
+	if b.win.Padded() {
+		// Resize takes the canvas's size, which pads the content.
+		pad := 2 * theme.Padding()
+		need = need.AddWidthHeight(pad, pad)
+	}
+	b.win.Resize(need.Max(b.win.Canvas().Size()))
 }
 
 // run ticks the clock once a second until the bar goes.
