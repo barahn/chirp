@@ -376,3 +376,16 @@ func TestTheRemotesFilePickerHasItsOwnWindowToo(t *testing.T) {
 		t.Fatal("the file picker covers the remote screen")
 	}
 }
+
+// During a session Chirp keeps to the tray: the session bar asks to stay off
+// the taskbar, so only the tray icon shows that Chirp runs. Seen on Windows
+// with v0.5.0-rc.2: the bar still had its taskbar button.
+func TestTheSessionBarStaysOffTheTaskbar(t *testing.T) {
+	w, _, _ := alertWindow(t)
+	var kept []fyne.Window
+	w.KeepOffTaskbar = func(win fyne.Window) { kept = append(kept, win) }
+	started(w, "Ana")
+	if len(kept) != 1 || kept[0] != w.bar.win {
+		t.Fatalf("kept %d windows off the taskbar, want the session bar alone", len(kept))
+	}
+}
