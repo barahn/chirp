@@ -12,8 +12,8 @@ github.com/barahn/remotekit v0.7.0 h1:K3XhNtdJXTUCdynVbXOC9gyzYKuemMIcnjYkHtVbuT
 github.com/barahn/remotekit v0.7.0/go.mod h1:VCNuzo7MOIAxHgoBWfW4KmJ3vrDNST05Y4oSvMqyBYc=
 github.com/barahn/remotekit/signal/nostr v0.1.0 h1:wwb8R41OMgQkjRtOl+pe8AsUXELRjbdU4Y5txNiSrBQ=
 github.com/barahn/remotekit/signal/nostr v0.1.0/go.mod h1:GZJfE3baEd17+2I5RJ5OaQKFmbu9Ec9Df6Rg7cj/f20=
-github.com/barahn/systray v1.12.3-0.20261018211529-cdee0ff04a4d h1:JtgaKMIk+BNLwYfhBuff92fJWkRAomKsh7ksUTPPZko=
-github.com/barahn/systray v1.12.3-0.20261018211529-cdee0ff04a4d/go.mod h1:RVwqP9nYMo7h5zViCBHri2FgjXF7H2cub7MAq4NSoLs=
+github.com/barahn/systray v1.12.3-0.20261019144530-2f6e39459a4f h1:brgvKhwGFJVCpCDoxekf1DTxaRpyrxBN8KhTsVldfrI=
+github.com/barahn/systray v1.12.3-0.20261019144530-2f6e39459a4f/go.mod h1:RVwqP9nYMo7h5zViCBHri2FgjXF7H2cub7MAq4NSoLs=
 github.com/btcsuite/btcd/btcec/v2 v2.5.0 h1:KioMXOWa76b86sTZZOmbzv/ldaQCmB8KFAyn5PbB8E8=
 github.com/btcsuite/btcd/btcec/v2 v2.5.0/go.mod h1:+K/MYXcLBtHEQjRbjHuJChuybk4LCgjdjgRwil+e+Kk=
 github.com/btcsuite/btcd/chainhash/v2 v2.0.0 h1:PMLlSloHJuEeB80XG9EjpXWNEKAZAMLl6YHZ6YsEuoA=
