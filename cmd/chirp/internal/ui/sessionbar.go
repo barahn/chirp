@@ -104,6 +104,9 @@ func (w *Window) showSessionBar(s client.ActiveSession) {
 	b.win.SetCloseIntercept(b.closed)
 	b.win.SetFixedSize(true)
 	b.win.Show()
+	if w.KeepOffTaskbar != nil {
+		w.KeepOffTaskbar(b.win)
+	}
 	b.win.RequestFocus()
 	w.updateTray()
 

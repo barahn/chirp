@@ -9,6 +9,7 @@ require github.com/gorilla/websocket v1.5.3
 require (
 	github.com/barahn/remotekit v0.7.0
 	github.com/barahn/remotekit/signal/nostr v0.1.0
+	github.com/jezek/xgb v1.3.1
 	golang.org/x/sys v0.49.0
 	modernc.org/sqlite v1.60.1
 )
@@ -22,7 +23,6 @@ require (
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/gtank/ristretto255 v0.2.0 // indirect
-	github.com/jezek/xgb v1.3.1 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/mendsec/cpace v0.1.0 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
