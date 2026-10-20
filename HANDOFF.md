@@ -103,6 +103,8 @@ CODE_OF_CONDUCT.md
 CONTRIBUTING.md
 ECOSYSTEM.md
 HANDOFF.md
+HANDOFF.md
+HANDOFF.md
 LICENSE
 LICENSING.md
 README.md
@@ -203,8 +205,13 @@ cmd/chirp/notify_windows.go
 cmd/chirp/pinbar_linux.go
 cmd/chirp/pinbar_other.go
 cmd/chirp/pinbar_windows.go
+cmd/chirp/rsrc_windows_amd64.syso
 cmd/chirp/tray.go
 cmd/chirp/tray_test.go
+cmd/chirp/winres/icon.png
+cmd/chirp/winres/icon/main.go
+cmd/chirp/winres/winres.json
+cmd/chirp/winres/winres_test.go
 deploy/caddy/Caddyfile
 deploy/container/Containerfile
 deploy/coturn/install.sh
@@ -248,6 +255,7 @@ scripts/check-site.sh
 scripts/gen-handoff.sh
 scripts/gen-macos-signing-cert.sh
 scripts/gen-third-party-notices.sh
+scripts/gen-winres.sh
 scripts/macapp/macapp_test.go
 scripts/macapp/main.go
 scripts/set-relay-dns.sh
@@ -303,6 +311,8 @@ github.com/barahn/chirp/cmd/chirp/internal/alert
 github.com/barahn/chirp/cmd/chirp/internal/privilege
 github.com/barahn/chirp/cmd/chirp/internal/ui
 github.com/barahn/chirp/cmd/chirp/internal/warm
+github.com/barahn/chirp/cmd/chirp/winres
+github.com/barahn/chirp/cmd/chirp/winres/icon
 github.com/barahn/chirp/cmd/chirp-relay
 github.com/barahn/chirp/cmd/chirp-status
 github.com/barahn/chirp/scripts/macapp
@@ -320,6 +330,8 @@ ok  	github.com/barahn/chirp/cmd/chirp
 ok  	github.com/barahn/chirp/cmd/chirp/internal/privilege
 ok  	github.com/barahn/chirp/cmd/chirp/internal/ui
 ok  	github.com/barahn/chirp/cmd/chirp/internal/warm
+ok  	github.com/barahn/chirp/cmd/chirp/winres
+?   	github.com/barahn/chirp/cmd/chirp/winres/icon	[no test files]
 ok  	github.com/barahn/chirp/cmd/chirp-relay
 ?   	github.com/barahn/chirp/cmd/chirp-status	[no test files]
 ok  	github.com/barahn/chirp/scripts/macapp
