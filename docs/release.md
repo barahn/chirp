@@ -147,23 +147,67 @@ and it ends when the platform reaches the full program.
 | 1 from 1.0 | macOS | In 1.0, but waits for barahn/remotekit#72 to capture the screen and inject input. A helper-only build before then would be an exception under the rule above. |
 | — | Windows 7 and 8, 32-bit systems | Not supported: Go no longer builds for them. |
 
-### Signing, for now without paid certificates
+### Signing and antivirus
 
-- **Windows:** the plan is SignPath Foundation's free code signing for
-  open-source projects, if Chirp qualifies under its dual licensing
-  ([LICENSING.md](../LICENSING.md)). Until then, Chirp stays unsigned and the
-  download page explains SmartScreen. Each release's `.exe` is also submitted
-  to Microsoft's malware analysis as a remote-support tool, because unsigned
-  remote-control tools are often flagged as potentially unwanted. The binaries
-  are never packed (UPX or similar), which makes such flags more likely.
-- **macOS:** a `.app` in a `.zip`, with a stable bundle identifier, since
-  Screen Recording and Accessibility attach to the app's identity
-  (barahn/chirp#51). Without the Apple Developer Program it carries only an
-  ad-hoc signature. Gatekeeper then needs *Privacy & Security* → *Open
-  Anyway*, and the permissions may have to be granted again after each
-  update.
+Chirp is never installed and is not in any store, so what matters is that the
+downloaded binary runs without antivirus, SmartScreen or Gatekeeper getting in
+the way. Windows decides by reputation. An unsigned file's reputation belongs
+to its hash and starts from zero with every release. A signed file's
+reputation builds up on the certificate. Remote-control tools also fall under
+"RemoteAdmin" and potentially-unwanted heuristics, which metadata, a signature
+and a clean history all weigh against. macOS lets an app open without asking
+only if it carries a Developer ID signature and is notarized.
+
+This is the plan, in order. barahn/chirp#69 tracks what is done.
+
+**First, at no cost:**
+
+- **Windows metadata:** `chirp.exe` carries a version resource (company,
+  product, version), its icon and an application manifest. A binary without
+  them looks more suspicious to heuristics.
+- **Never packed:** no UPX or similar, since packing makes flags more likely.
+- **Microsoft submission:** every release's `.exe` is submitted to Microsoft
+  Security Intelligence as a software developer, describing Chirp as a
+  remote-support tool.
+- **Scans and false positives:** every release is scanned on VirusTotal, as a
+  report and never a gate. A detection goes to that vendor's false-positive
+  form, with the same account of what Chirp does: consent each time, no
+  silent mode, nothing installed or left running.
+- **macOS:** a `.app` in a `.zip`, bundle ID `app.usechirp.chirp`, signed
+  with Fabrintek's self-signed code-signing certificate:
+  - **Why not ad-hoc:** macOS gives Screen Recording and Accessibility to the
+    app's identity (barahn/chirp#51). With the self-signed certificate that
+    identity is the bundle ID plus the certificate, so the grants survive
+    updates and an impostor with the same bundle ID gets none. An ad-hoc
+    signature loses the grants on every update. An identifier-only
+    requirement would hand them to any app that claims the bundle ID.
+  - **The key:** it is a release secret, kept only in the release
+    environment. Replacing it makes every user grant the permissions again.
+  - **Gatekeeper:** it still rejects the app, so every new download needs
+    *Privacy & Security* → *Open Anyway*, and the download page shows how.
 - **Everywhere:** `SHA256SUMS`, its Sigstore signature and the build
-  attestations ([Checking a download](#checking-a-download)).
+  attestations ([Checking a download](#checking-a-download)). Vendors can use
+  them to check where a binary came from.
+
+**At no cost, if accepted:** SignPath Foundation signs open-source projects
+for free. Its published conditions exclude commercial dual licensing, which
+Chirp has ([LICENSING.md](../LICENSING.md)), so this needs asking them
+directly. If accepted, Windows would show SignPath Foundation as the
+publisher, not Fabrintek.
+
+**When there is a budget:**
+
+- **Windows:** Authenticode through Azure Artifact Signing, the cheapest
+  managed option, with a monthly plan. Fabrintek's eligibility has to be
+  confirmed. The alternative is an OV certificate on a hardware token.
+  Reputation then builds up on the certificate across releases.
+- **macOS:** the Apple Developer Program as an organization, at US$ 99 a
+  year with a free D-U-N-S number, for Developer ID and notarization in the
+  release workflow. There is no free route: Apple waives the fee only for
+  non-profits, schools and governments.
+  - **The switch:** moving from the self-signed certificate to Developer ID
+    changes the app's identity, so users grant Screen Recording and
+    Accessibility once more. That release's notes must say so.
 
 ### Channels
 
