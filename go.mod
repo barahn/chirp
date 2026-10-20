@@ -10,6 +10,7 @@ require (
 	github.com/barahn/remotekit v0.7.0
 	github.com/barahn/remotekit/signal/nostr v0.1.0
 	github.com/jezek/xgb v1.3.1
+	github.com/tc-hib/winres v0.2.1
 	golang.org/x/sys v0.49.0
 	modernc.org/sqlite v1.60.1
 )
@@ -19,6 +20,7 @@ require (
 	github.com/FyshOS/fancyfs v0.0.1 // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.5.0 // indirect
 	github.com/btcsuite/btcd/chainhash/v2 v2.0.0 // indirect
+	github.com/cpuguy83/go-md2man/v2 v2.0.7 // indirect
 	github.com/decred/dcrd/crypto/blake256 v1.1.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
@@ -43,7 +45,11 @@ require (
 	github.com/pion/turn/v5 v5.1.2 // indirect
 	github.com/pion/webrtc/v4 v4.2.23 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
+	github.com/russross/blackfriday/v2 v2.1.0 // indirect
+	github.com/tc-hib/go-winres v0.3.3 // indirect
+	github.com/urfave/cli/v2 v2.27.7 // indirect
 	github.com/wlynxg/anet v0.0.5 // indirect
+	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/crypto v0.57.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
@@ -86,3 +92,5 @@ require (
 )
 
 replace fyne.io/systray => github.com/barahn/systray v1.12.3-0.20261019144530-2f6e39459a4f
+
+tool github.com/tc-hib/go-winres

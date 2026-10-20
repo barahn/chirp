@@ -93,6 +93,14 @@ jobs:
           go-version-file: go.mod
           check-latest: true
 
+      # Version information, icon and manifest (cmd/chirp/winres): the
+      # committed .syso says 0.0.0-dev; this stamps the release's tag into it.
+      - name: Stamp the version into the Windows resources
+        shell: bash
+        env:
+          CGO_ENABLED: 1
+        run: ./scripts/gen-winres.sh "$TAG"
+
       # -H windowsgui: double-clicked, Chirp opens its window without a console
       # behind it. What it would print there it says in a message box when it
       # matters (cmd/chirp/internal/alert).
