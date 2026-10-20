@@ -189,6 +189,7 @@ cmd/chirp/internal/warm/palette_test.go
 cmd/chirp/internal/warm/theme.go
 cmd/chirp/internal/warm/theme_test.go
 cmd/chirp/language.go
+cmd/chirp/language_darwin.go
 cmd/chirp/language_other.go
 cmd/chirp/language_test.go
 cmd/chirp/language_windows.go
