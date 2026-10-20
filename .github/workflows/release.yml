@@ -1,16 +1,17 @@
 name: Release
 
 # Builds the binaries a release ships and attaches them to it (#69): cmd/chirp
-# for Linux and Windows, cmd/chirp-relay for Linux, a notices bundle, and a
-# SHA256SUMS file signed with Sigstore. It runs when a release is published,
-# like sbom.yml, so the notes stay the maintainer's to write: tag, publish the
-# release, and this fills it in.
+# for Linux, Windows and macOS, cmd/chirp-relay for Linux, a notices bundle,
+# and a SHA256SUMS file signed with Sigstore. It runs when a release is
+# published, like sbom.yml, so the notes stay the maintainer's to write: tag,
+# publish the release, and this fills it in.
 #
 # cmd/chirp needs cgo (Fyne), and cgo does not cross-compile, so each system
 # builds on its own runner, as ci.yml's "Build cmd/chirp" matrix does. The
-# binaries are not code-signed yet: Authenticode and Apple notarization need
-# certificates Fabrintek does not hold. macOS waits for remotekit to capture
-# and inject there (barahn/remotekit#72).
+# Windows binary is not code-signed yet: Authenticode needs a certificate
+# Fabrintek does not hold. Chirp.app is signed with Fabrintek's self-signed
+# certificate, whose key lives only in the `release` environment, so that
+# macOS keeps its permissions across updates (#51). It is not notarized.
 #
 # Asset names carry no version, so releases/latest/download/<name> always
 # serves the newest build to the site's download buttons.
@@ -109,9 +110,82 @@ jobs:
           path: dist/
           if-no-files-found: error
 
+  # One universal Chirp.app, amd64 and arm64, in a zip: a Mac of either kind
+  # takes the same download. The runner is arm64, and Apple's clang builds
+  # the amd64 half there too.
+  macos:
+    name: Build for macOS
+    runs-on: macos-15
+    timeout-minutes: 30
+    # The signing key's secrets live only in this environment, which only
+    # v* tags may deploy to.
+    environment: release
+    env:
+      # What remotekit's screen capture needs (ScreenCaptureKit), and what
+      # Info.plist declares: scripts/macapp's minimumSystemVersion.
+      MACOSX_DEPLOYMENT_TARGET: '12.3'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.TAG }}
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          check-latest: true
+
+      - name: Build
+        env:
+          CGO_ENABLED: 1
+        run: |
+          mkdir -p build dist
+          GOARCH=amd64 CC='clang -arch x86_64' go build -trimpath -ldflags='-s -w' -o build/chirp-amd64 ./cmd/chirp
+          GOARCH=arm64 CC='clang -arch arm64' go build -trimpath -ldflags='-s -w' -o build/chirp-arm64 ./cmd/chirp
+          lipo -create -output build/chirp-universal build/chirp-amd64 build/chirp-arm64
+          lipo -info build/chirp-universal
+          vtool -show-build build/chirp-universal | grep minos
+
+      - name: Bundle
+        run: |
+          go run ./scripts/macapp -tag "$TAG" -bin build/chirp-universal -out build/Chirp.app
+          plutil -lint build/Chirp.app/Contents/Info.plist
+
+      # The designated requirement must come out as
+      # identifier "app.usechirp.chirp" and certificate leaf = H"<sha1>",
+      # which the script checks. MACOS_SIGNING_SHA1 is public; it is the
+      # fingerprint docs/release.md publishes.
+      - name: Sign
+        env:
+          MACOS_SIGNING_P12: ${{ secrets.MACOS_SIGNING_P12 }}
+          MACOS_SIGNING_P12_PASSWORD: ${{ secrets.MACOS_SIGNING_P12_PASSWORD }}
+          MACOS_SIGNING_SHA1: ${{ vars.MACOS_SIGNING_SHA1 }}
+        run: |
+          umask 077
+          printf '%s' "$MACOS_SIGNING_P12" | base64 --decode > "$RUNNER_TEMP/signing.p12"
+          printf '%s' "$MACOS_SIGNING_P12_PASSWORD" > "$RUNNER_TEMP/signing.pass"
+          trap 'rm -f "$RUNNER_TEMP/signing.p12" "$RUNNER_TEMP/signing.pass"' EXIT
+          ./scripts/sign-macos-app.sh build/Chirp.app "$RUNNER_TEMP/signing.p12" "$RUNNER_TEMP/signing.pass" "$MACOS_SIGNING_SHA1"
+
+      # ditto keeps what zip would drop (the signature's extended
+      # attributes, symlinks). The zip is checked as a Mac would unpack it.
+      - name: Zip
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent build/Chirp.app dist/chirp-macos-universal.zip
+          mkdir -p build/check
+          ditto -x -k dist/chirp-macos-universal.zip build/check
+          codesign --verify --strict --deep --verbose=2 build/check/Chirp.app
+          codesign -d -r- build/check/Chirp.app
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: macos
+          path: dist/
+          if-no-files-found: error
+
   publish:
     name: Sign and attach
-    needs: [ linux, windows ]
+    needs: [ linux, windows, macos ]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -161,6 +235,7 @@ jobs:
           subject-path: |
             dist/chirp-linux-amd64
             dist/chirp-windows-amd64.exe
+            dist/chirp-macos-universal.zip
             dist/chirp-relay-linux-amd64
             dist/chirp-relay-linux-arm64
 

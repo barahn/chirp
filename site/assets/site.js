@@ -92,7 +92,7 @@
     dlMac: "Baixar para macOS",
     dlLinux: "Baixar para Linux",
     saysWindows: "<b>O SmartScreen pode dizer</b> “O Windows protegeu o computador”. Escolha <b>Mais informações</b> e depois <b>Executar assim mesmo</b>.",
-    saysMac: "<b>O macOS pergunta</b> se você quer abrir um app baixado da internet. Escolha <b>Abrir</b>. Ele também pede que você permita <b>Gravação de Tela</b> e <b>Acessibilidade</b> para o Chirp.",
+    saysMac: "<b>O macOS diz</b> que não pôde verificar o Chirp. Feche o aviso e, em <b>Ajustes do Sistema → Privacidade e Segurança</b>, escolha <b>Abrir Mesmo Assim</b>, de novo a cada nova versão. Depois permita <b>Gravação de Tela</b> e <b>Acessibilidade</b> para o Chirp, uma vez só: elas continuam depois das atualizações.",
     saysLinux: "<b>Torne o arquivo executável</b> e rode. No Wayland, depois que você aperta Permitir, o sistema pergunta mais uma vez <b>qual tela compartilhar</b>.",
     verify: "Toda cópia é idêntica. Confira a sua com o SHA-256 e a assinatura publicados em cada versão.",
     verifyCode: "sha256 · publicado com a primeira versão",

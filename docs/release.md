@@ -71,8 +71,10 @@ passed. Until then Chirp's `go.mod` pins a commit of remotekit's `develop`.
    `git tag -a vX.Y.Z <commit>`, push it, and
    `gh release create vX.Y.Z --verify-tag` with the notes.
 6. `release.yml` attaches the files below in about ten minutes. If it fails,
-   fix the cause and run it again from the Actions tab with the tag. It
-   replaces what it uploaded.
+   fix the cause and run it again with the tag, from the tag:
+   `gh workflow run release.yml --ref vX.Y.Z -f tag=vX.Y.Z`. The macOS job
+   signs in the `release` environment, which only `v*` tags may use, so a
+   run from a branch stops there. It replaces what it uploaded.
 
 The release notes are the changelog: new, fixed, security, dependencies, and
 what upgrading needs.
@@ -106,6 +108,7 @@ sound), *v0.9* (public beta, fixes only) and *v1.0*.
 | File | What |
 | --- | --- |
 | `chirp-windows-amd64.exe` | Chirp for Windows 10 and 11, 64-bit. One file, no installer. |
+| `chirp-macos-universal.zip` | `Chirp.app` for macOS 12.3 or newer, Intel and Apple silicon in one bundle, signed with Fabrintek's self-signed certificate ([below](#chirpapp-and-its-certificate)). |
 | `chirp-linux-amd64` | Chirp for 64-bit Linux with glibc 2.35 or newer (Ubuntu 22.04, Debian 12 and later). It needs `libGL` and `libwayland-client`, which every desktop has, and on Wayland GStreamer with its PipeWire plugin (`gstreamer1.0-tools gstreamer1.0-pipewire` on Debian and Ubuntu) to share the screen. |
 | `chirp-relay-linux-amd64`, `chirp-relay-linux-arm64` | The relay, static, for a server (`docs/relay.md`). |
 | `chirp-notices.zip` | `LICENSE`, `THIRD_PARTY_NOTICES.md` and the fonts' OFL texts: the notices the binaries' third-party code and fonts require. |
@@ -116,11 +119,12 @@ The names carry no version, so
 `https://github.com/barahn/chirp/releases/latest/download/chirp-windows-amd64.exe`
 always serves the newest one.
 
-There is no macOS build yet: remotekit cannot capture the screen or inject
-input there (barahn/remotekit#72). The binaries are not code-signed:
-Authenticode and Apple notarization need certificates Fabrintek does not hold
-yet. Windows SmartScreen therefore warns on the first run ("Windows protected
-your PC"): *More info*, then *Run anyway*.
+Until remotekit captures the screen and injects input on macOS
+(barahn/remotekit#72), the macOS build can help but cannot be helped. The
+Windows binary is not code-signed: Authenticode needs a certificate Fabrintek
+does not hold yet. Windows SmartScreen therefore warns on the first run
+("Windows protected your PC"): *More info*, then *Run anyway*. On macOS,
+Gatekeeper asks for *Open Anyway* ([below](#chirpapp-and-its-certificate)).
 
 ## Platforms and distribution
 
@@ -144,7 +148,7 @@ and it ends when the platform reaches the full program.
 | 2 | Windows on ARM | The x64 build runs under emulation. A native arm64 build is planned. |
 | 2 | Linux arm64 | Planned, on the same glibc 2.35 baseline. |
 | 2 | Linux on wlroots (Sway, Hyprland) | No RemoteDesktop portal, so a helper can see the screen but not control it. |
-| 1 from 1.0 | macOS | In 1.0, but waits for barahn/remotekit#72 to capture the screen and inject input. A helper-only build before then would be an exception under the rule above. |
+| 1 from 1.0 | macOS 12.3 and newer, Intel and Apple silicon | In 1.0, but waits for barahn/remotekit#72 to capture the screen and inject input. Until then the build is helper-only, an exception under the rule above. 12.3 is what ScreenCaptureKit needs. |
 | — | Windows 7 and 8, 32-bit systems | Not supported: Go no longer builds for them. |
 
 ### Signing and antivirus
@@ -183,6 +187,7 @@ This is the plan, in order. barahn/chirp#69 tracks what is done.
     requirement would hand them to any app that claims the bundle ID.
   - **The key:** it is a release secret, kept only in the release
     environment. Replacing it makes every user grant the permissions again.
+    How it was made and is kept: [Chirp.app and its certificate](#chirpapp-and-its-certificate).
   - **Gatekeeper:** it still rejects the app, so every new download needs
     *Privacy & Security* → *Open Anyway*, and the download page shows how.
 - **Everywhere:** `SHA256SUMS`, its Sigstore signature and the build
@@ -237,6 +242,73 @@ scammers abuse it. iOS cannot be controlled at all.
   decision 5.
 
 A helper-only mobile Chirp is an exception under the rule above.
+
+## Chirp.app and its certificate
+
+`chirp-macos-universal.zip` holds `Chirp.app`, bundle ID
+`app.usechirp.chirp`, signed with a self-signed code-signing certificate
+that Fabrintek holds. macOS grants Screen Recording and Accessibility to
+the app's *designated requirement* (barahn/chirp#51). That requirement
+decides whether a permission survives an update, and who else could use it:
+
+| Signature | Designated requirement | After an update | Another app with the same bundle ID |
+| --- | --- | --- | --- |
+| ad-hoc | `cdhash H"…"` | asked again | — |
+| ad-hoc, requirement set to the identifier | `identifier "app.usechirp.chirp"` | kept | gets the permissions too |
+| **self-signed certificate (Chirp's)** | `identifier "app.usechirp.chirp" and certificate leaf = H"…"` | **kept** | **denied** |
+
+`release.yml` builds the app (`scripts/macapp`: Info.plist with the
+version from the tag, `CFBundleLocalizations` `en` and `pt-BR`, the icon),
+signs it with `scripts/sign-macos-app.sh`, and fails unless
+`codesign --verify --strict` passes and the designated requirement names
+exactly the certificate below. CI runs the same steps on every pull
+request with a throwaway certificate.
+
+Gatekeeper still refuses the app, because only the Apple Developer Program
+($99 a year) can notarize. The first time, and again with each new
+download, macOS says it could not verify Chirp: close the warning, then
+*System Settings* → *Privacy & Security* → *Open Anyway*. The permissions
+stay.
+
+Check a download's signature on a Mac:
+
+```sh
+codesign --verify --strict --verbose=2 Chirp.app
+codesign -d -r- Chirp.app
+```
+
+The second line must print
+`designated => identifier "app.usechirp.chirp" and certificate leaf = H"<fingerprint>"`
+with the fingerprint below.
+
+**The certificate.** Common name *Chirp Release Signing*, organisation
+Fabrintek Engenharia Digital Ltda, RSA 3072, valid from 2026-10-20 to
+2056-10-20. SHA-1 fingerprint, as `codesign` prints it:
+
+```
+e451a456fe4e7d4e6e95e2f440c57fccac854bd7
+```
+
+It was made once, on 2026-10-20, with
+
+```sh
+scripts/gen-macos-signing-cert.sh /path/on/a/trusted/machine
+```
+
+and is kept like this:
+
+- the `.p12`, base64-encoded, is the secret `MACOS_SIGNING_P12`, and its
+  password `MACOS_SIGNING_P12_PASSWORD`, both only in the repository's
+  `release` environment, which only `v*` tags may deploy to;
+- the fingerprint is that environment's variable `MACOS_SIGNING_SHA1`, and
+  is published here;
+- one offline copy of the `.p12` and its password, held by the maintainer.
+  Nothing else keeps the key.
+
+On the runner, the `.p12` goes into a keychain created for the job and
+deleted after it. Replacing the certificate, because it leaked or was lost,
+means every Mac asks for both permissions again: say so in that release's
+notes, and update the fingerprint here and in the environment.
 
 ## Checking a download
 
