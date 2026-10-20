@@ -158,6 +158,17 @@ jobs:
             exit 1
           fi
 
+      # chirp.exe's version information, icon and manifest are compiled into
+      # a committed .syso. Regenerated here, like the files above, so an edit
+      # to winres.json or to the app icon cannot ship without it.
+      - name: Windows resources are current
+        run: |
+          ./scripts/gen-winres.sh
+          if ! git diff --exit-code --stat -- cmd/chirp/rsrc_windows_amd64.syso cmd/chirp/winres/icon.png; then
+            echo "::error::cmd/chirp/rsrc_windows_amd64.syso is out of date. Run ./scripts/gen-winres.sh and commit the result."
+            exit 1
+          fi
+
       - name: SAST (gosec)
         run: go run github.com/securego/gosec/v2/cmd/gosec@v2.22.1 ./...
 
@@ -200,6 +211,21 @@ jobs:
           plutil -lint "$RUNNER_TEMP/Chirp.app/Contents/Info.plist"
           sha1=$(./scripts/gen-macos-signing-cert.sh "$RUNNER_TEMP/cert" "Chirp CI Signing" | tail -1)
           ./scripts/sign-macos-app.sh "$RUNNER_TEMP/Chirp.app" "$RUNNER_TEMP/cert/chirp-signing.p12" "$RUNNER_TEMP/cert/chirp-signing.p12.pass" "$sha1"
+
+      # The release path for chirp.exe's resources: stamp a version as
+      # release.yml does, build as it does, and read the resources back out
+      # of the real binary.
+      - name: Windows resources carry the release version
+        if: runner.os == 'Windows'
+        shell: bash
+        env:
+          CGO_ENABLED: 1
+          CHIRP_EXE: chirp-stamped.exe
+          CHIRP_VERSION: 1.2.3-rc.4
+        run: |
+          ./scripts/gen-winres.sh "v$CHIRP_VERSION"
+          go build -trimpath -ldflags='-s -w -H windowsgui' -o cmd/chirp/winres/chirp-stamped.exe ./cmd/chirp
+          go test -count=1 -run TestShippedExe -v ./cmd/chirp/winres
 
   # What docs/relay.md tells people to run on a server: the container image,
   # the install scripts and the Quadlet units. None of it is Go, so nothing
