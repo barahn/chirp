@@ -191,6 +191,16 @@ jobs:
           CGO_ENABLED: 1
         run: go build -o chirp-bin ./cmd/chirp
 
+      # The release's macOS packaging, end to end, with a throwaway
+      # certificate instead of the release one, whose key CI never sees.
+      - name: Bundle and sign Chirp.app with a throwaway certificate
+        if: runner.os == 'macOS'
+        run: |
+          go run ./scripts/macapp -tag v0.0.0-ci -bin chirp-bin -out "$RUNNER_TEMP/Chirp.app"
+          plutil -lint "$RUNNER_TEMP/Chirp.app/Contents/Info.plist"
+          sha1=$(./scripts/gen-macos-signing-cert.sh "$RUNNER_TEMP/cert" "Chirp CI Signing" | tail -1)
+          ./scripts/sign-macos-app.sh "$RUNNER_TEMP/Chirp.app" "$RUNNER_TEMP/cert/chirp-signing.p12" "$RUNNER_TEMP/cert/chirp-signing.p12.pass" "$sha1"
+
   # What docs/relay.md tells people to run on a server: the container image,
   # the install scripts and the Quadlet units. None of it is Go, so nothing
   # above would notice it breaking. The Proxmox script needs a Proxmox node
@@ -205,7 +215,7 @@ jobs:
           persist-credentials: false
 
       - name: Lint the deploy scripts
-        run: shellcheck -x deploy/install.sh deploy/proxmox/create-ct.sh deploy/proxmox/check-ct.sh deploy/proxy/setup-proxy.sh deploy/proxy/use-proxy.sh deploy/status/install.sh deploy/coturn/install.sh scripts/build-relay.sh scripts/build-status.sh scripts/check-relay.sh scripts/set-relay-dns.sh
+        run: shellcheck -x deploy/install.sh deploy/proxmox/create-ct.sh deploy/proxmox/check-ct.sh deploy/proxy/setup-proxy.sh deploy/proxy/use-proxy.sh deploy/status/install.sh deploy/coturn/install.sh scripts/build-relay.sh scripts/build-status.sh scripts/check-relay.sh scripts/set-relay-dns.sh scripts/gen-macos-signing-cert.sh scripts/sign-macos-app.sh
 
       - name: Build the relay image
         run: podman build -f deploy/container/Containerfile -t localhost/chirp-relay:ci .

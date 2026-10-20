@@ -244,8 +244,12 @@ scripts/check-live-site.sh
 scripts/check-relay.sh
 scripts/check-site.sh
 scripts/gen-handoff.sh
+scripts/gen-macos-signing-cert.sh
 scripts/gen-third-party-notices.sh
+scripts/macapp/macapp_test.go
+scripts/macapp/main.go
 scripts/set-relay-dns.sh
+scripts/sign-macos-app.sh
 session/consent.go
 session/lookup.go
 session/lookup_test.go
@@ -299,6 +303,7 @@ github.com/barahn/chirp/cmd/chirp/internal/ui
 github.com/barahn/chirp/cmd/chirp/internal/warm
 github.com/barahn/chirp/cmd/chirp-relay
 github.com/barahn/chirp/cmd/chirp-status
+github.com/barahn/chirp/scripts/macapp
 github.com/barahn/chirp/session
 github.com/barahn/chirp/signalling
 github.com/barahn/chirp/status
@@ -315,6 +320,7 @@ ok  	github.com/barahn/chirp/cmd/chirp/internal/ui
 ok  	github.com/barahn/chirp/cmd/chirp/internal/warm
 ok  	github.com/barahn/chirp/cmd/chirp-relay
 ?   	github.com/barahn/chirp/cmd/chirp-status	[no test files]
+ok  	github.com/barahn/chirp/scripts/macapp
 ok  	github.com/barahn/chirp/session
 ok  	github.com/barahn/chirp/signalling
 ok  	github.com/barahn/chirp/status
