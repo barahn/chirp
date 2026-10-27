@@ -11,6 +11,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 
@@ -51,6 +52,19 @@ type sessionBar struct {
 	closed  func()
 	done    bool
 	stop    chan struct{}
+
+	// The balloon, with a bird (bird.go): news is the alert it says now,
+	// queue those still to say. shown is whether the window is out; held,
+	// whether the owner opened it by tapping the bird; speaking, whether
+	// it is saying an alert; landed, whether the bird is perched.
+	news     *widget.Label
+	queue    []string
+	shown    bool
+	held     bool
+	speaking bool
+	landed   bool
+	pinned   bool
+	folding  func()
 }
 
 // showSessionBar opens the bar for s, replacing one still open.
@@ -58,7 +72,7 @@ func (w *Window) showSessionBar(s client.ActiveSession) {
 	if w.bar != nil {
 		w.bar.dismiss()
 	}
-	b := &sessionBar{w: w, win: w.app.NewWindow(tr(barTitle)), session: s, now: time.Now, stop: make(chan struct{})}
+	b := &sessionBar{w: w, win: w.balloonWindow(), session: s, now: time.Now, stop: make(chan struct{})}
 	b.start = b.now()
 	w.bar = b
 
@@ -70,7 +84,10 @@ func (w *Window) showSessionBar(s client.ActiveSession) {
 	b.end = widget.NewButton(tr(barEnd), b.endNow)
 	b.end.Importance = widget.DangerImportance
 	top := container.NewHBox(container.NewGridWrap(fyne.NewSize(10, 10), dot), b.who, b.clock, b.end)
-	content := container.NewVBox(top)
+	b.news = widget.NewLabelWithStyle("", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+	b.news.Wrapping = fyne.TextWrapWord
+	b.news.Hide()
+	content := container.NewVBox(b.news, top)
 	for _, name := range s.Permissions {
 		if name == permScreenView {
 			continue
@@ -105,16 +122,57 @@ func (w *Window) showSessionBar(s client.ActiveSession) {
 	b.win.SetCloseIntercept(b.closed)
 	b.win.SetFixedSize(true)
 	b.fit()
-	b.win.Show()
-	if w.PinBar != nil {
-		w.PinBar(b.win, w.win)
+	switch {
+	case w.birdOut():
+		b.land()
+	case w.Perch == nil:
+		// No bird: the balloon is the session window, and stays out.
+		b.show()
+		b.win.RequestFocus()
 	}
-	b.win.RequestFocus()
 	w.updateTray()
 
 	if w.animating {
 		go b.run()
 	}
+}
+
+// balloonWindow is the window for the balloon: borderless above the bird,
+// where there is one and the driver can draw it so, and an ordinary window
+// otherwise, which the owner can move and close.
+func (w *Window) balloonWindow() fyne.Window {
+	if w.Perch != nil {
+		if d, ok := w.app.Driver().(desktop.Driver); ok {
+			return d.CreateSplashWindow()
+		}
+	}
+	return w.app.NewWindow(tr(barTitle))
+}
+
+// show puts the balloon out, above the bird if there is one, and above
+// every other window.
+func (b *sessionBar) show() {
+	if b.done {
+		return
+	}
+	b.win.Show()
+	if !b.pinned && b.w.PinBar != nil {
+		b.pinned = true
+		b.w.PinBar(b.win, b.w.win)
+	}
+	if b.landed {
+		b.w.Perch.Place(b.win)
+	}
+	b.shown = true
+}
+
+// hide puts the balloon away; the session goes on.
+func (b *sessionBar) hide() {
+	if b.done {
+		return
+	}
+	b.win.Hide()
+	b.shown = false
 }
 
 // fit sizes the bar to what it holds. It is of fixed size, so a line added
@@ -169,7 +227,11 @@ func (b *sessionBar) dismiss() {
 	if b.done {
 		return
 	}
+	b.flyOff()
 	b.done = true
+	if b.folding != nil {
+		b.folding()
+	}
 	close(b.stop)
 	b.win.Close()
 	if b.w.bar == b {

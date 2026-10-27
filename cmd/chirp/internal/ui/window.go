@@ -73,11 +73,21 @@ type Window struct {
 	// per OS. The consent prompt uses it, so that it cannot open unseen
 	// behind other windows, while its taskbar button still flashes.
 	KeepOnTop func(fyne.Window)
+	// Perch is the bird by the taskbar, drawn by cmd/chirp where the
+	// system allows it (bird.go). Without one, the session bar is the
+	// session window, as before.
+	Perch Perch
+	// Prefs keeps whether the bird is hidden between runs, and nothing
+	// else. Without it nothing is remembered.
+	Prefs Prefs
 
 	// notify shows a system notification, and quit quits Chirp; tests
 	// replace them.
 	notify func(*fyne.Notification)
 	quit   func()
+	// after runs a function later on Fyne's goroutine, and returns how to
+	// cancel it: the balloon's timers. Tests replace it.
+	after func(time.Duration, func()) func()
 	// remote is the window onto a computer this machine is helping, while
 	// one is open.
 	remote *Remote
@@ -131,7 +141,7 @@ type Window struct {
 
 // New builds the window, not yet shown.
 func New(a fyne.App) *Window {
-	w := &Window{app: a, win: a.NewWindow("Chirp"), notify: a.SendNotification, quit: a.Quit}
+	w := &Window{app: a, win: a.NewWindow("Chirp"), notify: a.SendNotification, quit: a.Quit, after: afterFunc}
 	w.win.SetCloseIntercept(w.closeMain)
 	header := w.header()
 	card := w.ownerCard()
