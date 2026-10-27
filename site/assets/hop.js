@@ -13,7 +13,12 @@
 (function (root) {
   "use strict";
 
-  var HOP = { shortest: 18, longest: 30, shortestRest: 800, longestRest: 3000, turnChance: 0.12 };
+  // Now and then a hop is two short ones in a row, pairBeat apart: pair is 1
+  // on the first of them, 2 on the second.
+  var HOP = {
+    shortest: 18, longest: 30, shortestRest: 800, longestRest: 3000, turnChance: 0.12,
+    pairChance: 0.25, pairShortest: 10, pairLongest: 15, pairBeat: 140
+  };
   var SHOO = { passes: 3, within: 4000 };
 
   // The flight in when the page opens: from above and to the right, facing
@@ -38,19 +43,27 @@
 
   function nextHop(bird, bounds, random) {
     var x = clamp(bird.x, bounds);
+    if (bird.pair === 1) return secondOfPair(x, bird.facing, bounds, random);
     var facing = random() < HOP.turnChance ? -bird.facing : bird.facing;
-    var length = between(HOP.shortest, HOP.longest, random);
-    var room = facing > 0 ? bounds.max - x : x - bounds.min;
-    if (room < length) {
-      facing = -facing;
-      length = Math.min(length, facing > 0 ? bounds.max - x : x - bounds.min);
+    if (random() < HOP.pairChance && room(x, facing, bounds) >= 2 * HOP.pairLongest) {
+      return { x: Math.round(x + facing * between(HOP.pairShortest, HOP.pairLongest, random)), facing: facing, rest: HOP.pairBeat, pair: 1 };
     }
-    return {
-      x: Math.round(x + facing * length),
-      facing: facing,
-      rest: Math.round(between(HOP.shortestRest, HOP.longestRest, random))
-    };
+    var length = between(HOP.shortest, HOP.longest, random);
+    if (room(x, facing, bounds) < length) {
+      facing = -facing;
+      length = Math.min(length, room(x, facing, bounds));
+    }
+    return { x: Math.round(x + facing * length), facing: facing, rest: restAfterHop(random) };
   }
+
+  function secondOfPair(x, facing, bounds, random) {
+    var length = Math.min(between(HOP.pairShortest, HOP.pairLongest, random), room(x, facing, bounds));
+    return { x: Math.round(x + facing * length), facing: facing, rest: restAfterHop(random), pair: 2 };
+  }
+
+  function room(x, facing, bounds) { return facing > 0 ? bounds.max - x : x - bounds.min; }
+
+  function restAfterHop(random) { return Math.round(between(HOP.shortestRest, HOP.longestRest, random)); }
 
   // shooer counts the pointer's passes over the bird; each call is one pass,
   // at time now in milliseconds, and says whether it was the one that shoos.

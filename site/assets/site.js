@@ -479,8 +479,9 @@
     function step() {
       if (document.hidden || !inView) { paused = true; return; }
       var to = hop.nextHop(at, bounds(), Math.random);
-      move(to, 10, 320, function () {
-        if (Math.random() < 0.3) chirp();
+      var paired = Boolean(to.pair);
+      move(to, paired ? 6 : 10, paired ? 200 : 320, function () {
+        if (to.pair !== 1 && Math.random() < 0.3) chirp();
         rest(to.rest);
       });
     }

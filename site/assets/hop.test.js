@@ -48,6 +48,7 @@ describe("the bird hops along the top of the window", () => {
 
   test("it rests between hops, for a moment", () => {
     for (const { to } of walk(500, window460, seeded(4))) {
+      if (to.pair === 1) continue;
       expect(to.rest).toBeGreaterThanOrEqual(HOP.shortestRest);
       expect(to.rest).toBeLessThanOrEqual(HOP.longestRest);
     }
@@ -141,5 +142,43 @@ describe("the bird flies in and lands on the window's edge", () => {
 
   test("it then walks the way it landed", () => {
     expect(nextHop({ x: 0, facing: frames[frames.length - 1].facing }, window460, () => 0.5).facing).toBe(-1);
+  });
+});
+
+describe("now and then it hops twice, short and quick, as birds do on the ground", () => {
+  const hops = walk(3000, window460, seeded(6));
+  const pairs = hops.filter(({ to }) => to.pair === 1).map(({ to }) => hops.find((h) => h.from === to));
+
+  test("some hops come in pairs, most do not", () => {
+    const share = pairs.length / hops.length;
+    expect(share).toBeGreaterThan(0.05);
+    expect(share).toBeLessThan(0.3);
+  });
+
+  test("the first of a pair is followed at once by the second", () => {
+    for (const { from } of pairs) expect(from.rest).toBeLessThanOrEqual(HOP.pairBeat);
+    for (const second of pairs) expect(second.to.pair).toBe(2);
+  });
+
+  test("both are shorter than a single hop", () => {
+    for (const { from, to } of hops) {
+      if (!to.pair) continue;
+      const length = Math.abs(to.x - from.x);
+      expect(length).toBeGreaterThanOrEqual(HOP.pairShortest);
+      expect(length).toBeLessThan(HOP.shortest);
+    }
+  });
+
+  test("the second goes the same way as the first", () => {
+    for (const { from, to } of pairs) expect(to.facing).toBe(from.facing);
+  });
+
+  test("after the pair it rests as after any hop", () => {
+    for (const { to } of pairs) expect(to.rest).toBeGreaterThanOrEqual(HOP.shortestRest);
+  });
+
+  test("it starts a pair only with room for both", () => {
+    const hop = nextHop({ x: window460.min + 20, facing: -1 }, window460, () => HOP.turnChance);
+    expect(hop.pair || 0).not.toBe(1);
   });
 });
