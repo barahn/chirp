@@ -144,6 +144,8 @@ cmd/chirp/fatal_test.go
 cmd/chirp/internal/alert/alert.go
 cmd/chirp/internal/alert/alert_other.go
 cmd/chirp/internal/alert/alert_windows.go
+cmd/chirp/internal/chirpsound/sound.go
+cmd/chirp/internal/chirpsound/sound_test.go
 cmd/chirp/internal/perch/art.go
 cmd/chirp/internal/perch/art_test.go
 cmd/chirp/internal/perch/place.go
@@ -215,6 +217,11 @@ cmd/chirp/pinbar_linux.go
 cmd/chirp/pinbar_other.go
 cmd/chirp/pinbar_windows.go
 cmd/chirp/rsrc_windows_amd64.syso
+cmd/chirp/sound.go
+cmd/chirp/sound_darwin.go
+cmd/chirp/sound_linux.go
+cmd/chirp/sound_other.go
+cmd/chirp/sound_windows.go
 cmd/chirp/tray.go
 cmd/chirp/tray_test.go
 cmd/chirp/winres/icon.png
@@ -317,6 +324,7 @@ status/uptime_test.go
 github.com/barahn/chirp/client
 github.com/barahn/chirp/cmd/chirp
 github.com/barahn/chirp/cmd/chirp/internal/alert
+github.com/barahn/chirp/cmd/chirp/internal/chirpsound
 github.com/barahn/chirp/cmd/chirp/internal/perch
 github.com/barahn/chirp/cmd/chirp/internal/privilege
 github.com/barahn/chirp/cmd/chirp/internal/ui
@@ -337,6 +345,7 @@ github.com/barahn/chirp/status
 ok  	github.com/barahn/chirp/client
 ok  	github.com/barahn/chirp/cmd/chirp
 ?   	github.com/barahn/chirp/cmd/chirp/internal/alert	[no test files]
+ok  	github.com/barahn/chirp/cmd/chirp/internal/chirpsound
 ok  	github.com/barahn/chirp/cmd/chirp/internal/perch
 ok  	github.com/barahn/chirp/cmd/chirp/internal/privilege
 ok  	github.com/barahn/chirp/cmd/chirp/internal/ui
