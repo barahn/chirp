@@ -120,7 +120,8 @@ Chirp is not yet a runnable product.
   machines can use Chirp without hosting a relay first. It replaces the test relay at
   `relay-test.usechirp.app`, which is gone. It is the first node in the
   public network's registry (`network/servers.json`), and the status service
-  measures it, but it is not yet the blind public server below: until relays
+  measures it (to add yours, see
+  [docs/joining-the-network.md](docs/joining-the-network.md)), but it is not yet the blind public server below: until relays
   get a public mode ([docs/status-page-proposal.md](docs/status-page-proposal.md)),
   on the default path it sees the whole code and the signalling, as any
   relay does. Signal over Nostr if that matters to you.

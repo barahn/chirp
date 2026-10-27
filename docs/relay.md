@@ -14,6 +14,10 @@ All three run the same binary with the same TLS proxy (Caddy) in front of it,
 and they share the files in [`deploy/`](../deploy). Read the first sections
 whichever one you pick. [Local development](#local-development) is at the end.
 
+To add a relay you run to Chirp's public network, and to
+[status.usechirp.app](https://status.usechirp.app/), see
+[`joining-the-network.md`](joining-the-network.md).
+
 ## What the relay is
 
 `cmd/chirp-relay` is Chirp's server. It hands each running Chirp its code and

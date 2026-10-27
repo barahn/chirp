@@ -1,0 +1,94 @@
+name: Join the public network
+description: Add your Chirp relay to the public network, so status.usechirp.app lists and measures it
+title: "[Network]: "
+labels: ["network"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Read [Joining the public network](https://github.com/barahn/chirp/blob/main/docs/joining-the-network.md) first: what joining means today, what your relay needs, and what you agree to.
+
+        > [!WARNING]
+        > **Everything you write here is public**, and becomes your entry in `network/servers.json`. Never post a Chirp code or link, a password, a token or a TURN credential.
+  - type: input
+    id: url
+    attributes:
+      label: Relay URL
+      description: The relay's root, HTTPS on a domain name, nothing after the host.
+      placeholder: https://relay.example.org
+    validations:
+      required: true
+  - type: input
+    id: id
+    attributes:
+      label: Proposed id
+      description: Lowercase letters and digits joined by single hyphens, at most 40. Kept for good.
+      placeholder: example-sp-01
+    validations:
+      required: true
+  - type: input
+    id: operator
+    attributes:
+      label: Operator
+      description: You or your organisation, as the status page will show it.
+    validations:
+      required: true
+  - type: input
+    id: github
+    attributes:
+      label: Operator's GitHub handle
+      description: Problems with your relay will be raised as issues mentioning it. Usually your own.
+      placeholder: example-ops
+    validations:
+      required: true
+  - type: input
+    id: region
+    attributes:
+      label: Country
+      description: Optional. The ISO 3166 two-letter code of the country the relay runs in.
+      placeholder: BR
+  - type: input
+    id: contact
+    attributes:
+      label: Contact email
+      description: Optional, and published. For alerts about your relay.
+  - type: dropdown
+    id: behind_cdn
+    attributes:
+      label: Is a CDN or a proxy you do not run in front of the relay?
+      options:
+        - "No"
+        - "Yes"
+    validations:
+      required: true
+  - type: textarea
+    id: setup
+    attributes:
+      label: How it runs
+      description: Optional. Proxmox LXC, Podman, systemd, behind which proxy. Helps the review.
+  - type: checkboxes
+    id: requirements
+    attributes:
+      label: Requirements
+      options:
+        - label: "`curl -fsS <url>/healthz` prints `ok` from a machine outside my network."
+          required: true
+        - label: My relay meets every item of the security checklist in `docs/relay.md`.
+          required: true
+        - label: "`-security-contact` is set."
+          required: true
+        - label: I will keep it up to date with Chirp's releases.
+          required: true
+  - type: checkboxes
+    id: commitments
+    attributes:
+      label: What I agree to
+      options:
+        - label: I log no request URIs, routing digits or link tokens.
+          required: true
+        - label: I run no analytics on the relay's users.
+          required: true
+        - label: I do not restrict access by country.
+          required: true
+        - label: I publish, under the AGPL, any change I make to the relay's code.
+          required: true
