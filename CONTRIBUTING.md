@@ -95,6 +95,19 @@ Branch from `main` and open pull requests against `main`. The full model, and th
 branch protection it assumes, is in [docs/branching.md](docs/branching.md) and
 [docs/devsecops.md](docs/devsecops.md).
 
+## Comments in code
+
+Code should say what it does through its names and structure. Add a comment
+only when the intent cannot be communicated through code: a platform quirk, a
+constraint the code cannot show, the reason a gate is suppressed. Tests follow
+the same rule.
+
+A comment that restates the code is noise, and it goes stale when the code
+changes, so it ends up describing something that is no longer true. Before
+writing one, try a better name or a smaller function. The history of a bug — how
+it was found, what it broke — belongs in the commit message and the pull
+request, not beside the fix.
+
 ## What is enforced today
 
 CI checks that every non-merge commit in a pull request carries a
