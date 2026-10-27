@@ -189,6 +189,10 @@ func main() {
 	// The consent prompt stays above other windows too, on the taskbar.
 	w.KeepOnTop = keepOnTop
 	w.Prefs = a.Preferences()
+	// The bird by the taskbar, where Chirp can draw it (barahn/chirp#136).
+	if p := newPerch(); p != nil {
+		w.Perch = p
+	}
 	// The relay ends a session only when its owner gives the registration
 	// up, so ending one replaces the code and link too.
 	w.OnEndSession = owner.NewCode

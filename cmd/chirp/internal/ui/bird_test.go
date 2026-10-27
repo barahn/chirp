@@ -15,6 +15,7 @@ type fakePerch struct {
 	lands, flights int
 	poses          []string
 	placed         []fyne.Window
+	sizes          []fyne.Size // the balloon's size as each was placed
 	tapped         func()
 	perched        bool
 }
@@ -23,6 +24,7 @@ func (p *fakePerch) Land(tapped func()) { p.lands++; p.tapped = tapped; p.perche
 func (p *fakePerch) Pose(name string)   { p.poses = append(p.poses, name) }
 func (p *fakePerch) Place(w fyne.Window) {
 	p.placed = append(p.placed, w)
+	p.sizes = append(p.sizes, w.Canvas().Size())
 }
 func (p *fakePerch) FlyOff() { p.flights++; p.perched = false }
 
@@ -242,5 +244,31 @@ func TestWithoutABirdTheBalloonStaysOut(t *testing.T) {
 		if it.Label == "Hide the Chirp bird" || it.Label == "Show the Chirp bird" {
 			t.Fatalf("tray item %q without a bird", it.Label)
 		}
+	}
+}
+
+// The balloon is placed above the bird once it has its size: grown for an
+// alert after it was placed, it would hang down over the bird (seen on X11).
+func TestTheBalloonIsPlacedAtItsFinalSize(t *testing.T) {
+	w, p, _, _, _, c := birdWindow(t)
+	started(w, "Ana")
+	c.fire()
+	w.Alert("s1", Alert{Kind: AlertPastedIn, Size: 5})
+	got := p.sizes[len(p.sizes)-1]
+	if want := w.bar.win.Canvas().Size(); got != want {
+		t.Fatalf("placed at %v, then grew to %v: placed before it fit", got, want)
+	}
+}
+
+// So is a balloon that grows while open, for a file sent or received.
+func TestABalloonThatGrowsWhileOpenIsPlacedAgain(t *testing.T) {
+	w, p, _, _, _, c := birdWindow(t)
+	started(w, "Ana")
+	c.fire()
+	p.tapped()
+	w.bar.tools.received("photo.jpg", "/home/ana/Downloads/Chirp")
+	got := p.sizes[len(p.sizes)-1]
+	if want := w.bar.win.Canvas().Size(); got != want {
+		t.Fatalf("placed at %v, then grew to %v", got, want)
 	}
 }
