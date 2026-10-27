@@ -106,6 +106,11 @@ describe("the pointer passing over the bird three times shoos it", () => {
     expect(flee({ x: -280, facing: 1 }, window460).x).toBe(window460.max);
   });
 
+  test("it flies facing the way it flies", () => {
+    expect(flee({ x: -20, facing: 1 }, window460).flies).toBe(-1);
+    expect(flee({ x: -280, facing: -1 }, window460).flies).toBe(1);
+  });
+
   test("it lands facing back the way it came, toward the pointer", () => {
     expect(flee({ x: -20, facing: -1 }, window460).facing).toBe(1);
     expect(flee({ x: -280, facing: -1 }, window460).facing).toBe(-1);

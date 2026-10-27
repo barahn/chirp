@@ -462,6 +462,10 @@
         bird.classList.toggle("is-flying");
       }, 110);
     }
+    function turn(facing) {
+      at = { x: at.x, facing: facing };
+      art.animate([{ transform: pose(at.x, 0, facing) }], { duration: 160, fill: "forwards" });
+    }
     function land() {
       var landing = hop.LANDING;
       bird.classList.remove("is-arriving");
@@ -492,7 +496,11 @@
     bird.addEventListener("pointerenter", function (e) {
       if (e.pointerType !== "mouse" || moving || !shoo(e.timeStamp)) return;
       clearTimeout(resting);
-      flap(move(hop.flee(at, bounds()), 60, 700, function () { rest(1500); }), 640);
+      var to = hop.flee(at, bounds());
+      flap(move({ x: to.x, facing: to.flies }, 60, 700, function () {
+        turn(to.facing);
+        rest(1500);
+      }), 640);
     });
     document.addEventListener("visibilitychange", resume);
     if (window.IntersectionObserver) {

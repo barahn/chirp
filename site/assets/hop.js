@@ -78,9 +78,12 @@
     };
   }
 
+  // flee is where the bird goes when shooed: it flies facing the way it
+  // flies, then lands facing back, toward the pointer.
   function flee(bird, bounds) {
     var toLeft = bird.x - bounds.min > bounds.max - bird.x;
-    return { x: toLeft ? bounds.min : bounds.max, facing: toLeft ? 1 : -1 };
+    var flies = toLeft ? -1 : 1;
+    return { x: toLeft ? bounds.min : bounds.max, flies: flies, facing: -flies };
   }
 
   var api = { HOP: HOP, SHOO: SHOO, LANDING: LANDING, nextHop: nextHop, shooer: shooer, flee: flee };
