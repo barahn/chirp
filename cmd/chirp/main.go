@@ -416,6 +416,7 @@ func viewSession(ctx context.Context, conn *client.SessionConn, ice webrtc.PeerC
 		// End closes this session's conn, which ends this Help and no
 		// other; the viewer failing does the same.
 		r := w.OpenRemote(func(ev bark.InputEvent) { _ = v.SendInput(ev) }, func() { _ = conn.Close() })
+		r.SelectDisplay = v.SelectDisplay
 		r.SendFile = func(name string, f io.ReadSeeker, progress func(sent, total int64)) error {
 			_, err := v.SendFile(ctx, name, f, progress)
 			return err
@@ -426,6 +427,8 @@ func viewSession(ctx context.Context, conn *client.SessionConn, ice webrtc.PeerC
 	defer fyne.Do(remote.Close)
 	v.OnFrame(remote.Show)
 	v.OnNotice(func(n stream.Notice) { remote.Notice(n.Type) })
+	// The other computer's monitors, for the picker in the toolbar.
+	v.OnDisplays(remote.Displays)
 	sync := newClipSync(clipboard.NewManager(), 500*time.Millisecond, v.SendClipboard)
 	v.OnPermissions(func(granted []string) {
 		remote.Granted(granted)
