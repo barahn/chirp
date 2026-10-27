@@ -151,6 +151,7 @@ cmd/chirp/internal/ui/codeformat.go
 cmd/chirp/internal/ui/codeformat_test.go
 cmd/chirp/internal/ui/consent.go
 cmd/chirp/internal/ui/consent_test.go
+cmd/chirp/internal/ui/displays_test.go
 cmd/chirp/internal/ui/keys.go
 cmd/chirp/internal/ui/messages.go
 cmd/chirp/internal/ui/permission.go
