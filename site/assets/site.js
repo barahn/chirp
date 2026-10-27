@@ -462,10 +462,6 @@
         bird.classList.toggle("is-flying");
       }, 110);
     }
-    function turn(facing) {
-      at = { x: at.x, facing: facing };
-      art.animate([{ transform: pose(at.x, 0, facing) }], { duration: 160, fill: "forwards" });
-    }
     function land() {
       var landing = hop.LANDING;
       bird.classList.remove("is-arriving");
@@ -498,8 +494,7 @@
       clearTimeout(resting);
       var to = hop.flee(at, bounds());
       flap(move({ x: to.x, facing: to.flies }, 60, 700, function () {
-        turn(to.facing);
-        rest(1500);
+        move({ x: to.x, facing: to.facing }, 6, 200, function () { rest(1500); });
       }), 640);
     });
     document.addEventListener("visibilitychange", resume);
