@@ -56,9 +56,10 @@ type Alert struct {
 	Folder string
 }
 
-// Alert tells the owner what happened in the session sessionID, in a
-// notification, and in the session bar for a file that arrived. It is
-// called on Fyne's goroutine.
+// Alert tells the owner what happened in the session sessionID: in the
+// bird's balloon while the bird is out, in a system notification otherwise,
+// and in the balloon's file line, with Open folder, for a file that arrived.
+// It is called on Fyne's goroutine.
 func (w *Window) Alert(sessionID string, a Alert) {
 	b := w.bar
 	if b == nil || b.session.ID != sessionID || b.done {
@@ -69,6 +70,10 @@ func (w *Window) Alert(sessionID string, a Alert) {
 	}
 	text := alertText(b.session.Name, a)
 	if text == "" || w.alertsOff {
+		return
+	}
+	if w.birdOut() {
+		b.announce(text)
 		return
 	}
 	w.notify(fyne.NewNotification("Chirp", text))
@@ -146,18 +151,24 @@ func (w *Window) updateTray() {
 	if w.alertsOff {
 		alerts = tr("Turn alerts on")
 	}
-	w.Tray.Show(fyne.NewMenu("Chirp",
+	items := []*fyne.MenuItem{
 		fyne.NewMenuItem(tr("Open Chirp"), func() {
 			w.mainHidden = false
 			w.win.Show()
 			w.win.RequestFocus()
 		}),
+	}
+	if bird := w.birdItem(); bird != nil {
+		items = append(items, bird)
+	}
+	items = append(items,
 		fyne.NewMenuItem(alerts, func() {
 			w.alertsOff = !w.alertsOff
 			w.updateTray()
 		}),
 		fyne.NewMenuItem(tr("End session"), w.endFromTray),
-	))
+	)
+	w.Tray.Show(fyne.NewMenu("Chirp", items...))
 	if !w.mainHidden {
 		w.mainHidden = true
 		w.win.Hide()
