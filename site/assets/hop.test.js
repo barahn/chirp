@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Fabrintek Engenharia Digital Ltda
 
 import { describe, expect, test } from "bun:test";
-import { nextHop, shooer, flee, HOP, SHOO } from "./hop.js";
+import { nextHop, shooer, flee, HOP, SHOO, LANDING } from "./hop.js";
 
 // seeded is a small deterministic random source, so a walk can be replayed.
 function seeded(seed) {
@@ -108,5 +108,38 @@ describe("the pointer passing over the bird three times shoos it", () => {
   test("it lands facing back the way it came, toward the pointer", () => {
     expect(flee({ x: -20, facing: -1 }, window460).facing).toBe(1);
     expect(flee({ x: -280, facing: -1 }, window460).facing).toBe(-1);
+  });
+});
+
+describe("the bird flies in and lands on the window's edge", () => {
+  const frames = LANDING.frames;
+
+  test("it comes from above and to the right of its perch", () => {
+    expect(frames[0].x).toBeGreaterThan(0);
+    expect(frames[0].y).toBeLessThan(0);
+  });
+
+  test("it flies from right to left, never back", () => {
+    for (let i = 1; i < frames.length; i++) expect(frames[i].x).toBeLessThanOrEqual(frames[i - 1].x);
+  });
+
+  test("it faces the way it flies, to the left, the whole way", () => {
+    for (const f of frames) expect(f.facing).toBe(-1);
+  });
+
+  test("it touches down before it settles, and settles on its perch", () => {
+    expect(LANDING.touchdown).toBeGreaterThan(0);
+    expect(LANDING.touchdown).toBeLessThan(1);
+    const last = frames[frames.length - 1];
+    expect(last).toMatchObject({ offset: 1, x: 0, y: 0 });
+  });
+
+  test("its frames run in order, from start to end", () => {
+    expect(frames[0].offset).toBe(0);
+    for (let i = 1; i < frames.length; i++) expect(frames[i].offset).toBeGreaterThan(frames[i - 1].offset);
+  });
+
+  test("it then walks the way it landed", () => {
+    expect(nextHop({ x: 0, facing: frames[frames.length - 1].facing }, window460, () => 0.5).facing).toBe(-1);
   });
 });

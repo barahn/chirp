@@ -16,6 +16,22 @@
   var HOP = { shortest: 18, longest: 30, shortestRest: 800, longestRest: 3000, turnChance: 0.12 };
   var SHOO = { passes: 3, within: 4000 };
 
+  // The flight in when the page opens: from above and to the right, facing
+  // the way it flies, down onto the window's edge. touchdown is the share of
+  // the flight after which its feet are down and it stops flapping; the legs
+  // give a little before it settles.
+  var LANDING = {
+    duration: 1300,
+    touchdown: 0.8,
+    frames: [
+      { offset: 0, x: 220, y: -170, facing: -1 },
+      { offset: 0.35, x: 120, y: -110, facing: -1 },
+      { offset: 0.65, x: 40, y: -40, facing: -1 },
+      { offset: 0.8, x: 0, y: 5, facing: -1 },
+      { offset: 1, x: 0, y: 0, facing: -1 }
+    ]
+  };
+
   function between(lo, hi, random) { return lo + (hi - lo) * random(); }
 
   function clamp(x, bounds) { return Math.min(bounds.max, Math.max(bounds.min, x)); }
@@ -54,7 +70,7 @@
     return { x: toLeft ? bounds.min : bounds.max, facing: toLeft ? 1 : -1 };
   }
 
-  var api = { HOP: HOP, SHOO: SHOO, nextHop: nextHop, shooer: shooer, flee: flee };
+  var api = { HOP: HOP, SHOO: SHOO, LANDING: LANDING, nextHop: nextHop, shooer: shooer, flee: flee };
   if (typeof module === "object" && module.exports) module.exports = api;
   else root.ChirpHop = api;
 })(this);
