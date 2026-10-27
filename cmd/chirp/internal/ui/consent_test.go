@@ -253,3 +253,21 @@ func TestElevatedChirpShowsNoCode(t *testing.T) {
 		t.Errorf("ShowElevated shows %q", got)
 	}
 }
+
+// The prompt asks for attention: it is kept above other windows, where it
+// cannot open unseen behind them (barahn/chirp#147; seen on Windows 11 with
+// v0.5.0-rc.4, behind an active PowerShell). It keeps its taskbar button,
+// which flashes while it waits: unlike the session bar, it is not pinned.
+func TestThePromptStaysOnTopAndOnTheTaskbar(t *testing.T) {
+	w := newWindow(t)
+	var onTop, pinned []fyne.Window
+	w.KeepOnTop = func(win fyne.Window) { onTop = append(onTop, win) }
+	w.PinBar = func(win, _ fyne.Window) { pinned = append(pinned, win) }
+	w.ApplyOwner(client.OwnerEvent{Phase: client.OwnerReady, Peer: shown, Consent: request()})
+	if len(onTop) != 1 || onTop[0] != w.prompt.win {
+		t.Fatalf("kept %d windows on top, want the prompt alone", len(onTop))
+	}
+	if len(pinned) != 0 {
+		t.Fatal("the prompt was pinned off the taskbar")
+	}
+}

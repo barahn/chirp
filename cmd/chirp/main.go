@@ -183,6 +183,8 @@ func main() {
 	// During a session only the tray icon shows Chirp runs, and the
 	// session bar stays above other windows.
 	w.PinBar = pinBar
+	// The consent prompt stays above other windows too, on the taskbar.
+	w.KeepOnTop = keepOnTop
 	// The relay ends a session only when its owner gives the registration
 	// up, so ending one replaces the code and link too.
 	w.OnEndSession = owner.NewCode

@@ -120,6 +120,11 @@ func (w *Window) showPrompt(req *client.ConsentRequest) {
 	p.closed = func() { p.answer(false) }
 	p.win.SetCloseIntercept(p.closed)
 	p.win.Show()
+	// Above other windows, so it cannot open unseen behind them
+	// (barahn/chirp#147); left on the taskbar, where it flashes.
+	if w.KeepOnTop != nil {
+		w.KeepOnTop(p.win)
+	}
 	p.win.RequestFocus()
 	p.win.Canvas().Focus(p.decline)
 

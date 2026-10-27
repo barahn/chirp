@@ -40,10 +40,6 @@ func pinBar(win, owner fyne.Window) {
 			gwlpHWNDParent   = ^uintptr(7)  // GWLP_HWNDPARENT, -8: the owner
 			gwlExStyle       = ^uintptr(19) // GWL_EXSTYLE, -20
 			wsExAppWindow    = 0x00040000
-			hwndTopmost      = ^uintptr(0) // HWND_TOPMOST, -1
-			swpNoSize        = 0x0001
-			swpNoMove        = 0x0002
-			swpNoActivate    = 0x0010
 			swHide           = 0
 			swShowNoActivate = 4
 		)
@@ -52,8 +48,28 @@ func pinBar(win, owner fyne.Window) {
 		style, _, _ := procGetWindowLong.Call(wc.HWND, gwlExStyle)
 		_, _, _ = procSetWindowLong.Call(wc.HWND, gwlExStyle, style&^wsExAppWindow)
 		_, _, _ = procShowWindow.Call(wc.HWND, swShowNoActivate)
-		_, _, _ = procSetWindowPos.Call(wc.HWND, hwndTopmost, 0, 0, 0, 0, swpNoMove|swpNoSize|swpNoActivate)
+		topmost(wc.HWND)
 	})
+}
+
+// keepOnTop keeps win above every other window and leaves it on the taskbar
+// (barahn/chirp#147).
+func keepOnTop(win fyne.Window) {
+	if h := hwnd(win); h != 0 {
+		topmost(h)
+	}
+}
+
+// topmost puts the window h in the topmost band, without moving, resizing or
+// activating it.
+func topmost(h uintptr) {
+	const (
+		hwndTopmost   = ^uintptr(0) // HWND_TOPMOST, -1
+		swpNoSize     = 0x0001
+		swpNoMove     = 0x0002
+		swpNoActivate = 0x0010
+	)
+	_, _, _ = procSetWindowPos.Call(h, hwndTopmost, 0, 0, 0, 0, swpNoMove|swpNoSize|swpNoActivate)
 }
 
 // hwnd is win's native handle, or 0.

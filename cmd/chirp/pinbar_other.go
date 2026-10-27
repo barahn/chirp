@@ -7,5 +7,8 @@ package main
 
 import "fyne.io/fyne/v2"
 
-// pinBar does nothing on macOS yet: Chirp has no macOS build.
+// pinBar does nothing on macOS yet.
 func pinBar(_, _ fyne.Window) {}
+
+// keepOnTop does nothing on macOS yet.
+func keepOnTop(fyne.Window) {}
