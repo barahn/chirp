@@ -186,6 +186,11 @@ func (b *sessionBar) fit() {
 		need = need.AddWidthHeight(pad, pad)
 	}
 	b.win.Resize(need.Max(b.win.Canvas().Size()))
+	// Grown above the bird, it goes back to sitting on the bird's head
+	// rather than hanging down over it.
+	if b.landed && b.shown {
+		b.w.Perch.Place(b.win)
+	}
 }
 
 // run ticks the clock once a second until the bar goes.
