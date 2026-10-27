@@ -418,13 +418,65 @@
 
   setLang(detectLang(), false);
 
-  // The bird chirps now and then, as it does in the app.
+  // The bird hops along the top of the window and chirps now and then, as
+  // it does in the app; the pointer passing over it three times in a row
+  // shoos it to the far side. hop.js makes the choices; this moves it.
   var still = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   var bird = document.getElementById("hero-bird");
-  if (bird && !still) {
-    setInterval(function () {
+  if (bird && !still && window.ChirpHop && bird.animate) walk(bird, window.ChirpHop);
+
+  function walk(bird, hop) {
+    var art = bird.querySelector("svg");
+    var stage = bird.parentNode;
+    var at = { x: 0, facing: 1 };
+    var moving = null, resting = 0, paused = false, inView = true;
+    var shoo = hop.shooer();
+
+    function bounds() {
+      var inset = stage.clientWidth - bird.offsetLeft - bird.offsetWidth;
+      return { min: Math.min(0, 2 * inset + bird.offsetWidth - stage.clientWidth), max: 0 };
+    }
+    function pose(x, y, facing) { return "translate(" + x + "px, " + y + "px) scaleX(" + facing + ")"; }
+    function move(to, lift, duration, then) {
+      var from = at;
+      at = to;
+      moving = art.animate([
+        { transform: pose(from.x, 0, to.facing) },
+        { transform: pose((from.x + to.x) / 2, -lift, to.facing) },
+        { transform: pose(to.x, 0, to.facing) }
+      ], { duration: duration, easing: "ease-in-out", fill: "forwards" });
+      moving.finished.then(function () { moving = null; then(); });
+    }
+    function chirp() {
       bird.classList.add("is-chirping");
       setTimeout(function () { bird.classList.remove("is-chirping"); }, 700);
-    }, 5200);
+    }
+    function rest(ms) { clearTimeout(resting); resting = setTimeout(step, ms); }
+    function step() {
+      if (document.hidden || !inView) { paused = true; return; }
+      var to = hop.nextHop(at, bounds(), Math.random);
+      move(to, 10, 320, function () {
+        if (Math.random() < 0.3) chirp();
+        rest(to.rest);
+      });
+    }
+    function resume() {
+      if (paused && !document.hidden && inView) { paused = false; step(); }
+    }
+
+    bird.addEventListener("pointerenter", function (e) {
+      if (e.pointerType !== "mouse" || moving || !shoo(e.timeStamp)) return;
+      clearTimeout(resting);
+      move(hop.flee(at, bounds()), 60, 700, function () { rest(1500); });
+    });
+    document.addEventListener("visibilitychange", resume);
+    if (window.IntersectionObserver) {
+      new IntersectionObserver(function (entries) {
+        inView = entries[entries.length - 1].isIntersecting;
+        resume();
+      }).observe(bird);
+    }
+    // After it lands (the land animation in site.css).
+    rest(2500);
   }
 })();

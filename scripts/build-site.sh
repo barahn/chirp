@@ -24,6 +24,8 @@ warm="$root/cmd/chirp/internal/warm"
 
 rm -rf "$out"
 cp -R "$root/site" "$out"
+# The tests for the site's scripts sit next to them, and stay in the repo.
+find "$out" -name '*.test.js' -delete
 mkdir -p "$out/assets/fonts"
 cp "$warm"/fonts/*.ttf "$warm"/fonts/OFL-*.txt "$out/assets/fonts/"
 cp "$warm/bird/icon.svg" "$out/favicon.svg"
