@@ -183,8 +183,9 @@ written to make an unexpected request easy to decline. It is built in
   the user pressing a button, or the prompt closing or running out of time,
   which both decline.
 - **It asks for attention and carries no bird and no brand word.** It opens
-  as its own window and asks for focus. Keeping it above every other window
-  needs the per-OS shim the session bar uses (§ During a session).
+  as its own window, asks for focus, and is kept above every other window
+  by the per-OS shim the session bar uses (§ During a session). Unlike the
+  bar, it stays on the taskbar, where its button flashes while it waits.
 - **After the answer** the main window says what was decided. A session that
   was let in can be ended there; since the relay ends a session only when its
   owner gives the registration up, ending one also replaces the code and link.
@@ -240,7 +241,8 @@ portable way to keep a window above the others, so a small per-OS shim does
 which keeps it off the taskbar, and topmost; on X11 it asks the window
 manager for `_NET_WM_STATE_ABOVE` and to skip the taskbar. Under Wayland and
 on macOS nothing is done yet. The bar grows to show what it adds after it
-opens. The consent prompt does not use the shim yet.
+opens. The consent prompt is kept above other windows by the same shim
+(`keepOnTop`), but left on the taskbar.
 
 **On the controller's machine,** the remote screen fills the window, with a
 toolbar for monitors, clipboard, files and *End*. So far the toolbar has

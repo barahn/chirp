@@ -68,6 +68,11 @@ type Window struct {
 	// and the bar cannot be lost behind other windows; the file picker it
 	// opens is pinned above it, owned by it.
 	PinBar func(win, owner fyne.Window)
+	// KeepOnTop keeps a shown window above every other window, where the
+	// system allows it, and leaves it on the taskbar; cmd/chirp provides it
+	// per OS. The consent prompt uses it, so that it cannot open unseen
+	// behind other windows, while its taskbar button still flashes.
+	KeepOnTop func(fyne.Window)
 
 	// notify shows a system notification, and quit quits Chirp; tests
 	// replace them.
