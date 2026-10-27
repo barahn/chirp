@@ -74,3 +74,18 @@ func TestTheHeadIsWhereTheBodyStarts(t *testing.T) {
 		t.Fatalf("head at %d in a 164-pixel canvas, want about 96 (the body's top at y = 34)", got)
 	}
 }
+
+// Only the perched bird takes clicks: its box holds its body and stops
+// well short of the canvas's empty top and right, where the flight in
+// starts.
+func TestOnlyThePerchedBirdTakesClicks(t *testing.T) {
+	const w = 164
+	hit := Hit(w)
+	body := image.Pt(58, 64-int(canvasY)) // the body's middle, in canvas pixels
+	if !body.In(hit) {
+		t.Fatalf("hit box %v misses the body at %v", hit, body)
+	}
+	if hit.Min.Y < 90 || hit.Max.X > 110 {
+		t.Fatalf("hit box %v reaches into the empty canvas", hit)
+	}
+}

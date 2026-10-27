@@ -48,3 +48,15 @@ func BalloonAt(bird image.Rectangle, size image.Point, work image.Rectangle) ima
 	}
 	return r
 }
+
+// Hit is the box, in a bird window width pixels wide, that takes clicks:
+// the perched bird's, beak and tail included. The rest of the window lets
+// clicks through, where the system needs telling (X11's input shape).
+func Hit(width int) image.Rectangle {
+	scale := float64(width) / canvasW
+	at := func(x, y float64) image.Point {
+		return image.Pt(int(math.Round((x-canvasX)*scale)), int(math.Round((y-canvasY)*scale)))
+	}
+	// The perched bird spans x 12 to 101 and y 34 to 101 in the art.
+	return image.Rectangle{Min: at(12, 34), Max: at(101, 102)}
+}
