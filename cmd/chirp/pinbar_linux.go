@@ -17,7 +17,19 @@ import (
 // lost behind other windows. Under Wayland there are no such requests, and
 // nothing is done.
 func pinBar(bar, _ fyne.Window) {
-	nw, ok := bar.(driver.NativeWindow)
+	addWMState(bar, "_NET_WM_STATE_SKIP_TASKBAR", "_NET_WM_STATE_SKIP_PAGER", "_NET_WM_STATE_ABOVE")
+}
+
+// keepOnTop asks the X11 window manager to keep win above other windows
+// (_NET_WM_STATE_ABOVE), leaving it on the taskbar (barahn/chirp#147).
+func keepOnTop(win fyne.Window) {
+	addWMState(win, "_NET_WM_STATE_ABOVE")
+}
+
+// addWMState asks the window manager to add the named _NET_WM_STATE states
+// to win. It does nothing under Wayland, or where X11 cannot be reached.
+func addWMState(win fyne.Window, states ...string) {
+	nw, ok := win.(driver.NativeWindow)
 	if !ok {
 		return
 	}
@@ -44,7 +56,11 @@ func pinBar(bar, _ fyne.Window) {
 		}
 		root := xproto.Setup(conn).DefaultScreen(conn).Root
 		// Each request carries at most two states.
-		add := func(first, second xproto.Atom) {
+		for i := 0; i < len(states); i += 2 {
+			first, second := atom(states[i]), xproto.Atom(0)
+			if i+1 < len(states) {
+				second = atom(states[i+1])
+			}
 			const netWMStateAdd = 1
 			ev := xproto.ClientMessageEvent{
 				Format: 32,
@@ -55,7 +71,5 @@ func pinBar(bar, _ fyne.Window) {
 			mask := uint32(xproto.EventMaskSubstructureRedirect | xproto.EventMaskSubstructureNotify)
 			_ = xproto.SendEventChecked(conn, false, root, mask, string(ev.Bytes())).Check()
 		}
-		add(atom("_NET_WM_STATE_SKIP_TASKBAR"), atom("_NET_WM_STATE_SKIP_PAGER"))
-		add(atom("_NET_WM_STATE_ABOVE"), 0)
 	})
 }

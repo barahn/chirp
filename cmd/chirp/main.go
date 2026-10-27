@@ -95,7 +95,10 @@ func main() {
 		}
 		os.Exit(1)
 	}})
-	a := app.New()
+	// The ID is the one the macOS bundle carries (scripts/macapp). Fyne
+	// keeps preferences under it, where the only one Chirp writes is
+	// whether the bird is hidden (barahn/chirp#136, #49).
+	a := app.NewWithID(appID)
 	a.Settings().SetTheme(warm.New())
 	a.SetIcon(warm.AppIcon)
 	w := ui.New(a)
@@ -183,6 +186,9 @@ func main() {
 	// During a session only the tray icon shows Chirp runs, and the
 	// session bar stays above other windows.
 	w.PinBar = pinBar
+	// The consent prompt stays above other windows too, on the taskbar.
+	w.KeepOnTop = keepOnTop
+	w.Prefs = a.Preferences()
 	// The relay ends a session only when its owner gives the registration
 	// up, so ending one replaces the code and link too.
 	w.OnEndSession = owner.NewCode
@@ -356,6 +362,9 @@ func nostrConfig(list string) *client.NostrConfig {
 // docs/relay.md). There is no TURN by default: a TURN credential baked into
 // every binary would work for anyone who unpacks one (docs/stun-turn.md,
 // Credentials).
+// appID names Chirp to the system, as the macOS bundle does.
+const appID = "app.usechirp.chirp"
+
 const (
 	defaultRelay = "https://relay.usechirp.app"
 	defaultICE   = "stun:relay.usechirp.app:3478"
@@ -414,6 +423,7 @@ func viewSession(ctx context.Context, conn *client.SessionConn, ice webrtc.PeerC
 		// End closes this session's conn, which ends this Help and no
 		// other; the viewer failing does the same.
 		r := w.OpenRemote(func(ev bark.InputEvent) { _ = v.SendInput(ev) }, func() { _ = conn.Close() })
+		r.SelectDisplay = v.SelectDisplay
 		r.SendFile = func(name string, f io.ReadSeeker, progress func(sent, total int64)) error {
 			_, err := v.SendFile(ctx, name, f, progress)
 			return err
@@ -424,6 +434,8 @@ func viewSession(ctx context.Context, conn *client.SessionConn, ice webrtc.PeerC
 	defer fyne.Do(remote.Close)
 	v.OnFrame(remote.Show)
 	v.OnNotice(func(n stream.Notice) { remote.Notice(n.Type) })
+	// The other computer's monitors, for the picker in the toolbar.
+	v.OnDisplays(remote.Displays)
 	sync := newClipSync(clipboard.NewManager(), 500*time.Millisecond, v.SendClipboard)
 	v.OnPermissions(func(granted []string) {
 		remote.Granted(granted)

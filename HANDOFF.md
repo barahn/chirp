@@ -132,6 +132,7 @@ cmd/chirp-relay/main_test.go
 cmd/chirp-relay/pages.go
 cmd/chirp-relay/pages_test.go
 cmd/chirp-status/main.go
+cmd/chirp/appid_test.go
 cmd/chirp/clipsync.go
 cmd/chirp/clipsync_test.go
 cmd/chirp/downloads.go
@@ -147,10 +148,13 @@ cmd/chirp/internal/privilege/privilege.go
 cmd/chirp/internal/privilege/privilege_other.go
 cmd/chirp/internal/privilege/privilege_test.go
 cmd/chirp/internal/privilege/privilege_windows.go
+cmd/chirp/internal/ui/bird.go
+cmd/chirp/internal/ui/bird_test.go
 cmd/chirp/internal/ui/codeformat.go
 cmd/chirp/internal/ui/codeformat_test.go
 cmd/chirp/internal/ui/consent.go
 cmd/chirp/internal/ui/consent_test.go
+cmd/chirp/internal/ui/displays_test.go
 cmd/chirp/internal/ui/keys.go
 cmd/chirp/internal/ui/messages.go
 cmd/chirp/internal/ui/permission.go

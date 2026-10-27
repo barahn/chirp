@@ -183,8 +183,9 @@ written to make an unexpected request easy to decline. It is built in
   the user pressing a button, or the prompt closing or running out of time,
   which both decline.
 - **It asks for attention and carries no bird and no brand word.** It opens
-  as its own window and asks for focus. Keeping it above every other window
-  needs the per-OS shim the session bar uses (§ During a session).
+  as its own window, asks for focus, and is kept above every other window
+  by the per-OS shim the session bar uses (§ During a session). Unlike the
+  bar, it stays on the taskbar, where its button flashes while it waits.
 - **After the answer** the main window says what was decided. A session that
   was let in can be ended there; since the relay ends a session only when its
   owner gives the registration up, ending one also replaces the code and link.
@@ -240,13 +241,39 @@ portable way to keep a window above the others, so a small per-OS shim does
 which keeps it off the taskbar, and topmost; on X11 it asks the window
 manager for `_NET_WM_STATE_ABOVE` and to skip the taskbar. Under Wayland and
 on macOS nothing is done yet. The bar grows to show what it adds after it
-opens. The consent prompt does not use the shim yet.
+opens. The consent prompt is kept above other windows by the same shim
+(`keepOnTop`), but left on the taskbar.
+
+**The bird by the taskbar** (barahn/chirp#136) makes the bar its balloon.
+The window's side is built (`cmd/chirp/internal/ui/bird.go`); the bird
+itself, drawn per OS in a window of its own shape (`ui.Perch`), comes next.
+With a bird:
+
+- **It lands** by the tray when the session starts, and its balloon, borderless
+  above it, opens to say who is in, then folds away.
+- **Tapping the bird** opens the balloon -- who, the clock, *End*, the switches
+  that only turn off, Send a file -- until it is tapped again.
+- **Each alert** (a paste, a copy, a file, a password held back) is said in the
+  balloon, one at a time for a few seconds, with the bird chirping, instead of
+  a system notification. *Turn alerts off* in the tray silences both.
+- **The tray** has *Hide the Chirp bird* or *Show the Chirp bird*, by its state.
+  Hidden, the alerts are system notifications again. Whether it is hidden is
+  the one thing Chirp remembers between runs (#49), in Fyne's preferences
+  under the app ID `app.usechirp.chirp`.
+- **When the session ends** the bird flies off and the main window comes back.
+
+Without a bird -- until the per-OS shim lands, and under Wayland and on macOS
+-- the balloon is the session window as the bar was: always out, movable,
+and closing it ends the session.
 
 **On the controller's machine,** the remote screen fills the window, with a
-toolbar for monitors, clipboard, files and *End*. So far the toolbar has
-*Send a file* and *End*, and lines for what the other person has not allowed,
-what the other computer says instead of its picture, and how the last file
-went; the monitor picker is still to come (#79). *Send a file* (Pigeon Post)
+toolbar for monitors, clipboard, files and *End*. The toolbar has the monitor
+picker, *Send a file* and *End*, and lines for what the other person has not
+allowed, what the other computer says instead of its picture, and how the
+last file went. The picker (#79) shows only when the other computer has more
+than one monitor: *Screen 1 of 2*, with the one being streamed selected.
+Picking another asks for it; the picker follows what the other computer then
+streams, and a switch it refuses is said. *Send a file* (Pigeon Post)
 sends one file, or several dropped on the window, one at a time, with the
 progress as the owner's Chirp acknowledges it, while the owner allows files.
 The clipboard needs no button: while the owner allows it, it syncs both ways

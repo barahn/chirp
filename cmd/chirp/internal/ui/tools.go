@@ -17,6 +17,8 @@ import (
 	"fyne.io/fyne/v2/storage"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+
+	"github.com/barahn/remotekit/bark"
 )
 
 // The clipboard and files during a session (barahn/chirp#134, docs/ux.md,
@@ -54,9 +56,10 @@ type Alert struct {
 	Folder string
 }
 
-// Alert tells the owner what happened in the session sessionID, in a
-// notification, and in the session bar for a file that arrived. It is
-// called on Fyne's goroutine.
+// Alert tells the owner what happened in the session sessionID: in the
+// bird's balloon while the bird is out, in a system notification otherwise,
+// and in the balloon's file line, with Open folder, for a file that arrived.
+// It is called on Fyne's goroutine.
 func (w *Window) Alert(sessionID string, a Alert) {
 	b := w.bar
 	if b == nil || b.session.ID != sessionID || b.done {
@@ -67,6 +70,10 @@ func (w *Window) Alert(sessionID string, a Alert) {
 	}
 	text := alertText(b.session.Name, a)
 	if text == "" || w.alertsOff {
+		return
+	}
+	if w.birdOut() {
+		b.announce(text)
 		return
 	}
 	w.notify(fyne.NewNotification("Chirp", text))
@@ -144,18 +151,24 @@ func (w *Window) updateTray() {
 	if w.alertsOff {
 		alerts = tr("Turn alerts on")
 	}
-	w.Tray.Show(fyne.NewMenu("Chirp",
+	items := []*fyne.MenuItem{
 		fyne.NewMenuItem(tr("Open Chirp"), func() {
 			w.mainHidden = false
 			w.win.Show()
 			w.win.RequestFocus()
 		}),
+	}
+	if bird := w.birdItem(); bird != nil {
+		items = append(items, bird)
+	}
+	items = append(items,
 		fyne.NewMenuItem(alerts, func() {
 			w.alertsOff = !w.alertsOff
 			w.updateTray()
 		}),
 		fyne.NewMenuItem(tr("End session"), w.endFromTray),
-	))
+	)
+	w.Tray.Show(fyne.NewMenu("Chirp", items...))
 	if !w.mainHidden {
 		w.mainHidden = true
 		w.win.Hide()
@@ -184,10 +197,14 @@ func (w *Window) closeMain() {
 	w.quit()
 }
 
-// remoteTools is the controller's toolbar: Send a file, usable while the
-// other person allows files, and a line for how things went.
+// remoteTools is the controller's toolbar: which monitor to see, when the
+// other computer has several (barahn/chirp#79); Send a file, usable while the
+// other person allows files; and a line for how things went.
 type remoteTools struct {
 	r        *Remote
+	screens  *widget.Select
+	indexes  []int // the agent's index for each of screens' options
+	quiet    bool  // set while the picker follows the other computer
 	sendFile *widget.Button
 	open     *widget.Button
 	status   *widget.Label
@@ -198,6 +215,8 @@ type remoteTools struct {
 
 func newRemoteTools(r *Remote) *remoteTools {
 	t := &remoteTools{r: r}
+	t.screens = widget.NewSelect(nil, t.pickScreen)
+	t.screens.Hide()
 	t.sendFile = widget.NewButtonWithIcon(tr("Send a file"), theme.UploadIcon(), t.chooseFile)
 	t.open = widget.NewButtonWithIcon(tr("Open folder"), theme.FolderOpenIcon(), func() { openFolder(r.app, t.folder) })
 	t.open.Hide()
@@ -210,8 +229,60 @@ func newRemoteTools(r *Remote) *remoteTools {
 
 // buttons is the toolbar's row, before End.
 func (t *remoteTools) buttons() fyne.CanvasObject {
-	return container.NewHBox(t.sendFile, t.open, layout.NewSpacer())
+	return container.NewHBox(t.screens, t.sendFile, t.open, layout.NewSpacer())
 }
+
+// displays shows the other computer's monitors in the picker, with the one
+// being streamed selected, and says why a switch was refused. With fewer
+// than two there is nothing to pick, and no picker.
+func (t *remoteTools) displays(p bark.DisplaysPayload) {
+	if p.Error != "" {
+		t.say(tr(screenRefused))
+	}
+	if len(p.Displays) < 2 {
+		t.screens.Hide()
+		t.r.win.Content().Refresh()
+		return
+	}
+	options := make([]string, len(p.Displays))
+	t.indexes = make([]int, len(p.Displays))
+	selected := ""
+	for i, d := range p.Displays {
+		options[i] = trf("Screen %d of %d", i+1, len(p.Displays))
+		t.indexes[i] = d.Index
+		if d.Index == p.Active {
+			selected = options[i]
+		}
+	}
+	t.quiet = true
+	t.screens.SetOptions(options)
+	if selected != "" {
+		t.screens.SetSelected(selected)
+	} else {
+		t.screens.ClearSelected()
+	}
+	t.quiet = false
+	t.screens.Show()
+	t.r.win.Content().Refresh()
+}
+
+// pickScreen asks the other computer for the monitor the user picked. The
+// picker moves back if the other computer refuses, when it says which
+// monitor it still streams.
+func (t *remoteTools) pickScreen(option string) {
+	if t.quiet {
+		return
+	}
+	i := slices.Index(t.screens.Options, option)
+	if i < 0 || i >= len(t.indexes) || t.r.SelectDisplay == nil {
+		return
+	}
+	if err := t.r.SelectDisplay(t.indexes[i]); err != nil {
+		t.say(tr(screenRefused))
+	}
+}
+
+const screenRefused = "That screen can't be shown right now. Try again."
 
 // granted takes what the other person allows now.
 func (t *remoteTools) granted(permissions []string) {
