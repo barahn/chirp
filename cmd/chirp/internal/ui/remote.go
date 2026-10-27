@@ -25,14 +25,18 @@ import (
 // ends the session. The clipboard needs no button: cmd/chirp syncs it both
 // ways while the other person allows it (#134).
 //
-// Show, Notice, Granted and FileReceived may be called from any goroutine;
-// everything else from Fyne's.
+// Show, Notice, Granted, Displays and FileReceived may be called from any
+// goroutine; everything else from Fyne's.
 type Remote struct {
 	// SendFile is how Send a file reaches the other computer: cmd/chirp
 	// sets it on Fyne's goroutine, right after OpenRemote. It is called off
 	// Fyne's goroutine, and returns once the other end has saved the file or
 	// refused it.
 	SendFile func(name string, f io.ReadSeeker, progress func(sent, total int64)) error
+	// SelectDisplay asks the other computer to stream the monitor with its
+	// index, as Displays reported it. The outcome comes back through
+	// Displays. It is called on Fyne's goroutine.
+	SelectDisplay func(index int) error
 
 	w      *Window
 	end    func()
@@ -116,6 +120,17 @@ func (r *Remote) Show(img *image.YCbCr) {
 			}
 		})
 	}
+}
+
+// Displays takes the other computer's monitors, which one is streamed, and
+// why a switch was refused, as its runner announces them. It may be called
+// from any goroutine.
+func (r *Remote) Displays(p bark.DisplaysPayload) {
+	fyne.Do(func() {
+		if !r.closed {
+			r.tools.displays(p)
+		}
+	})
 }
 
 // Notice shows what the other computer said instead of its screen: kind is

@@ -245,10 +245,13 @@ opens. The consent prompt is kept above other windows by the same shim
 (`keepOnTop`), but left on the taskbar.
 
 **On the controller's machine,** the remote screen fills the window, with a
-toolbar for monitors, clipboard, files and *End*. So far the toolbar has
-*Send a file* and *End*, and lines for what the other person has not allowed,
-what the other computer says instead of its picture, and how the last file
-went; the monitor picker is still to come (#79). *Send a file* (Pigeon Post)
+toolbar for monitors, clipboard, files and *End*. The toolbar has the monitor
+picker, *Send a file* and *End*, and lines for what the other person has not
+allowed, what the other computer says instead of its picture, and how the
+last file went. The picker (#79) shows only when the other computer has more
+than one monitor: *Screen 1 of 2*, with the one being streamed selected.
+Picking another asks for it; the picker follows what the other computer then
+streams, and a switch it refuses is said. *Send a file* (Pigeon Post)
 sends one file, or several dropped on the window, one at a time, with the
 progress as the owner's Chirp acknowledges it, while the owner allows files.
 The clipboard needs no button: while the owner allows it, it syncs both ways
