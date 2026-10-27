@@ -169,8 +169,9 @@ func (b *sessionBar) next() {
 	b.news.SetText(text)
 	b.news.Show()
 	b.w.Perch.Pose(poseChirping)
-	b.show()
+	// Fit first: show places the balloon above the bird by its size.
 	b.fit()
+	b.show()
 	b.w.after(alertShow, b.next)
 }
 

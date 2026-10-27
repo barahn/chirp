@@ -208,6 +208,7 @@ cmd/chirp/notify_linux.go
 cmd/chirp/notify_linux_test.go
 cmd/chirp/notify_other.go
 cmd/chirp/notify_windows.go
+cmd/chirp/perch_linux.go
 cmd/chirp/perch_other.go
 cmd/chirp/perch_windows.go
 cmd/chirp/pinbar_linux.go
