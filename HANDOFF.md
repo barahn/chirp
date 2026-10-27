@@ -146,6 +146,8 @@ cmd/chirp/internal/alert/alert_other.go
 cmd/chirp/internal/alert/alert_windows.go
 cmd/chirp/internal/perch/art.go
 cmd/chirp/internal/perch/art_test.go
+cmd/chirp/internal/perch/place.go
+cmd/chirp/internal/perch/place_test.go
 cmd/chirp/internal/privilege/privilege.go
 cmd/chirp/internal/privilege/privilege_other.go
 cmd/chirp/internal/privilege/privilege_test.go
@@ -206,6 +208,8 @@ cmd/chirp/notify_linux.go
 cmd/chirp/notify_linux_test.go
 cmd/chirp/notify_other.go
 cmd/chirp/notify_windows.go
+cmd/chirp/perch_other.go
+cmd/chirp/perch_windows.go
 cmd/chirp/pinbar_linux.go
 cmd/chirp/pinbar_other.go
 cmd/chirp/pinbar_windows.go
