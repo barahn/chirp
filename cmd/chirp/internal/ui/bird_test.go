@@ -4,10 +4,15 @@
 package ui
 
 import (
+	"slices"
 	"testing"
 	"time"
 
 	"fyne.io/fyne/v2"
+	"github.com/barahn/remotekit/bark"
+
+	"github.com/barahn/chirp/client"
+	"github.com/barahn/chirp/cmd/chirp/internal/chirpsound"
 )
 
 // fakePerch records what the window asks of the bird by the taskbar.
@@ -270,5 +275,66 @@ func TestABalloonThatGrowsWhileOpenIsPlacedAgain(t *testing.T) {
 	got := p.sizes[len(p.sizes)-1]
 	if want := w.bar.win.Canvas().Size(); got != want {
 		t.Fatalf("placed at %v, then grew to %v", got, want)
+	}
+}
+
+// heard records the chirps a window plays.
+func heard(w *Window) *[]chirpsound.Sound {
+	var got []chirpsound.Sound
+	w.Sound = func(s chirpsound.Sound) { got = append(got, s) }
+	return &got
+}
+
+// The bird chirps only once the owner has let someone in: as it lands, at
+// each alert, and as it flies off. Nothing plays while the prompt asks, so
+// a friendly sound can never be the cue to click Allow (docs/ux.md, Sound).
+func TestTheBirdChirpsOnlyAfterTheOwnerLetsSomeoneIn(t *testing.T) {
+	w, _, _, _, _, c := birdWindow(t)
+	got := heard(w)
+	w.ApplyOwner(client.OwnerEvent{Phase: client.OwnerReady, Peer: shown, Consent: request()})
+	if len(*got) != 0 {
+		t.Fatalf("heard %v while the prompt asked", *got)
+	}
+	started(w, "Ana")
+	c.fire()
+	w.Alert("s1", Alert{Kind: AlertPastedIn, Size: 5})
+	w.bar.endNow()
+	want := []chirpsound.Sound{chirpsound.Landed, chirpsound.Alert, chirpsound.Leaving}
+	if !slices.Equal(*got, want) {
+		t.Fatalf("heard %v, want %v", *got, want)
+	}
+}
+
+// A hidden bird is silent, and so are alerts turned off.
+func TestAHiddenBirdAndAlertsOffAreSilent(t *testing.T) {
+	w, _, _, _, prefs, _ := birdWindow(t)
+	prefs[birdHiddenKey] = true
+	got := heard(w)
+	started(w, "Ana")
+	w.Alert("s1", Alert{Kind: AlertPastedIn, Size: 5})
+	if len(*got) != 0 {
+		t.Fatalf("heard %v from a hidden bird", *got)
+	}
+
+	w2, _, _, _, _, c := birdWindow(t)
+	got2 := heard(w2)
+	started(w2, "Ana")
+	c.fire()
+	w2.alertsOff = true
+	w2.Alert("s1", Alert{Kind: AlertPastedIn, Size: 5})
+	if slices.Contains(*got2, chirpsound.Alert) {
+		t.Fatalf("heard %v with alerts off", *got2)
+	}
+}
+
+// The person helping hears the chirp once, when they are let in.
+func TestTheHelperHearsAChirpWhenLetIn(t *testing.T) {
+	inPlace(t)
+	w := newWindow(t)
+	got := heard(w)
+	r := w.OpenRemote(func(bark.InputEvent) {}, func() {})
+	defer r.Close()
+	if !slices.Equal(*got, []chirpsound.Sound{chirpsound.LetIn}) {
+		t.Fatalf("heard %v, want the let-in chirp once", *got)
 	}
 }

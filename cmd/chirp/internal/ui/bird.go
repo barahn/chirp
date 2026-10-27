@@ -6,6 +6,8 @@ package ui
 import (
 	"time"
 
+	"github.com/barahn/chirp/cmd/chirp/internal/chirpsound"
+
 	"fyne.io/fyne/v2"
 )
 
@@ -106,6 +108,13 @@ func (w *Window) birdItem() *fyne.MenuItem {
 	return fyne.NewMenuItem(tr("Hide the Chirp bird"), func() { w.setBirdHidden(true) })
 }
 
+// play plays s, if Chirp can.
+func (w *Window) play(s chirpsound.Sound) {
+	if w.Sound != nil {
+		w.Sound(s)
+	}
+}
+
 // land brings the bird in, with the balloon open to say who is in.
 func (b *sessionBar) land() {
 	p := b.w.Perch
@@ -114,6 +123,7 @@ func (b *sessionBar) land() {
 	}
 	b.landed = true
 	p.Land(b.tapped)
+	b.w.play(chirpsound.Landed)
 	b.show()
 	b.folding = b.w.after(landShow, b.fold)
 }
@@ -125,6 +135,7 @@ func (b *sessionBar) flyOff() {
 	}
 	b.landed = false
 	b.w.Perch.FlyOff()
+	b.w.play(chirpsound.Leaving)
 }
 
 // tapped is a click on the bird: it opens the balloon, or closes one the
@@ -169,6 +180,7 @@ func (b *sessionBar) next() {
 	b.news.SetText(text)
 	b.news.Show()
 	b.w.Perch.Pose(poseChirping)
+	b.w.play(chirpsound.Alert)
 	// Fit first: show places the balloon above the bird by its size.
 	b.fit()
 	b.show()

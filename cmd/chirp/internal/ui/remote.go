@@ -17,6 +17,8 @@ import (
 	"fyne.io/fyne/v2/widget"
 
 	"github.com/barahn/remotekit/bark"
+
+	"github.com/barahn/chirp/cmd/chirp/internal/chirpsound"
 )
 
 // Remote is the controller's window onto the other computer (docs/ux.md,
@@ -97,6 +99,8 @@ func (w *Window) OpenRemote(input func(bark.InputEvent), end func()) *Remote {
 	r.win.Resize(fyne.NewSize(1024, 640))
 	r.win.Show()
 	r.win.Canvas().Focus(r.view)
+	// Let in: the one moment that is good news for both people.
+	w.play(chirpsound.LetIn)
 	r.end = finish
 	w.remote = r
 	w.updateTray()

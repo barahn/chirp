@@ -189,6 +189,8 @@ func main() {
 	// The consent prompt stays above other windows too, on the taskbar.
 	w.KeepOnTop = keepOnTop
 	w.Prefs = a.Preferences()
+	// Its chirps, where the system can play them (barahn/chirp#81).
+	w.Sound = newSoundPlayer()
 	// The bird by the taskbar, where Chirp can draw it (barahn/chirp#136).
 	if p := newPerch(); p != nil {
 		w.Perch = p
