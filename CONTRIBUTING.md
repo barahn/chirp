@@ -98,10 +98,14 @@ branch protection it assumes, is in [docs/branching.md](docs/branching.md) and
 ## What is enforced today
 
 CI checks that every non-merge commit in a pull request carries a
-`Signed-off-by` trailer, and that the dependency licences in
-[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) are current and permissive,
+`Signed-off-by` trailer, and that every dependency's licence is permissive,
 apart from exceptions the maintainer has accepted by name (today, the fonts
-Fyne embeds: barahn/chirp#54).
+Fyne embeds: barahn/chirp#54). That check is
+`scripts/gen-third-party-notices.sh`, which fails on a copyleft or
+unrecognised licence. It writes `THIRD_PARTY_NOTICES.md`, which is **not
+committed** -- it is generated here, uploaded as a run artefact, and shipped
+with each release in `chirp-notices.zip`. Run the script locally if you want
+to read it.
 
 Fabrintek's ownership of Chirp is no defence against third-party code arriving
 here under terms Fabrintek cannot pass on. The licence gate treats an

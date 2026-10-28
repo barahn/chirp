@@ -111,7 +111,7 @@ sound), *v0.9* (public beta, fixes only) and *v1.0*.
 | `chirp-macos-universal.zip` | `Chirp.app` for macOS 12.3 or newer, Intel and Apple silicon in one bundle, signed with Fabrintek's self-signed certificate ([below](#chirpapp-and-its-certificate)). |
 | `chirp-linux-amd64` | Chirp for 64-bit Linux with glibc 2.35 or newer (Ubuntu 22.04, Debian 12 and later). It needs `libGL` and `libwayland-client`, which every desktop has, and on Wayland GStreamer with its PipeWire plugin (`gstreamer1.0-tools gstreamer1.0-pipewire` on Debian and Ubuntu) to share the screen. |
 | `chirp-relay-linux-amd64`, `chirp-relay-linux-arm64` | The relay, static, for a server (`docs/relay.md`). |
-| `chirp-notices.zip` | `LICENSE`, `THIRD_PARTY_NOTICES.md` and the fonts' OFL texts: the notices the binaries' third-party code and fonts require. |
+| `chirp-notices.zip` | `LICENSE`, the fonts' OFL texts, and `THIRD_PARTY_NOTICES.md` generated during the release from the modules it was built from: the notices the binaries' third-party code and fonts require. |
 | `SHA256SUMS`, `SHA256SUMS.sigstore.json` | Checksums of every file above, and their Sigstore signature. |
 | `chirp-sbom.spdx.json` | The SBOM, from `sbom.yml`. |
 

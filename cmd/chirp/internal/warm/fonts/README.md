@@ -5,9 +5,11 @@ commercial terms cover them. Each one is under the SIL Open Font License 1.1,
 which the maintainer accepted for Chirp in barahn/chirp#54, and stays under it
 whichever licence Chirp is used under. The OFL allows that: the fonts may be
 bundled with any software, provided their notices go with them and they are
-not sold by themselves. `THIRD_PARTY_NOTICES.md` reproduces each licence in
-full, and `scripts/gen-third-party-notices.sh` gates every font here one by
-one.
+not sold by themselves. `scripts/gen-third-party-notices.sh` gates every font
+here one by one and reproduces each licence in full in the
+`THIRD_PARTY_NOTICES.md` it generates; that file ships in every release's
+`chirp-notices.zip`, which is how the notices reach the people the OFL means
+them for.
 
 | File | Family, weight | Licence text | Copyright |
 | --- | --- | --- | --- |

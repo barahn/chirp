@@ -221,6 +221,10 @@ jobs:
       # them. THIRD_PARTY_NOTICES.md reproduces every one.
       - name: Bundle the licence notices
         run: |
+          # Generated here rather than read from the tree: the notices describe
+          # the modules this release was built from, so generating them at
+          # release time is the only way they cannot disagree with it.
+          ./scripts/gen-third-party-notices.sh THIRD_PARTY_NOTICES.md
           mkdir -p notices
           cp LICENSE THIRD_PARTY_NOTICES.md cmd/chirp/internal/warm/fonts/OFL-*.txt notices/
           (cd notices && zip -q -9 ../dist/chirp-notices.zip ./*)
