@@ -53,6 +53,9 @@
           },
           {
             "context": "Relay image & deploy files"
+          },
+          {
+            "context": "Design hold"
           }
         ]
       }
