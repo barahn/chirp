@@ -109,7 +109,6 @@ LICENSE
 LICENSING.md
 README.md
 SECURITY.md
-THIRD_PARTY_NOTICES.md
 client/client.go
 client/client_test.go
 client/e2e_test.go
@@ -1054,8 +1053,8 @@ platform, and on Linux the X11 and OpenGL development headers. CI's
 pull request that adds `cmd/chirp` (barahn/chirp#10) has to move its build to
 native runners per OS (a matrix of `ubuntu`, `windows` and `macos`), or keep
 the cross-compile check for the library packages and build `cmd/chirp`
-natively. `THIRD_PARTY_NOTICES.md` grows by Fyne's tree in that same pull
-request, and the licence gate re-checks it there. The library packages
+The notices the licence gate generates grow by Fyne's tree in that
+same pull request, and the gate re-checks every one of them there. The library packages
 (`session`, `signalling`) must not import Fyne. Keep the UI in `cmd/chirp`,
 or a package under it, so the relay still builds without cgo.
 
@@ -1085,8 +1084,9 @@ may become):
   be licence-*compatible* and still unacceptable: Fabrintek relicenses Chirp
   for its proprietary platform on the strength of owning all of Chirp, and it
   owns none of its dependencies. Permissive only (MIT/BSD/Apache-2.0). CI
-  enforces this via `scripts/gen-third-party-notices.sh`; after any dependency
-  change, re-run it and commit `THIRD_PARTY_NOTICES.md`. The one exception is
+  enforces this via `scripts/gen-third-party-notices.sh`, whose exit status
+  *is* the gate -- the notices it writes are generated, never committed, and
+  ship in each release's `chirp-notices.zip`. The one exception is
   the fonts Fyne embeds: the maintainer accepted the SIL OFL 1.1 and the
   Bitstream Vera licence for them (barahn/chirp#54). They stay under their own
   licences, and the script gates every embedded font one by one, so a font a

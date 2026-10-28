@@ -58,8 +58,11 @@ platform, and it never will: the dependency runs the other way.
 ## Third-party code
 
 Chirp's dependencies are listed with their full licence texts in
-[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), which is generated and
-checked in CI.
+`THIRD_PARTY_NOTICES.md`, which `scripts/gen-third-party-notices.sh`
+generates. It is not committed: CI runs the script on every pull request --
+that run *is* the licence check -- and the release generates it again and
+ships it in `chirp-notices.zip`, which is where the notices have to travel
+with the binaries that embed the code.
 
 The dual-licensing above rests on Fabrintek owning what is in this repository.
 It is no defence against third-party code arriving here under terms Fabrintek
