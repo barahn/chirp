@@ -17,6 +17,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/barahn/chirp/signalling"
 	"github.com/barahn/remotekit/pake"
 	"github.com/barahn/remotekit/signal/nostr"
 	"github.com/barahn/remotekit/stream"
@@ -307,6 +308,36 @@ func TestASessionIsSignalledOverNostr(t *testing.T) {
 		if k != 1059 {
 			t.Fatalf("the Nostr relay saw an event of kind %d; want only gift wraps (1059): %v", k, kinds)
 		}
+	}
+}
+
+func TestAPublicNodeCarriesASessionSignalledOverNostr(t *testing.T) {
+	r := newRelay(t, func(s *signalling.Server) { s.LookupOnly = true })
+	nr := newNostrRelay(t)
+	serve, served := serving()
+	o, events, _, _ := runOwnerServing(t, newNostrClient(t, r, nr), serve)
+	shown := await(t, events, "a code", ready).Peer
+
+	cc := newNostrClient(t, r, nr)
+	viewed := make(chan *SessionConn, 1)
+	cc.View = func(_ context.Context, conn *SessionConn) {
+		viewed <- conn
+		<-conn.Done()
+	}
+	helped := helpWith(t, cc, shown.Spoken(), "Ana")
+	req, _ := askedAndReplaced(t, events, shown.Code)
+	if _, err := o.Answer(context.Background(), req.SessionID, req.Permissions); err != nil {
+		t.Fatal(err)
+	}
+	await(t, helped, "the helper to be let in", func(ev HelperEvent) bool { return ev.Phase == HelperAllowed })
+	owner := await(t, served, "the owner's session", func(*SessionConn) bool { return true })
+	view := await(t, viewed, "the helper's session", func(*SessionConn) bool { return true })
+
+	if err := view.WriteMessage([]byte(`{"type":"offer","sdp":"v=0","viewer_id":"helper"}`)); err != nil {
+		t.Fatal(err)
+	}
+	if got := fieldsOf(t, read(t, owner)); got["type"] != "offer" {
+		t.Errorf("the owner read %v; want the offer", got)
 	}
 }
 

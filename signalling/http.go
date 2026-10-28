@@ -58,6 +58,13 @@ type Server struct {
 	// is free for the next one. Zero means DefaultControllerGrace.
 	ControllerGrace time.Duration
 
+	// LookupOnly makes a public node: the server only says how an owner can
+	// be reached over Nostr, and offers no path on which it would relay a
+	// session's signalling, since on that path it could swap the DTLS
+	// fingerprints and sit in the middle. Owners still hold their socket, so
+	// the server knows they are running; no controller can join one.
+	LookupOnly bool
+
 	// PingInterval is how often the relay pings each socket. A socket that
 	// answers none of the pings for two intervals is closed, so a peer that
 	// vanished without closing is noticed; and the pings keep the socket from
@@ -127,14 +134,16 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/peers", s.registerPeer)
 	mux.HandleFunc("GET /api/peers/{peer}", s.getPeer)
 	mux.HandleFunc("DELETE /api/peers/{peer}", s.releasePeer)
-	mux.HandleFunc("POST /api/peers/{peer}/consent", s.submitConsent)
-	mux.HandleFunc("POST /api/redeem", s.redeem)
-	mux.HandleFunc("POST /api/links/{token}/sessions", s.redeemLink)
-	mux.HandleFunc("GET /api/sessions/{id}", s.getSession)
 	mux.HandleFunc("PUT /api/peers/{peer}/contact", s.setContact)
 	mux.HandleFunc("POST /api/lookup", s.lookup)
 	mux.HandleFunc("POST /api/links/{token}/lookup", s.lookupLink)
 	mux.HandleFunc("GET /ws", s.serveWS)
+	if !s.LookupOnly {
+		mux.HandleFunc("POST /api/peers/{peer}/consent", s.submitConsent)
+		mux.HandleFunc("POST /api/redeem", s.redeem)
+		mux.HandleFunc("POST /api/links/{token}/sessions", s.redeemLink)
+		mux.HandleFunc("GET /api/sessions/{id}", s.getSession)
+	}
 	return limitBody(mux)
 }
 
@@ -420,6 +429,10 @@ func (s *Server) serveWS(w http.ResponseWriter, r *http.Request) {
 	case RoleOwner:
 		s.serveOwner(w, r)
 	case RoleController:
+		if s.LookupOnly {
+			http.NotFound(w, r)
+			return
+		}
 		s.serveController(w, r)
 	default:
 		writeError(w, http.StatusBadRequest, "role must be controller or owner")

@@ -130,6 +130,7 @@ client/view_test.go
 cmd/chirp-relay/landing.html
 cmd/chirp-relay/main.go
 cmd/chirp-relay/main_test.go
+cmd/chirp-relay/mode_test.go
 cmd/chirp-relay/pages.go
 cmd/chirp-relay/pages_test.go
 cmd/chirp-status/main.go
@@ -263,6 +264,8 @@ docs/ux.md
 go.mod
 go.sum
 network/servers.json
+node/node.go
+node/node_test.go
 scripts/apply-cloudflare.sh
 scripts/build-relay.sh
 scripts/build-site.sh
@@ -292,6 +295,7 @@ signalling/http_test.go
 signalling/hub.go
 signalling/hub_test.go
 signalling/lookup.go
+signalling/lookuponly_test.go
 signalling/relay.go
 site/CNAME
 site/assets/images/consent-dark-pt.webp
@@ -335,6 +339,7 @@ github.com/barahn/chirp/cmd/chirp/winres
 github.com/barahn/chirp/cmd/chirp/winres/icon
 github.com/barahn/chirp/cmd/chirp-relay
 github.com/barahn/chirp/cmd/chirp-status
+github.com/barahn/chirp/node
 github.com/barahn/chirp/scripts/macapp
 github.com/barahn/chirp/session
 github.com/barahn/chirp/signalling
@@ -356,6 +361,7 @@ ok  	github.com/barahn/chirp/cmd/chirp/winres
 ?   	github.com/barahn/chirp/cmd/chirp/winres/icon	[no test files]
 ok  	github.com/barahn/chirp/cmd/chirp-relay
 ?   	github.com/barahn/chirp/cmd/chirp-status	[no test files]
+ok  	github.com/barahn/chirp/node
 ok  	github.com/barahn/chirp/scripts/macapp
 ok  	github.com/barahn/chirp/session
 ok  	github.com/barahn/chirp/signalling
