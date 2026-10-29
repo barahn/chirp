@@ -10,7 +10,7 @@
 # tests pass. Those live between generated markers and are rewritten here.
 #
 # The snapshot is a function of the tree alone. CI regenerates it and fails if
-# the committed copy differs, the way THIRD_PARTY_NOTICES.md is checked, so it
+# the committed copy differs, so it
 # must come out identical on a pull request's head and on the merge that lands
 # it. That rules out anything read from history -- the commit log, a commit
 # count, a branch name -- because merging changes all three and not the tree.
