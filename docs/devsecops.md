@@ -111,6 +111,16 @@ are the half of DevSecOps that a pull request cannot deliver:
    single maintainer. Import those files rather than configuring rules by hand:
    a hand-made rule that is not in the files is drift.
 
+   The files are generated from the live rulesets, not written by hand, so that
+   they can be compared field for field — with
+   `gh api repos/barahn/chirp/rulesets/<id>`, keeping `name`, `target`, `enforcement`, `conditions`, `bypass_actors` and
+   `rules` and dropping the server's `id`, `source` and timestamps. Re-generate
+   rather than edit, and **never import a file that was hand-edited from a
+   partial copy**: a field the file omits is sent as its default, so an import
+   meant to apply the record can switch a protection off instead. That is not
+   hypothetical — `main-protected.json` was missing four live fields until
+   2026-10-29, `require_extra_approval_for_unattributed_changes` among them.
+
 3. **Code security** (Settings → Advanced Security):
    - Secret scanning **and** push protection. gitleaks in CI catches a secret
      before merge; push protection catches it before it ever reaches GitHub.
