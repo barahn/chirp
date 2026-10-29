@@ -61,3 +61,11 @@ nest/
 
 # Website, assembled by scripts/build-site.sh
 _site/
+
+# Generated from go.mod by scripts/gen-third-party-notices.sh. Not committed:
+# the licence gate is the script's own exit status, not a comparison against a
+# stored copy, and a stored copy only went stale on every dependency bump --
+# which Dependabot cannot fix, since it cannot run the script. The release
+# generates it and ships it in chirp-notices.zip, where the fonts' OFL and
+# Bitstream-Vera obligations actually apply.
+/THIRD_PARTY_NOTICES.md

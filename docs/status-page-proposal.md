@@ -104,6 +104,10 @@ depend on it and can be built first.
 
 ### Joining by pull request
 
+Until pull requests from outside Fabrintek can be merged (`CONTRIBUTING.md`),
+an operator applies with an issue form and a maintainer writes the entry:
+[`joining-the-network.md`](joining-the-network.md) is that guide.
+
 An operator adds an entry to `network/servers.json`:
 
 ```json

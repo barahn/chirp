@@ -38,19 +38,55 @@ anything configured on GitHub that is not there is drift.
 | Merge method | rebase |
 | Linear history | yes |
 | Branch up to date with base before merge | yes |
+| Merge blocked while held for a design decision | yes — see below |
 | Signed commits | not yet — see below |
 
 Required checks: `Build, Test & SAST` (build, vet, lint, `-race` tests, DCO,
 third-party licences, gosec, govulncheck), `gitleaks`, `Analyze (Go)` (CodeQL),
-`Review dependency changes`, and `Relay image & deploy files` (the relay's image
+`Review dependency changes`, `Relay image & deploy files` (the relay's image
 builds and serves, its deploy scripts pass shellcheck, its Quadlet units generate;
-[relay.md](relay.md)). CodeQL and dependency review run only while the
+[relay.md](relay.md)), and `Design hold` (see below). CodeQL and dependency review run only while the
 `CODE_SCANNING` variable is set — see [devsecops.md](devsecops.md). Where it is
 not set they are skipped, and a skipped required check counts as passing, so they
 enforce nothing there.
 
 `bypass_actors` is empty on all rulesets, on purpose: the rules bind administrators
 too.
+
+### The design hold
+
+`Design hold` is a required check that fails while the pull request carries the
+**`hold: design`** label, and passes on every pull request that does not. It is
+how a merge is blocked on purpose.
+
+It exists because this repository is trunk-based and requires no approving
+review: nothing stands between a merge and the next release tag, so whatever
+lands on `main` ships by default. When something must be designed, demonstrated
+and approved before any of it reaches a release — the public relay network's
+operating architecture is the case it was built for — the gate has to bind at
+the merge. Converting a pull request to a draft does not: it is one click from
+being undone, and it tells an agent that has not read the discussion nothing.
+
+The maintainer applies and removes the label. Removing it re-runs the check on
+the same commit and turns it green, so lifting a hold needs no dummy push.
+
+The hold is opt-in per pull request, never a blanket block on a subject area.
+The design and documentation pull requests a hold is waiting on are not its
+target: they are the condition for lifting it, and they must stay mergeable.
+
+The check reports on every pull request because
+`strict_required_status_checks_policy` is set, and a required context that never
+reports leaves every pull request unmergeable. For the same reason the job has
+no `if:` condition — a skipped required check counts as passing, which would be
+the opposite of a hold. The workflow is
+[`hold.yml`](../.github/workflows/hold.yml).
+
+Creating the label, once:
+
+```sh
+gh label create 'hold: design' --color B60205 \
+  --description 'Held: a design decision must be approved before this can merge'
+```
 
 ### Why linear history and rebase are enforced on `main`
 
