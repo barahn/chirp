@@ -8,12 +8,12 @@ Chirp follows **Trunk-Based Development**.
 request targets it. `main` is the repository's default branch.
 
 ```
-feature/*  fix/*  deps/*  ──(rebase)──▶  main  ──(tag)──▶  vX.Y.Z
+feature/*  fix/*  deps/*  ──(merge)──▶  main  ──(tag)──▶  vX.Y.Z
 ```
 
-Work lands on `main` via pull request with linear history. Releases are tagged
-points (`vX.Y.Z`) on `main` — CI runs on those tags, and `sbom.yml` attaches an
-SBOM to the release.
+Work lands on `main` via pull request, by a merge commit that GitHub signs.
+Releases are tagged points (`vX.Y.Z`) on `main` — CI runs on those tags, and
+`sbom.yml` attaches an SBOM to the release.
 
 Branch names: `feature/<topic>`, `fix/<topic>`, `deps/<topic>`, `docs/<topic>`.
 
@@ -35,11 +35,11 @@ anything configured on GitHub that is not there is drift.
 | Approvals | 0 — see below |
 | Approval dismissed on each push | yes |
 | Review threads resolved | yes |
-| Merge method | rebase |
-| Linear history | yes |
+| Merge method | merge commit |
+| Linear history | no — see below |
 | Branch up to date with base before merge | yes |
 | Merge blocked while held for a design decision | yes — see below |
-| Signed commits | not yet — see below |
+| Signed commits | required — see below |
 
 Required checks: `Build, Test & SAST` (build, vet, lint, `-race` tests, DCO,
 third-party licences, gosec, govulncheck), `gitleaks`, `Analyze (Go)` (CodeQL),
@@ -88,21 +88,34 @@ gh label create 'hold: design' --color B60205 \
   --description 'Held: a design decision must be approved before this can merge'
 ```
 
-### Why linear history and rebase are enforced on `main`
+### Why signed commits, by merge commit, are enforced on `main`
 
-Linear history keeps `git log` readable and bisectable. Pull requests are merged
-using **rebase**, ensuring that each commit lands with its verified DCO
-`Signed-off-by` trailer intact and without merge bubbles. Squash merges are
-disallowed because GitHub's automated squash commit can bypass or drop the
-individual DCO attestations.
+Squash merges are disallowed because GitHub's automated squash commit can bypass
+or drop the individual DCO attestations. That has not changed, and it is the one
+argument that rules a merge method out entirely.
 
-Signed commits are not required yet, and a DCO `Signed-off-by` trailer is not a
-cryptographic signature. Signing keys alone will not be enough to require them:
-GitHub cannot sign the commits of a rebase merge — it rewrites each one and has
-no key of the author's — so with rebase as the only merge method every commit
-lands on `main` unsigned, which is exactly what `required_signatures` refuses.
-Turning it on is a merge-method decision as well as a keys one, to be weighed
-against the reason squash is off above.
+Between the other two, `main` requires **signed commits**, and the only allowed
+merge method is a **merge commit**, which GitHub creates and signs. The two
+cannot be combined with rebase: GitHub rewrites each commit of a rebase merge
+and has no key of the author's, so under rebase every commit lands unsigned,
+which is exactly what `required_signatures` refuses. A DCO `Signed-off-by`
+trailer is an attestation of origin, not a cryptographic signature; anyone can
+type the line.
+
+This repository used to enforce the other side of that trade, and the reasoning
+had a gap worth recording. Rebase was justified *against squash*, on the DCO
+attestations. Against a merge commit it had no argument beyond the shape of
+`git log`: a merge preserves the commits underneath, with their signatures and
+their trailers intact, and `ci.yml` already skips merges when it checks DCO
+(`git log --no-merges`). Measured on 2026-10-29, before the change: 2 of the
+last 100 commits on this trunk were verified, against 100 of 100 on remotekit,
+which has required signatures and merge commits — bots included, because GitHub
+signs what it creates through the API.
+
+The price is merge bubbles; `git log --first-parent` reads the trunk without
+them. The cost that does not go away is that *Update branch with rebase* and
+`gh pr update-branch --rebase` rewrite commits server-side and land them
+unsigned, which the ruleset then refuses with every check green.
 
 ## The approval policy, as decided
 
