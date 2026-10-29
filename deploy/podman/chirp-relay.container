@@ -41,7 +41,11 @@ HealthTimeout=5s
 HealthRetries=3
 HealthOnFailure=kill
 
-# The relay keeps all its state in memory and writes nothing.
+# A node of the public network keeps its key in a volume of its own
+# (docs/relay.md, "Public mode"); otherwise the relay writes nothing.
+#Volume=chirp-relay-state:/var/lib/chirp-relay:U
+#Environment=CHIRP_RELAY_MODE=public
+#Environment=CHIRP_RELAY_NODE_KEY=/var/lib/chirp-relay/node.key
 ReadOnly=true
 DropCapability=ALL
 NoNewPrivileges=true
