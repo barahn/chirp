@@ -118,14 +118,27 @@ is scrolled away, and with reduced motion it only perches, as before.
 
 ## Sound
 
-Chirp makes its namesake sound in one place only: **on the helper's side,
-when the other person allows them in.** It is the one moment that is good news
-for both people and gives nothing away.
+Chirp's namesake sound is synthesized in code (`cmd/chirp/internal/chirpsound`,
+barahn/chirp#81): short rising or falling chirps, no audio file and no
+licence to clear. It plays in two places, both after someone was let in:
 
-It never plays on the machine being controlled. There, the consent prompt asks
-for attention with the system's own means — a flashing taskbar button, a
-bouncing dock icon — so that a friendly sound can never become the cue to
-click Allow.
+- **On the helper's side, when the other person allows them in:** three quick
+  rising notes. It is the one moment that is good news for both people and
+  gives nothing away.
+- **On the machine being controlled, with the bird by the taskbar** (decided
+  2026-10-27): two rising notes as it lands, one short soft note for each
+  alert, and as it flies off three quick notes, each lower and softer, as a
+  call fading away. Hide the Chirp bird silences it,
+  and Turn alerts off silences the alert's note.
+
+Nothing plays on the machine being controlled before or while the consent
+prompt asks. There the prompt asks for attention with the system's own means
+-- a flashing taskbar button, a bouncing dock icon -- so that a friendly sound
+can never become the cue to click Allow.
+
+Chirp plays the sounds with what each system has: `PlaySound` on Windows,
+`afplay` on macOS, and the first of `pw-play`, `paplay` or `aplay` on Linux.
+Without any of them it is silent.
 
 ## The main window
 

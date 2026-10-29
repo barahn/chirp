@@ -24,6 +24,7 @@ import (
 	"fyne.io/fyne/v2/widget"
 
 	"github.com/barahn/chirp/client"
+	"github.com/barahn/chirp/cmd/chirp/internal/chirpsound"
 	"github.com/barahn/chirp/cmd/chirp/internal/warm"
 )
 
@@ -80,6 +81,11 @@ type Window struct {
 	// Prefs keeps whether the bird is hidden between runs, and nothing
 	// else. Without it nothing is remembered.
 	Prefs Prefs
+	// Sound plays a chirp (barahn/chirp#81): for the person helping when
+	// they are let in, and for the bird by the taskbar once the owner has
+	// let someone in. cmd/chirp provides it; without it Chirp is silent.
+	// It must not block.
+	Sound func(chirpsound.Sound)
 
 	// notify shows a system notification, and quit quits Chirp; tests
 	// replace them.

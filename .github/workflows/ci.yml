@@ -102,15 +102,21 @@ jobs:
       # with it -- and still unacceptable. Fabrintek relicenses Chirp for its
       # proprietary platform on the strength of owning all of Chirp; it owns
       # none of its dependencies. See the script header and LICENSING.md.
+      # The gate is the script's exit status, not a comparison: it returns 2
+      # when a dependency's licence is copyleft, unrecognised, or an embedded
+      # font nobody has reviewed. The notices are not committed, so there is
+      # nothing to compare against and nothing to go stale -- see .gitignore.
       - name: Third-Party License Compliance
-        run: |
-          git ls-files --error-unmatch THIRD_PARTY_NOTICES.md >/dev/null
-          ./scripts/gen-third-party-notices.sh THIRD_PARTY_NOTICES.md
-          if ! git diff --exit-code --stat -- THIRD_PARTY_NOTICES.md; then
-            echo "::error::THIRD_PARTY_NOTICES.md is out of date. Run ./scripts/gen-third-party-notices.sh and commit the result."
-            git diff -- THIRD_PARTY_NOTICES.md
-            exit 1
-          fi
+        run: ./scripts/gen-third-party-notices.sh THIRD_PARTY_NOTICES.md
+
+      # So a reviewer can read what the release will ship without running the
+      # generator themselves.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: third-party-notices
+          path: THIRD_PARTY_NOTICES.md
+          if-no-files-found: warn
 
       - name: Build & Vet
         run: |
