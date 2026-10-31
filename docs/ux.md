@@ -379,11 +379,14 @@ needs the same, mostly on the machine being controlled:
 - **Windows administrator prompts.** On a default session, they appear on a
   secure desktop the helper cannot see. Under the hybrid elevation model
   (decision 7, barahn/chirp#117), the helper can request elevation during the
-  session. When approved, Chirp installs the auxiliary remotekit service,
-  explaining clearly to the owner: *"To allow remote control of Windows security
-  prompts and administrative tasks, an auxiliary remotekit service will be
-  permanently installed on this computer. Chirp will never use this service
-  autonomously or unattended."*
+  session. Chirp's prompt tells the owner what allowing it means, before
+  Windows asks too: *"They're asking for administrator rights. If you allow
+  it, they'll be able to answer Windows security prompts and change anything
+  on this computer until the session ends. Chirp adds a small helper service
+  for this session only and removes it when the session ends. Windows will
+  ask you to confirm next."* The UAC prompt that follows is expected, and
+  only the owner sees it. The session bar shows the elevated state and can
+  take it back; taking it back, or ending the session, removes the service.
 
 ## Help: "Getting to know Chirp"
 
