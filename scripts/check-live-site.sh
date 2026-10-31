@@ -14,8 +14,8 @@
 #
 # One rewrite is allowed, exactly: the inline script Cloudflare's JavaScript
 # Detections inserts before </body>. On the Free plan it cannot be turned off,
-# and the pages' CSP blocks it, so it never runs. Its r and t parameters change
-# on every response; anything else in it, or any other change, fails.
+# and the pages' CSP blocks it, so it never runs. Its r, t and ray parameters
+# change on every response; anything else in it, or any other change, fails.
 #
 # Usage: scripts/check-live-site.sh [--wait SECONDS]
 #
@@ -38,8 +38,8 @@ if [ "${1:-}" = "--wait" ]; then wait="${2:?--wait needs seconds}"; fi
 # includeSubDomains and preload. See docs/devsecops.md.
 hsts="max-age=31536000; includeSubDomains; preload"
 
-# The JavaScript Detections snippet, with r and t emptied.
-jsd="<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML=\"window.__CF\$cv\$params={r:'',t:''};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);\";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>"
+# The JavaScript Detections snippet, with r, t and ray emptied.
+jsd="<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML=\"window.__CF\$cv\$params={r:'',t:''};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);\";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>"
 
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
@@ -86,8 +86,11 @@ check_once() {
 			continue
 		fi
 		if [ "${src##*.}" = "html" ]; then
-			# Empty r and t, then drop the snippet once, right before </body>.
-			sed -E -i "s/__CF\\\$cv\\\$params=\\{r:'[A-Za-z0-9]*',t:'[A-Za-z0-9+\/=]*'\\}/__CF\$cv\$params={r:'',t:''}/" "$got"
+			# Empty r, t and ray, then drop the snippet once, right before </body>.
+			sed -E -i \
+				-e "s/__CF\\\$cv\\\$params=\\{r:'[A-Za-z0-9]*',t:'[A-Za-z0-9+\/=]*'\\}/__CF\$cv\$params={r:'',t:''}/" \
+				-e "s|/cdn-cgi/challenge-platform/scripts/jsd/main\\.js\\?ray=[A-Za-z0-9]*|/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=|" \
+				"$got"
 			html="$(cat "$got"; printf x)"
 			html="${html%x}"
 			html="${html/"$jsd</body>"/</body>}"
