@@ -3,7 +3,8 @@
 **Status:** proposal, not decided. It records the maintainer's answers of
 2026-10-15 and the design that follows from them. Phase 1, the status service
 measuring only, is built: `cmd/chirp-status` and the `status` package. So
-is phase 2, the page.
+is phase 2, the page, and phase 4 but for the sealed version attestation:
+`chirp-relay -mode public` and the `node` package.
 
 The goal is a page on usechirp.app that shows which servers make up Chirp's
 public network, how long each has been up, which are new, which are dedicated
@@ -60,12 +61,14 @@ Nostr path:
 
 So:
 
-1. **A public node does not offer the trusted path.** `GET /ws`,
-   `POST /api/redeem`, `POST /api/links/{token}/sessions`,
+1. **A public node does not offer the trusted path.** A controller's
+   `GET /ws`, `POST /api/redeem`, `POST /api/links/{token}/sessions`,
    `GET /api/sessions/{id}` and `POST /api/peers/{peer}/consent` answer `404`.
    A public node does lookup only: `POST /api/peers`, `GET`/`DELETE
    /api/peers/{peer}`, `PUT /api/peers/{peer}/contact`, `POST /api/lookup` and
-   `POST /api/links/{token}/lookup`.
+   `POST /api/links/{token}/lookup`. An owner still holds its socket
+   (`GET /ws?role=owner`), which is how the node knows it is running; with no
+   session to join, nothing crosses it.
 2. **The private mode needs the PAKE too.** Either the PAKE also runs over the
    relay's own WebSocket, or the private mode moves to the Nostr path with a
    private Nostr relay. This is a separate change, and a precondition for
@@ -337,8 +340,11 @@ sets a policy, and must allow the same for `/status/`.
    visitor's. After merging, run `scripts/apply-cloudflare.sh` to load the
    new rule, or `scripts/check-live-site.sh` fails on `/status/`.
 3. **Nostr and TURN members**, server-sent events, the conformance suite.
-4. **The relay's public mode:** `-mode public`, `/.well-known/chirp-node`,
-   the node key, sealed version attestation, the trusted path disabled.
+4. **The relay's public mode. Built, but for the sealed version
+   attestation:** `-mode public`, `/.well-known/chirp-node`, the node key,
+   the trusted path disabled ([`relay.md`](relay.md), *Public mode*). The
+   attestation needs the status service's X25519 key (open question 4) and a
+   version compiled into the relay, which release builds do not set yet.
 5. **Admission and alerts:** applications, probation, pull requests and
    issues opened by the status service, emails, suspension.
 6. **The signed list and `-network public` in Chirp.** Needs the decision on

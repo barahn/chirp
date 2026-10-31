@@ -593,6 +593,8 @@ location / {
 | `-socket-mode` | `CHIRP_RELAY_SOCKET_MODE` | `0660` | Permissions of the Unix socket, in octal. |
 | `-trusted-proxies` | `CHIRP_RELAY_TRUSTED_PROXIES` | none | Over TCP: comma-separated addresses or CIDRs whose `X-Forwarded-For` is believed. |
 | `-security-contact` | `CHIRP_RELAY_SECURITY_CONTACT` | none | Where to report a security problem with this relay: an email address or an `https:` URL. Served as `/.well-known/security.txt`; without it, there is none. |
+| `-mode` | `CHIRP_RELAY_MODE` | `private` | `private`, a relay for your own people, or `public`, a node of Chirp's public network. See [Public mode](#public-mode). |
+| `-node-key` | `CHIRP_RELAY_NODE_KEY` | none | In public mode, the file holding the node's key, created on first start. Required in public mode. |
 | `-healthcheck` | | | Ask the relay on `-addr` for `/healthz`, and exit 0 if it answers. Used by container health checks. |
 
 A flag on the command line overrides the environment. Code lifetimes,
@@ -646,6 +648,41 @@ There are two ways to get this right:
 
 Either way, the proxy must overwrite a client's `X-Forwarded-For` or append
 to it. Caddy does this by default.
+
+### Public mode
+
+`-mode public` makes the relay a node of Chirp's public network
+([`joining-the-network.md`](joining-the-network.md)). A node must never be
+able to read a session, so it offers only the blind path: an owner says how
+it can be reached over Nostr, and a controller with the code or the link gets
+that back. The trusted path, on which the relay carries the signalling and
+could swap the DTLS fingerprints, is not there: `POST /api/redeem`,
+`POST /api/links/{token}/sessions`, `GET /api/sessions/{id}`,
+`POST /api/peers/{peer}/consent` and a controller's `GET /ws` answer `404`.
+An owner still holds its socket, so the node knows it is running.
+
+So a Chirp reaches people through a public node only when it signals over
+Nostr. A Chirp pointed at it with `CHIRP_RELAY` alone gets `404` when it
+redeems a code.
+
+A node has an ed25519 key, in the file `-node-key` names. It is created on
+first start, readable only by the relay's user, and refused if anyone else
+can read it. **Keep it, and back it up**: the network knows your node by it,
+and a new key is a new node. The systemd unit keeps it in
+`/var/lib/chirp-relay/` (`StateDirectory`); `relay.env` has the two lines to
+uncomment. With Podman, give the container a volume for it: the lines are in
+`chirp-relay.container`.
+
+The node proves it holds the key at `/.well-known/chirp-node`. Without a
+query it answers the public key. With `?nonce=` and 16 to 64 random bytes in
+base64url, it also signs the nonce together with the host it was asked at,
+so the answer proves control of that domain and of nothing else:
+
+```bash
+curl -fsS "https://relay.example.org/.well-known/chirp-node?nonce=$(head -c 32 /dev/urandom | basenc --base64url | tr -d '=')"
+```
+
+The answer names no version.
 
 ## Pointing Chirp at the relay
 

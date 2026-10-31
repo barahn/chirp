@@ -77,6 +77,7 @@ body:
           required: true
         - label: "`-security-contact` is set."
           required: true
+        - label: "It runs in public mode (`-mode public`), and its node key is backed up. Not required yet."
         - label: I will keep it up to date with Chirp's releases.
           required: true
   - type: checkboxes
