@@ -418,13 +418,92 @@
 
   setLang(detectLang(), false);
 
-  // The bird chirps now and then, as it does in the app.
+  // The bird flies in and lands on the window, hops along its top and
+  // chirps now and then, as it does in the app; the pointer passing over it
+  // three times in a row shoos it to the far side. hop.js makes the choices;
+  // this moves it.
   var still = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   var bird = document.getElementById("hero-bird");
-  if (bird && !still) {
-    setInterval(function () {
+  if (bird && !still && window.ChirpHop && bird.animate) walk(bird, window.ChirpHop);
+  else if (bird) bird.classList.remove("is-arriving");
+
+  function walk(bird, hop) {
+    var art = bird.querySelector("svg");
+    var stage = bird.parentNode;
+    var at = { x: 0, facing: -1 };
+    var moving = null, resting = 0, paused = false, inView = true;
+    var shoo = hop.shooer();
+
+    function bounds() {
+      var inset = stage.clientWidth - bird.offsetLeft - bird.offsetWidth;
+      return { min: Math.min(0, 2 * inset + bird.offsetWidth - stage.clientWidth), max: 0 };
+    }
+    function pose(x, y, facing) { return "translate(" + x + "px, " + y + "px) scaleX(" + facing + ")"; }
+    function move(to, lift, duration, then) {
+      var from = at;
+      at = to;
+      moving = art.animate([
+        { transform: pose(from.x, 0, to.facing) },
+        { transform: pose((from.x + to.x) / 2, -lift, to.facing) },
+        { transform: pose(to.x, 0, to.facing) }
+      ], { duration: duration, easing: "ease-in-out", fill: "forwards" });
+      moving.finished.then(function () { moving = null; then(); });
+      return moving;
+    }
+    // flap beats the wings while flight runs, until its time reaches until.
+    function flap(flight, until) {
+      bird.classList.add("is-flying");
+      var beat = setInterval(function () {
+        if (flight.playState === "finished" || flight.currentTime >= until) {
+          clearInterval(beat);
+          bird.classList.remove("is-flying");
+          return;
+        }
+        bird.classList.toggle("is-flying");
+      }, 110);
+    }
+    function land() {
+      var landing = hop.LANDING;
+      bird.classList.remove("is-arriving");
+      moving = art.animate(landing.frames.map(function (f) {
+        return { offset: f.offset, transform: pose(f.x, f.y, f.facing), easing: "ease-out" };
+      }), { duration: landing.duration, fill: "forwards" });
+      flap(moving, landing.touchdown * landing.duration);
+      moving.finished.then(function () { moving = null; rest(1200); });
+    }
+    function chirp() {
       bird.classList.add("is-chirping");
       setTimeout(function () { bird.classList.remove("is-chirping"); }, 700);
-    }, 5200);
+    }
+    function rest(ms) { clearTimeout(resting); resting = setTimeout(step, ms); }
+    function step() {
+      if (document.hidden || !inView) { paused = true; return; }
+      var to = hop.nextHop(at, bounds(), Math.random);
+      var paired = Boolean(to.pair);
+      move(to, paired ? 6 : 10, paired ? 200 : 320, function () {
+        if (to.pair !== 1 && Math.random() < 0.3) chirp();
+        rest(to.rest);
+      });
+    }
+    function resume() {
+      if (paused && !document.hidden && inView) { paused = false; step(); }
+    }
+
+    bird.addEventListener("pointerenter", function (e) {
+      if (e.pointerType !== "mouse" || moving || !shoo(e.timeStamp)) return;
+      clearTimeout(resting);
+      var to = hop.flee(at, bounds());
+      flap(move({ x: to.x, facing: to.flies }, 60, 700, function () {
+        move({ x: to.x, facing: to.facing }, 6, 200, function () { rest(1500); });
+      }), 640);
+    });
+    document.addEventListener("visibilitychange", resume);
+    if (window.IntersectionObserver) {
+      new IntersectionObserver(function (entries) {
+        inView = entries[entries.length - 1].isIntersecting;
+        resume();
+      }).observe(bird);
+    }
+    land();
   }
 })();

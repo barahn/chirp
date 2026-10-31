@@ -294,6 +294,8 @@ signalling/hub_test.go
 signalling/lookup.go
 signalling/relay.go
 site/CNAME
+site/assets/hop.js
+site/assets/hop.test.js
 site/assets/images/consent-dark-pt.webp
 site/assets/images/consent-dark.webp
 site/assets/images/consent-light-pt.webp
