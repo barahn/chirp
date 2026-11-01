@@ -141,7 +141,8 @@ the server that hands them out, and each Chirp only ever sees a pair that
 stops working on its own. remotekit is adding the generator
 (barahn/remotekit#64). Something trusted also has to hand the pairs out. The
 natural place is Chirp's relay, which already speaks to both ends, but nothing
-in Chirp does it yet.
+in Chirp does it yet;
+[`network-paths-proposal.md`](network-paths-proposal.md) proposes how.
 
 ## What TURN can see
 

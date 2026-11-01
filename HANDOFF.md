@@ -252,6 +252,7 @@ docs/images/chirp-dark.png
 docs/images/chirp-light.png
 docs/images/chirp-social.png
 docs/joining-the-network.md
+docs/network-paths-proposal.md
 docs/product-model.md
 docs/relay.md
 docs/release.md
