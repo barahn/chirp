@@ -303,13 +303,20 @@ func (rs *runners) sendFile(ctx context.Context, id, name string, f io.ReadSeeke
 
 // clipboardAlert is what the owner is told of a clipboard sync.
 func clipboardAlert(ev stream.ClipboardEvent) (ui.Alert, bool) {
+	size := int64(ev.Size)
 	switch {
+	case ev.Direction == stream.ClipboardToHost && len(ev.Files) > 0:
+		return ui.Alert{Kind: ui.AlertFilesPastedIn, Files: ev.Files, Size: size}, true
+	case ev.Direction == stream.ClipboardFromHost && ev.TooLarge:
+		return ui.Alert{Kind: ui.AlertFilesTooLarge, Files: ev.Files, Size: size}, true
+	case ev.Direction == stream.ClipboardFromHost && len(ev.Files) > 0:
+		return ui.Alert{Kind: ui.AlertFilesCopiedOut, Files: ev.Files, Size: size}, true
 	case ev.Direction == stream.ClipboardToHost:
-		return ui.Alert{Kind: ui.AlertPastedIn, Size: int64(ev.Size)}, true
+		return ui.Alert{Kind: ui.AlertPastedIn, Size: size}, true
 	case ev.Direction == stream.ClipboardFromHost && ev.Concealed:
 		return ui.Alert{Kind: ui.AlertPasswordHeld}, true
 	case ev.Direction == stream.ClipboardFromHost:
-		return ui.Alert{Kind: ui.AlertCopiedOut, Size: int64(ev.Size)}, true
+		return ui.Alert{Kind: ui.AlertCopiedOut, Size: size}, true
 	}
 	return ui.Alert{}, false
 }
