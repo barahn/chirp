@@ -449,12 +449,14 @@ func viewSession(ctx context.Context, conn *client.SessionConn, ice webrtc.PeerC
 	v.OnNotice(func(n stream.Notice) { remote.Notice(n.Type) })
 	// The other computer's monitors, for the picker in the toolbar.
 	v.OnDisplays(remote.Displays)
-	sync := newClipSync(clipboard.NewManager(), 500*time.Millisecond, v.SendClipboard)
+	sendFiles := func(list clipboard.FileList) error { return v.SendClipboardFiles(ctx, list) }
+	sync := newClipSync(clipboard.NewManager(), 500*time.Millisecond, v.SendClipboard, sendFiles)
 	v.OnPermissions(func(granted []string) {
 		remote.Granted(granted)
 		sync.granted(granted)
 	})
 	v.OnClipboard(sync.received)
+	v.OnClipboardFiles(sync.receivedFiles)
 	// Files the other person sends land in the Chirp folder in Downloads.
 	v.OnFileOffer(func(stream.FileOffer) bool { return true })
 	v.OnFileSaved(func(f stream.ReceivedFile) { remote.FileReceived(f.Name, filepath.Dir(f.Path)) })
