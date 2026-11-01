@@ -276,6 +276,18 @@ With a bird:
 
 - **It lands** by the tray when the session starts, and its balloon, borderless
   above it, opens to say who is in, then folds away.
+- **It walks** along the taskbar from there, as the site's bird walks on its
+  app window (barahn/chirp#187): small hops to the left of its spot, a rest
+  between them, now and then two short hops in a row, a chirp now and then.
+  The pointer passing over it three times within four seconds shoos it: to
+  the far end of its stretch, or, half the time, up onto the top edge of a
+  window that shows -- not minimized, not maximized, not Chirp's, with room
+  above it -- and it walks along that. Shooed again, or when that window
+  moves, shuts or is covered, it flies back to its spot by the tray. While
+  its balloon is open it stands still. Where the system asks for less motion
+  (Windows' *Animation effects*, GNOME's *enable-animations*) it only
+  perches. The rules are `cmd/chirp/internal/perch/walk.go`, the site's in
+  Go; `cmd/chirp/stroll.go` drives them the same on every OS.
 - **Tapping the bird** opens the balloon -- who, the clock, *End*, the switches
   that only turn off, Send a file -- until it is tapped again.
 - **Each alert** (a paste, a copy, a file, a password held back) is said in the

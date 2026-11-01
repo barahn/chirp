@@ -38,8 +38,10 @@ func Height(width int) int {
 
 // Motion places the bird in flight: moved by DX, DY in the art's units,
 // turned by Rotate degrees about its middle, and drawn at Alpha, 0 to 1.
+// The art faces right; Left mirrors it about its middle.
 type Motion struct {
 	DX, DY, Rotate, Alpha float64
+	Left                  bool
 }
 
 // Perched is the bird at rest.
@@ -68,7 +70,13 @@ func Frame(pose warm.Pose, m Motion, width int) (*image.RGBA, error) {
 	fmt.Fprintf(&svg, `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %g %g" width="%d" height="%d">`,
 		canvasW, canvasH, width, height)
 	fmt.Fprintf(&svg, `<g transform="translate(%g %g) rotate(%g 60 60)">`, m.DX-canvasX, m.DY-canvasY, m.Rotate)
+	if m.Left {
+		svg.WriteString(`<g transform="matrix(-1 0 0 1 120 0)">`)
+	}
 	svg.Write(drawing)
+	if m.Left {
+		svg.WriteString(`</g>`)
+	}
 	svg.WriteString(`</g></svg>`)
 
 	icon, err := oksvg.ReadIconStream(&svg)

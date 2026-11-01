@@ -23,6 +23,7 @@ type fakePerch struct {
 	sizes          []fyne.Size // the balloon's size as each was placed
 	tapped         func()
 	perched        bool
+	held           bool
 }
 
 func (p *fakePerch) Land(tapped func()) { p.lands++; p.tapped = tapped; p.perched = true }
@@ -31,7 +32,8 @@ func (p *fakePerch) Place(w fyne.Window) {
 	p.placed = append(p.placed, w)
 	p.sizes = append(p.sizes, w.Canvas().Size())
 }
-func (p *fakePerch) FlyOff() { p.flights++; p.perched = false }
+func (p *fakePerch) FlyOff()        { p.flights++; p.perched = false }
+func (p *fakePerch) Hold(held bool) { p.held = held }
 
 // fakePrefs records what the window remembers between runs.
 type fakePrefs map[string]bool
@@ -107,6 +109,36 @@ func TestTheBirdIsTheOnlySessionWindow(t *testing.T) {
 	}
 	if !w.bar.shown {
 		t.Fatal("no balloon on landing to say who is in")
+	}
+}
+
+// The bird stands still while its balloon is open, so the balloon stays on
+// its head, and walks again once it folds (barahn/chirp#187).
+func TestTheBirdHoldsStillUnderItsBalloon(t *testing.T) {
+	w, p, _, _, _, c := birdWindow(t)
+	started(w, "Ana")
+	if !p.held {
+		t.Fatal("walking with the landing balloon open")
+	}
+	c.fire()
+	if p.held {
+		t.Fatal("still held once the landing balloon folded")
+	}
+	p.tapped()
+	if !p.held {
+		t.Fatal("walking with the balloon opened by a click")
+	}
+	p.tapped()
+	if p.held {
+		t.Fatal("still held once a click closed the balloon")
+	}
+	w.Alert("s1", Alert{Kind: AlertPastedIn, Size: 5})
+	if !p.held {
+		t.Fatal("walking while it says an alert")
+	}
+	c.fire()
+	if p.held {
+		t.Fatal("still held after the last alert")
 	}
 }
 

@@ -37,6 +37,9 @@ type Perch interface {
 	Place(balloon fyne.Window)
 	// FlyOff sends the bird away.
 	FlyOff()
+	// Hold keeps the bird still on its spot while held, under its open
+	// balloon; let go, it walks along the taskbar again.
+	Hold(held bool)
 }
 
 // Prefs is where the one thing Chirp remembers between runs is kept:
