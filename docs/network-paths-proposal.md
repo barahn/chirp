@@ -165,8 +165,52 @@ another address keeps its codes.
   though, only yields a contact and spends the code: the attacker still needs
   the four secret digits, one chance in 10,000, and each code's secret is good
   for one attempt (`client/pake.go`). The space an attacker has to search is
-  still 10¹⁰. What grows is the number of codes an attacker can spend to deny
-  them to their owners, which is open question 2.
+  still 10¹⁰. What would grow is the number of codes an attacker can spend
+  to deny them to their owners, and the next section keeps it where it is.
+
+### Spending other people's codes
+
+A lookup that hits the routing digits spends the code, and the owner is
+given another (`session/lookup.go`). So an attacker can deny a code without
+knowing its secret, though not choose whose: they hit codes at random, and
+only misses cost them anything. Each origin may miss 5 times in 10 minutes
+(`DefaultMaxRedemptionFailures`) in a space of 900,000 codes. The chance
+that a code is spent while someone reads it out for *t* minutes is about
+
+```
+p ≈ A · N · t / 1,800,000
+```
+
+for an attacker with A addresses against N nodes, however many codes are
+live. Links are not affected: their token cannot be guessed.
+
+| A = 1,000 addresses, t = 2 minutes | p |
+|---|---|
+| One relay, today | 0.11 % |
+| 20 nodes, each with today's budget | 2.2 % |
+| 20 nodes, with the rule below | 0.11 % |
+
+**The rule.** Each node allows an origin 5 misses per window of
+10 minutes × N, where N is the length of the signed list. Across the network
+an attacker then has today's budget of one relay. Someone who mistypes the
+routing digits lands on any node, so their misses spread across nodes and
+rarely meet the limit. Behind a carrier-grade NAT, each node sees 1/N of the
+origin's misses and allows 1/N of the budget. The rule needs no shared state:
+every node already holds the list, and nodes whose copies differ by a version
+differ in their window by a little.
+
+It holds as long as the node sees the client's address. Once requests go
+through another node (3.2), the node sees only that node's address, and how
+to count misses then is open question 2.
+
+The rule bounds origins, so an origin must be one subscriber. An IPv6
+client is one origin per /64, not per address; today the relay counts each
+address, so a single /64 escapes every per-origin limit.
+
+Two other ways were set aside. Proof of work per lookup: a cloud core spends
+dozens of codes an hour for cents. Letting the node check part of the
+secret: it would cut the hits, and give the node a shortcut to sit in the
+middle of the session, which the PAKE is there to prevent.
 
 ### When the list changes
 
@@ -225,7 +269,7 @@ has `crypto/hpke`, so this adds no dependency.
 **What it costs.** The throttle on guessing is per origin, and B no longer
 sees the origin. A takes over the per-address limit, counting every request it
 forwards, since it cannot tell a failure from a success; B limits each A as a
-whole. That is a coarser throttle than today's, and open question 3 asks
+whole. That is a coarser throttle than today's, and open question 2 asks
 whether anonymous tokens (Privacy Pass, RFC 9576) should replace it. A lookup
 also takes one more hop.
 
@@ -254,7 +298,7 @@ registration.
 
 **What it costs.** One more hop of latency, and the network carries every
 relayed byte twice. Whether a chain is the default whenever TURN is needed, or
-an option, is open question 4.
+an option, is open question 3.
 
 ### 3.4 Relay only
 
@@ -303,7 +347,8 @@ Each step is test-first, and each lands only once this proposal is approved.
 2. **The session key after the PAKE** (3.1). Client only.
 3. **Renewals instead of the socket in public mode** (part 4), in
    barahn/chirp#170.
-4. **Rendezvous hashing** (part 2), with phase 6's signed list.
+4. **Rendezvous hashing** (part 2), with phase 6's signed list and the miss
+   budget divided by its length. Needs origins counted per IPv6 /64.
 5. **Requests through another node** (3.2).
 6. **The TURN chain** (3.3), with remotekit's relay selection.
 
@@ -313,13 +358,12 @@ Each step is test-first, and each lands only once this proposal is approved.
    network changes midway. Not needed for step 1. (A credential's lifetime
    against long sessions was open here, and so was where the credential
    generator comes from; part 1 settles both.)
-2. How to limit spending other people's codes when each node meters only
-   its own lookups.
-3. Whether anonymous tokens replace the per-address throttle once requests go
-   through another node.
-4. Whether the TURN chain is the default whenever TURN is needed, or an
+2. Whether anonymous tokens replace the per-address throttle once requests go
+   through another node, where the rule in part 2 no longer holds.
+   (Spending other people's codes was open here; part 2 settles it.)
+3. Whether the TURN chain is the default whenever TURN is needed, or an
    option.
-5. Whether section 3's requests go through a node of the network, or also
+4. Whether section 3's requests go through a node of the network, or also
    through relays outside it.
 
 ---
