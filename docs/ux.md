@@ -376,8 +376,14 @@ needs the same, mostly on the machine being controlled:
   remotekit's `screen` on macOS.
 - **Wayland portals.** After *Allow*, the system asks once more which screen
   to share. The prompt's last line says so, so the second dialog is expected.
-- **Windows administrator prompts** appear on a secure desktop the helper
-  cannot see. A help article tells both people what is happening.
+- **Windows administrator prompts.** On a default session, they appear on a
+  secure desktop the helper cannot see. Under the hybrid elevation model
+  (decision 7, barahn/chirp#117), the helper can request elevation during the
+  session. When approved, Chirp installs the auxiliary remotekit service,
+  explaining clearly to the owner: *"To allow remote control of Windows security
+  prompts and administrative tasks, an auxiliary remotekit service will be
+  permanently installed on this computer. Chirp will never use this service
+  autonomously or unattended."*
 
 ## Help: "Getting to know Chirp"
 

@@ -87,9 +87,9 @@ only when all of these hold:
 - **The core works on both sides on every supported system:** screen,
   control, clipboard, files, the tray and its alerts, with the decisions
   behind them recorded in `docs/product-model.md`.
-- **The open decisions are settled:** administrator rights (#117), what
-  Chirp writes to disk (#49), and macOS's permissions (#51), since macOS is
-  in 1.0 (#132).
+- **The open decisions are settled and implemented:** administrator rights
+  (#117), what Chirp writes to disk (#49), and macOS's permissions (#51),
+  since macOS is in 1.0 (#132).
 - **The binaries are signed** (#69).
 - **No security issue of high severity or above is open**, in Chirp or in
   remotekit.
@@ -98,10 +98,17 @@ only when all of these hold:
   no serious bug open.
 - **Basic accessibility** (#84) and the **help centre** (#83) are published.
 
-The milestones are on GitHub: *v0.5* (automatic clipboard, alerts and tray,
-files both ways), *v0.6* (transfer manager, files through the clipboard,
-monitor picker, the bird), *v0.7* (signing, accessibility, code expiry,
-sound), *v0.9* (public beta, fixes only) and *v1.0*.
+The milestones on GitHub reflect this progression:
+- *v0.5* (automatic clipboard, alerts and tray, files both ways);
+- *v0.6* (transfer manager, files through the clipboard, monitor picker, the bird);
+- *v0.7* (signing, accessibility, code expiry, sound);
+- *v0.9* (**Feature-complete public beta, ready for general use & testing**):
+  all core features, platforms and decisions are implemented. Chirp is made
+  available for real-world use and testing with dozens of outside users. This
+  phase is where most bugs, security observations and operational adjustments
+  surface and are triaged based on severity;
+- *v1.0* (**Stable release**): tagged only after v0.9 runs in the field with
+  outside users and leaves no serious bug or security issue open.
 
 ## What a release carries
 

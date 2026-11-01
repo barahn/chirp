@@ -199,6 +199,31 @@ Decided by the maintainer:
      names reserved for examples (RFC 2606). Showing `usechirp.app` there
      would suggest a public relay that is not offered yet.
 
+7. **Administrator rights and elevation follow a hybrid model (barahn/chirp#117).**
+   Chirp always starts unelevated in the owner's standard user context, and it
+   never operates unattended: every session requires interactive, real-time
+   human consent. When support requires administrative rights (such as
+   interacting with Windows UAC or installers, or privileged dialogs on Linux):
+
+   - **Elevation is requested dynamically during a session.** The helper
+     requests elevation, and the owner is presented with an explicit prompt
+     explaining the change in privileges. The session bar visibly indicates the
+     elevated state for as long as it lasts and allows revoking it at any point.
+   - **On Linux (Wayland):** Respects compositor-mediated isolation and
+     portals (`xdg-desktop-portal`: `ScreenCast` and `RemoteDesktop`).
+     Privileged prompts (polkit/pkexec) remain bound to compositor security.
+   - **On Windows:** Because UIPI and the Secure Desktop isolate unprivileged
+     processes, an auxiliary Windows service provided by remotekit
+     (`NT AUTHORITY\SYSTEM`) is installed permanently upon first approval. The
+     elevation prompt explicitly discloses this installation and makes an
+     unambiguous commitment: *Chirp will never use this service autonomously or
+     unattended.*
+   - **Anti-LPE shielding:** The service enforces caller verification over IPC
+     via Authenticode (`WinVerifyTrust`). Only executables digitally signed by
+     Fabrintek Engenharia Digital Ltda (Chirp or Barahn) belonging to the active
+     console session are authorized to command it. Under remotekit's Apache-2.0
+     license, this verification is implemented as an extensible `CallerPolicy`.
+
 ## Where the pieces live
 
 The mechanism behind this — allocating and redeeming codes, minting codes from a

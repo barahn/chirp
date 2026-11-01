@@ -5,6 +5,25 @@
 measuring only, is built: `cmd/chirp-status` and the `status` package. So
 is phase 2, the page.
 
+The maintainer decided on 2026-10-31, in the review of barahn/chirp#170:
+
+- A node keeps no record of lookups, in the relay or in its proxy
+  ([What a node still sees](#what-a-node-still-sees)).
+- An owner's Nostr key lives for one registration and is never reused; what a
+  node can link through it is written down rather than hidden (same section).
+- The key identifies a node and admits nothing
+  ([Joining automatically](#joining-automatically)).
+- No node says anything about its version, sealed or not
+  ([Versions](#versions)).
+- Phase 4's node key is the identity that relay selection in remotekit
+  verifies, and that selection does not answer how a code finds its node
+  ([The precondition](#the-precondition-finding-the-right-node)).
+- Applications to join are suspended until the network's design is approved
+  as a whole ([`joining-the-network.md`](joining-the-network.md)).
+
+Whether a public node keeps the owner's socket is still open (open question
+6), and the rest of the document is still a proposal.
+
 The goal is a page on usechirp.app that shows which servers make up Chirp's
 public network, how long each has been up, which are new, which are dedicated
 nodes, which are off-line and since when, and which are out of date. Every
@@ -65,7 +84,8 @@ So:
    `GET /api/sessions/{id}` and `POST /api/peers/{peer}/consent` answer `404`.
    A public node does lookup only: `POST /api/peers`, `GET`/`DELETE
    /api/peers/{peer}`, `PUT /api/peers/{peer}/contact`, `POST /api/lookup` and
-   `POST /api/links/{token}/lookup`.
+   `POST /api/links/{token}/lookup`. Whether an owner's `GET /ws` stays is
+   open question 6.
 2. **The private mode needs the PAKE too.** Either the PAKE also runs over the
    relay's own WebSocket, or the private mode moves to the Nostr path with a
    private Nostr relay. This is a separate change, and a precondition for
@@ -79,6 +99,33 @@ happen. A Nostr relay sees that a key received gift wraps, when, and how big
 they were. Operators therefore pledge not to log or keep any of this beyond
 the throttle's in-memory window (see [Conformance](#conformance)). The pledge
 cannot be verified from outside, and the documentation for users must say so.
+
+**No record of lookups.** Every attempt on a code or a link passes through
+`POST /api/lookup` or `POST /api/links/{token}/lookup`, failures and successes
+alike, so a node that kept them would hold who tried to reach whom, and when.
+The relay keeps none: it logs only when it starts, stops and fails. That
+absence is a commitment, not an accident of the code, and it covers the proxy
+in front of the relay too. The shipped Caddyfile does not meet it yet: it
+logs one line per request with the client's address and the time, which for a
+lookup is exactly that record. A public node's Caddyfile must log no client
+address, and phase 4 ships one.
+
+**The owner's Nostr key.** A lookup hands out the owner's contact: a Nostr key
+and its relays. Chirp makes that key for one registration, and a new one when
+it registers again (a new code asked for, a restart, the relay's grace
+exceeded) or when every Nostr relay drops it (`client/nostr.go`). A key is
+never reused across registrations, and that is now a rule, not a detail of
+the client.
+
+One registration does span several codes: a lookup spends the code shown and
+the node issues the next one under the same peer, and each use of a link
+mints one. For the whole registration, the node can therefore watch that one
+key on the public Nostr relays: when gift wraps reach it, and how big they
+are, for every session the registration has. Turning the key over with each
+code would not hide this from the node, because the node registers every key
+it hands out, and already knows which codes belong to which peer. What the
+key gives away ends with the registration: the next one has a key the node
+cannot link to it except by timing and address.
 
 ## The precondition: finding the right node
 
@@ -99,6 +146,18 @@ A link can name its node without cost, because nobody reads it aloud. Codes
 cannot. This needs its own decision in [`product-model.md`](product-model.md)
 before the public network can carry real sessions. The status page does not
 depend on it and can be built first.
+
+remotekit's
+[`relay-path-selection.md`](https://github.com/barahn/remotekit/blob/main/docs/relay-path-selection.md)
+chooses the TURN relay a session's media crosses, by round trips the peers
+measure themselves. It does not answer this question: a measurement says which
+node is near, not which node holds the registration behind six digits. The
+two documents meet at the node key instead. Before a peer trusts a
+measurement, it checks that the candidate signs a fresh nonce with the key the
+list names for it, so that a CDN or a DNS answer in front of a listed node
+cannot inherit its measured record. That check is phase 4's
+`/.well-known/chirp-node`. So phase 4 supplies what selection needs, and phase
+6 still waits on this decision.
 
 ## Membership
 
@@ -149,6 +208,11 @@ Automatic entry follows the same rules, with no human in the checks:
 A failed probation closes the application with the reasons, and the operator
 may apply again.
 
+A valid key is not admission. Making a key costs nothing, so the key only
+says which node is answering; probation and the measurements that follow are
+what earn it a place in the list, and losing them loses the place, whatever
+key it holds.
+
 ### Leaving
 
 An operator leaves with a pull request removing the entry. A node that
@@ -169,7 +233,7 @@ signed list leaves it out.
 | Identity | `/.well-known/chirp-node` signs a fresh nonce with the listed key |
 | Public mode only | the trusted-path endpoints answer `404` |
 | Throttle on | the prober sends six malformed codes from its own address within the window and expects `429`. It spends only its own budget |
-| Up to date | see [Versions](#versions) |
+| Up to date | passes every check added by a security release, within its grace (see [Versions](#versions)) |
 | No version on the wire | no `Server` or other header names the relay's version |
 
 **Nostr relays:**
@@ -184,43 +248,43 @@ signed list leaves it out.
 
 **Pledges** that cannot be checked from outside, and to which the operator
 agrees by joining: no logging of URIs, routing digits or link tokens (the
-Caddyfile's filtered logs, kept as shipped); no analytics; no access
+Caddyfile's filtered logs, kept as shipped); no record of lookups, and, from
+phase 4's Caddyfile on, no client addresses in any log, the proxy's included
+(see [What a node still sees](#what-a-node-still-sees)); no analytics; no access
 restrictions by country; any changes to the code published under the AGPL.
 
 ## Versions
 
 A node must never tell the public its version, because that tells an attacker
 which flaws it has. Invidious, by contrast, publishes its version in
-`/api/v1/stats` and so does not have this problem to solve. Here the version
-goes only to the status service:
+`/api/v1/stats` and so does not have this problem to solve.
 
-- The status service has an X25519 key, published in this repository.
-- When the prober asks `/.well-known/chirp-node?nonce=…`, the node answers
-  with `attestation`: its version and the nonce, signed with the node key,
-  then sealed to the status service's key and padded to a fixed size. Anyone
-  else who asks gets a sealed box they cannot open, of the same length for
-  every version.
-- The status service opens it, checks the signature and the nonce, compares
-  the version with the releases, and publishes only the verdict.
+A node does not tell the status service its version either. An earlier draft
+had the node seal a signed version to the status service's key. That is the
+node's own word about itself, which nothing else on this page counts: a
+modified node would attest whatever it liked, and the seal only kept others
+from reading the claim. A version signed by the release pipeline does not
+help here either. It proves that a release exists, not that the node runs it.
 
-**Limit:** the version is still the node's own word. A modified node can claim
-any version. Where a security fix changes behaviour that can be seen from
-outside, the conformance suite gains a check for it, and those checks are the
-evidence that cannot be faked.
+**What is measured instead:** where a release fixes something that can be
+seen from outside, the conformance suite gains a check for it, and passing
+that check is the evidence that cannot be faked.
 
 **The rule:**
 
-- A node is **up to date** while it runs the latest release or the one before
-  it.
-- After a release marked **security**, a node has **7 days** to update.
-- After any other release, a node has **30 days**, the same as Invidious.
+- After a release marked **security** that adds a check, a node has **7
+  days** to pass it.
 - Past that, it is **out of date**. The page says "out of date for N days",
-  never which version it runs, and the signed list drops it.
+  never which release it fails, and the signed list drops it.
+
+**Limit:** a fix that changes nothing visible from outside cannot be enforced.
+The page cannot say a node runs the latest release, only that it passes every
+check the releases have added.
 
 ## Alerts
 
-When a member becomes non-conforming, or a release starts a node's grace
-period, the status service:
+When a member becomes non-conforming, or a security release starts a node's
+grace period, the status service:
 
 1. opens a GitHub issue on this repository, labelled `network`, mentioning
    the operator's `github` handle, naming the failed check and the deadline;
@@ -271,8 +335,6 @@ decision 5's "public network", and it should be recorded there when decided.
 - **Storage:** SQLite through a pure-Go driver, so the binary needs no CGO.
   `probes(server_id, vantage, ts, ok, latency_ms, err_class)` is kept for 90
   days; `daily(server_id, day, up_minutes, observed_minutes, p50_ms)` is kept
-  for good. Sealed version attestations are opened, judged and discarded: only
-  the verdict is stored.
 - **API:**
   - `GET /v1/servers`: the current state of every member and applicant;
   - `GET /v1/servers/{id}/history?days=90`: one member's history;
@@ -338,11 +400,14 @@ sets a policy, and must allow the same for `/status/`.
    new rule, or `scripts/check-live-site.sh` fails on `/status/`.
 3. **Nostr and TURN members**, server-sent events, the conformance suite.
 4. **The relay's public mode:** `-mode public`, `/.well-known/chirp-node`,
-   the node key, sealed version attestation, the trusted path disabled.
+   the node key, the trusted path disabled, and a Caddyfile that logs no
+   client address. No version attestation. The node key is also what
+   remotekit's relay selection verifies before it trusts a measurement.
 5. **Admission and alerts:** applications, probation, pull requests and
    issues opened by the status service, emails, suspension.
 6. **The signed list and `-network public` in Chirp.** Needs the decision on
-   [finding the right node](#the-precondition-finding-the-right-node).
+   [finding the right node](#the-precondition-finding-the-right-node), which
+   remotekit's relay selection does not make.
 7. **More vantage points**, signed daily exports.
 
 Separately, before the invariant can be claimed for both modes: the PAKE on
@@ -353,11 +418,17 @@ the private mode's path.
 1. How a code finds its node, among the options above.
 2. Whether admission ends with an automatic merge, which needs a change to
    the `main` ruleset, or keeps a maintainer's review.
-3. The thresholds: 95 % uptime over a 30-day probation; 7 and 30 days of
-   grace; 90 days suspended before removal.
-4. Who holds the status service's signing and sealing keys, and how they are
-   rotated. A Chirp release pins the list key, so rotating it needs a release.
+3. The thresholds: 95 % uptime over a 30-day probation; 7 days of grace
+   after a security release; 90 days suspended before removal.
+4. Who holds the status service's signing key, and how it is rotated. A Chirp
+   release pins the list key, so rotating it needs a release.
 5. Whether operators must state the jurisdiction they run in, beyond a region.
+6. Whether a public node keeps the owner's socket. With it, the node knows
+   which owners are running, from when and for how long, through a live
+   connection tied to each registration. Without it, an owner re-registers on
+   an interval and the registration expires, so the node learns only that a
+   write was recent. The socket is how the grace of product-model decision 1
+   is measured today, so dropping it changes that measure as well.
 
 ---
 
