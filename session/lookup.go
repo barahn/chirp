@@ -103,7 +103,7 @@ func (sm *SessionManager) SetContact(id rendezvous.PeerID, c Contact) error {
 // An owner that registered no contact still loses the code it was reached
 // by, since which owner a code belongs to is known only once it is redeemed.
 func (sm *SessionManager) Lookup(code, origin string) (*Contact, error) {
-	m, err := sm.reg.Redeem(code, origin)
+	m, err := sm.reg.Redeem(code, throttleKey(origin))
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +129,7 @@ func (sm *SessionManager) Lookup(code, origin string) (*Contact, error) {
 // LookupLink mints a single-use code from a link and looks it up in one step,
 // metered against origin like MintFromLink.
 func (sm *SessionManager) LookupLink(t rendezvous.Token, origin string) (*Contact, error) {
-	code, err := sm.reg.MintFromLink(t, origin, sm.codeTTL)
+	code, err := sm.reg.MintFromLink(t, throttleKey(origin), sm.codeTTL)
 	if err != nil {
 		return nil, err
 	}
