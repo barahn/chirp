@@ -30,8 +30,13 @@ behind a symmetric or carrier-grade NAT do not connect today.
 remotekit already generates credentials that expire
 (`webrtc.GenerateEphemeralTURNCredentials`, barahn/remotekit#64): username
 `<expiry>:<id>`, password `base64(HMAC-SHA1(secret, username))`, the format
-coturn's `use-auth-secret` checks. What is missing is something that hands
-them out. The relay already speaks to both ends.
+coturn's `use-auth-secret` checks. Released in v0.8.0, it is what the relay
+uses: one implementation of the format, shared with the client, and no new
+module, since `cmd/chirp` already imports `remotekit/webrtc`. remotekit
+tests it against pion's TURN server only, so Chirp tests it against coturn,
+the version `deploy/` runs: an allocation with a fresh credential, refusal
+once it has expired, and a session that outlives it. What is missing is
+something that hands them out. The relay already speaks to both ends.
 
 ### Who gets a credential
 
@@ -293,8 +298,8 @@ trusted path uses it to tell the owner a controller arrived.
 Each step is test-first, and each lands only once this proposal is approved.
 
 1. **TURN credentials on the relay** (part 1). Independent of the network,
-   and it lets two Chirps behind carrier-grade NAT connect. Needs open
-   question 6 answered.
+   and it lets two Chirps behind carrier-grade NAT connect. Moves Chirp to
+   remotekit v0.8.0.
 2. **The session key after the PAKE** (3.1). Client only.
 3. **Renewals instead of the socket in public mode** (part 4), in
    barahn/chirp#170.
@@ -306,7 +311,8 @@ Each step is test-first, and each lands only once this proposal is approved.
 
 1. ICE restart with fresh credentials, in remotekit, for a session whose
    network changes midway. Not needed for step 1. (A credential's lifetime
-   against long sessions was open here; part 1 settles it.)
+   against long sessions was open here, and so was where the credential
+   generator comes from; part 1 settles both.)
 2. How to limit spending other people's codes when each node meters only
    its own lookups.
 3. Whether anonymous tokens replace the per-address throttle once requests go
@@ -315,9 +321,6 @@ Each step is test-first, and each lands only once this proposal is approved.
    option.
 5. Whether section 3's requests go through a node of the network, or also
    through relays outside it.
-6. Where step 1 gets the credential generator: from a remotekit release that
-   includes `webrtc/turn.go`, which is that repository's separate decision, or
-   from twelve lines of HMAC in the relay, which duplicate it.
 
 ---
 
