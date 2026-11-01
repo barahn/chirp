@@ -35,13 +35,20 @@ them out. The relay already speaks to both ends.
 
 ### Who gets a credential
 
-- **The owner**, with `POST /api/peers/{peer}/turn`. The peer ID in the path is
-  the credential, as for every other owner endpoint.
-- **The controller**, in the answer to a lookup that returned a contact (and,
-  in private mode, to a redeem). A lookup is already metered per origin, so a
-  credential costs a controller what a lookup costs.
+Only the owner asks, with `POST /api/peers/{peer}/turn`. The peer ID in the
+path is the credential, as for every other owner endpoint. It asks once the
+user has let a controller in, for two credentials: its own, and one it sends
+the controller over the session's signalling. Over Nostr that is after the
+PAKE, signed with the key it proved and encrypted to the controller; over the
+relay's own path, through the relay, which issued it anyway.
 
-The answer:
+So the controller never asks the node for one, and a lookup carries none:
+whoever only looks codes up, guesses included, gets nothing to relay with,
+and every credential comes out of a registration's allowance. Each one is
+used within seconds of being issued, which is what lets its lifetime be
+short.
+
+The answer, for each:
 
 ```json
 {
@@ -49,7 +56,7 @@ The answer:
            "turn:relay.usechirp.app:3478?transport=tcp"],
   "username": "1793500000:3f9c1a7e",
   "credential": "…",
-  "expires_in": 3600
+  "expires_in": 300
 }
 ```
 
@@ -60,31 +67,49 @@ allocation to a registration.
 
 | Limit | Where | Proposed |
 |---|---|---|
-| Lifetime | relay | 1 hour |
-| Credentials per registration | relay | 4 per hour |
+| Lifetime | relay | 5 minutes |
+| Credentials per registration | relay | 8 per hour, two per session |
 | Allocations per credential | coturn `user-quota` | 2 |
 | Bandwidth per allocation | coturn `max-bps` | sized to the uplink |
 | Bandwidth for the whole server | coturn `bps-capacity` | sized to the uplink |
 | Peers it may reach | coturn `denied-peer-ip` | private ranges, as `stun-turn.md` lists |
 
 Abuse is bounded by registrations: one origin holds at most 30 peers
-(`DefaultMaxPeersPerOrigin`), so at most 30 × 4 credentials an hour, each
+(`DefaultMaxPeersPerOrigin`), so at most 30 × 8 credentials an hour, each
 capped by `max-bps`, all capped by `bps-capacity`. TURN carries every byte of
 a relayed session, so on `pve-dc` the caps come from its uplink, not from a
 round number.
 
-coturn checks the credential on every Refresh as well as on the Allocate, so
-a session that outlives the credential loses its relay (step 1's tests are to
-confirm this against coturn). Either the lifetime
-covers the longest session the relay allows, or the client fetches a fresh
-credential and remotekit restarts ICE with it. Which one is open question 1
-below.
+### A session outlives its credential
+
+The lifetime bounds when a credential can open an allocation, not how long
+the allocation lasts. coturn checks the expiry only on an allocation's first
+authenticated request: it then keeps the key for that allocation, and every
+Refresh after is checked against the kept key, not the clock. This was read
+in `src/server/ns_turn_server.c`, in 4.6.1 (Debian 13's) and in the current
+master. An allocation also cannot change credentials midway: coturn answers
+`441`, as RFC 8656 requires. So a five-minute credential carries a session of
+any length, and a stolen one is useless five minutes later.
+
+pion/turn's server does not behave this way. It checks the expiry on every
+Refresh, CreatePermission and ChannelBind (`lt_cred.go`), so its allocations
+die within the five minutes a permission lasts once the credential expires.
+The network therefore requires the coturn behaviour of its TURN members, and
+measures it rather than taking the operator's word: the prober allocates with
+a credential of its own, waits past its expiry, and expects the allocation
+to keep relaying. It joins the TURN checks in `status-page-proposal.md`'s
+*Conformance*.
+
+A new allocation does need a fresh credential, whatever its lifetime. That
+happens when a user's network changes midway, from Wi-Fi to mobile data. The
+owner then asks for two more and remotekit restarts ICE with them, which
+remotekit cannot do yet (open question 1).
 
 ### The shared secret
 
 `CHIRP_RELAY_TURN_SECRET` in `relay.env`, or a file named by it, mode 600 like
 the node key; coturn's `static-auth-secret` holds the same value. A relay
-without it answers `404` on the TURN route and leaves `turn` out of lookups.
+without it answers `404` on the TURN route.
 
 ### Fabrintek's node
 
@@ -213,10 +238,14 @@ X sees the owner and Y; Y sees the controller and X. Neither sees both ends.
 
 The owner gets its credential from its own node, as in part 1. The controller
 picks Y by the round trips it measures (remotekit's
-[`relay-path-selection.md`](https://github.com/barahn/remotekit/blob/main/docs/relay-path-selection.md)) and gets a credential there with a voucher: the
-owner's node signs `chirp-turn-voucher/v1 ∥ Y's id ∥ expiry ∥ nonce` in the
-lookup's answer, and Y checks it against that node's key in the list. A
-credential still costs one successful lookup.
+[`relay-path-selection.md`](https://github.com/barahn/remotekit/blob/main/docs/relay-path-selection.md))
+and tells the owner. The owner's node then signs a voucher,
+`chirp-turn-voucher/v1 ∥ Y's id ∥ expiry ∥ nonce`, which the owner passes to
+the controller as it would a credential. The controller presents it to Y,
+which checks it against that node's key in the list and issues a credential.
+Y learns the controller's address but not which node or owner sent it there,
+beyond the voucher's signer. The credential still comes out of the owner's
+registration.
 
 **What it costs.** One more hop of latency, and the network carries every
 relayed byte twice. Whether a chain is the default whenever TURN is needed, or
@@ -250,9 +279,9 @@ owner's `GET /ws`.
 
 **Proposed:** in public mode, no socket. The owner renews its registration
 with a new `PUT /api/peers/{peer}` every 40 s, and a registration not
-renewed for 2 minutes expires, which keeps product-model decision 1's grace as it is. The
-node learns that a write was recent, not a live connection's start and
-length.
+renewed for 2 minutes expires, which keeps product-model decision 1's grace
+as it is. The node learns that a write was recent, not a live connection's
+start and length.
 
 It also fits 3.2: a renewal is a request, so it travels through another node
 like the rest, while a WebSocket would tie the owner's address to its
@@ -264,7 +293,8 @@ trusted path uses it to tell the owner a controller arrived.
 Each step is test-first, and each lands only once this proposal is approved.
 
 1. **TURN credentials on the relay** (part 1). Independent of the network,
-   and it lets two Chirps behind carrier-grade NAT connect.
+   and it lets two Chirps behind carrier-grade NAT connect. Needs open
+   question 6 answered.
 2. **The session key after the PAKE** (3.1). Client only.
 3. **Renewals instead of the socket in public mode** (part 4), in
    barahn/chirp#170.
@@ -274,8 +304,9 @@ Each step is test-first, and each lands only once this proposal is approved.
 
 ## Open questions
 
-1. A credential's lifetime against long sessions: a lifetime as long as the
-   longest session, or fresh credentials and an ICE restart.
+1. ICE restart with fresh credentials, in remotekit, for a session whose
+   network changes midway. Not needed for step 1. (A credential's lifetime
+   against long sessions was open here; part 1 settles it.)
 2. How to limit spending other people's codes when each node meters only
    its own lookups.
 3. Whether anonymous tokens replace the per-address throttle once requests go
@@ -284,6 +315,9 @@ Each step is test-first, and each lands only once this proposal is approved.
    option.
 5. Whether section 3's requests go through a node of the network, or also
    through relays outside it.
+6. Where step 1 gets the credential generator: from a remotekit release that
+   includes `webrtc/turn.go`, which is that repository's separate decision, or
+   from twelve lines of HMAC in the relay, which duplicate it.
 
 ---
 
