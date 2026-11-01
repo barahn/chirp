@@ -245,6 +245,9 @@ in a Chirp folder in Downloads at either end, never replacing one already
 there. Everything the person helping does with the clipboard and files --
 each paste into the computer, each copy that leaves it, each file, a password
 that was held back -- is told in a system notification (barahn/chirp#134).
+Copied files count as pastes and copies, named or counted with their size;
+files copied on this computer that total more than 25 MB are not sent, and the
+owner is told to use *Send a file* instead.
 
 While a session is on, Chirp has an icon in the tray, at either end, with
 *Open Chirp* and *End session*; closing the main window then hides it there
@@ -299,7 +302,7 @@ streams, and a switch it refuses is said. *Send a file* (Pigeon Post)
 sends one file, or several dropped on the window, one at a time, with the
 progress as the owner's Chirp acknowledges it, while the owner allows files.
 The clipboard needs no button: while the owner allows it, it syncs both ways
-on its own. Closing the window ends the session too. The mouse and keyboard over the
+on its own, text and copied files up to 25 MB, if files are allowed too. Closing the window ends the session too. The mouse and keyboard over the
 picture go to the other computer, keys as the physical keys they are, so its
 own layout decides what they type.
 
