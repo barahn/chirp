@@ -151,6 +151,8 @@ cmd/chirp/internal/perch/art.go
 cmd/chirp/internal/perch/art_test.go
 cmd/chirp/internal/perch/place.go
 cmd/chirp/internal/perch/place_test.go
+cmd/chirp/internal/perch/walk.go
+cmd/chirp/internal/perch/walk_test.go
 cmd/chirp/internal/privilege/privilege.go
 cmd/chirp/internal/privilege/privilege_other.go
 cmd/chirp/internal/privilege/privilege_test.go
@@ -223,6 +225,8 @@ cmd/chirp/sound_darwin.go
 cmd/chirp/sound_linux.go
 cmd/chirp/sound_other.go
 cmd/chirp/sound_windows.go
+cmd/chirp/stroll.go
+cmd/chirp/stroll_test.go
 cmd/chirp/tray.go
 cmd/chirp/tray_test.go
 cmd/chirp/winres/icon.png
