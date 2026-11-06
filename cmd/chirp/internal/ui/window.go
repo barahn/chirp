@@ -149,6 +149,11 @@ type Window struct {
 func New(a fyne.App) *Window {
 	w := &Window{app: a, win: a.NewWindow("Chirp"), notify: a.SendNotification, quit: a.Quit, after: afterFunc}
 	w.win.SetCloseIntercept(w.closeMain)
+	w.win.Canvas().SetOnTypedKey(func(ev *fyne.KeyEvent) {
+		if w.bar != nil {
+			w.bar.key(ev)
+		}
+	})
 	header := w.header()
 	card := w.ownerCard()
 	help := w.helpArea()

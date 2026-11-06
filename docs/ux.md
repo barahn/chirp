@@ -234,7 +234,9 @@ in. A translation is reviewed as a change to the prompt, not as a string.
 **On the owner's machine,** a bar stays on top of every window for as long as
 the session lasts: *"João da TI" is controlling this computer · 04:12 ·
 End* — or *is seeing this screen*, when the mouse and keyboard were not
-allowed. *End* acts at once, without asking for confirmation. Under that
+allowed. *End* acts at once, without asking for confirmation, and pressing
+*Esc* twice in a row ends the session at once too, without needing the
+pointer. Under that
 line, each permission allowed besides *See your screen* is the same switch
 as in the prompt, and it only turns off: the owner takes one back at any
 moment, it stops at once, and it stays off (*Taken back*) until a new
