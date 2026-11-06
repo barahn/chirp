@@ -718,6 +718,21 @@ timing. It does not log the URI or the headers, because peer IDs, session
 IDs and link tokens travel there, and each one is a credential. If you change
 the Caddyfile's `log` blocks, keep them filtered.
 
+Those lines still say which addresses used the relay, and when. For a lookup,
+that is a record of who tried a code or a link and whether it worked. The
+relay itself keeps no such record, and a node of the public network must keep
+none anywhere, its proxy included: no client addresses in any log
+([`status-page-proposal.md`](status-page-proposal.md), *What a node still
+sees*). The Caddyfile for public mode will log no client address; until it
+ships, a private relay's operator decides whether to keep these lines.
+
+The relay also hands out each running Chirp's Nostr key to whoever looks its
+code up. Chirp makes that key for one registration, makes a new one if every
+Nostr relay drops it, and never reuses one. While the registration lasts,
+though, every code and link of it returns the same key. With it, the relay's
+operator can watch when that Chirp receives signalling on the public Nostr
+relays, and how much, for as long as it stays registered.
+
 ### Restarts and upgrades
 
 The state is in memory, so a restart:

@@ -80,7 +80,7 @@ func TestTheHeadIsWhereTheBodyStarts(t *testing.T) {
 // starts.
 func TestOnlyThePerchedBirdTakesClicks(t *testing.T) {
 	const w = 164
-	hit := Hit(w)
+	hit := Hit(w, false)
 	body := image.Pt(58, 64-int(canvasY)) // the body's middle, in canvas pixels
 	if !body.In(hit) {
 		t.Fatalf("hit box %v misses the body at %v", hit, body)

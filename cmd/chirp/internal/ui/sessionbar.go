@@ -161,6 +161,7 @@ func (b *sessionBar) show() {
 		b.w.PinBar(b.win, b.w.win)
 	}
 	if b.landed {
+		b.w.Perch.Hold(true)
 		b.w.Perch.Place(b.win)
 	}
 	b.shown = true
@@ -173,6 +174,9 @@ func (b *sessionBar) hide() {
 	}
 	b.win.Hide()
 	b.shown = false
+	if b.landed {
+		b.w.Perch.Hold(false)
+	}
 }
 
 // fit sizes the bar to what it holds. It is of fixed size, so a line added

@@ -45,13 +45,24 @@ const (
 	AlertPasswordHeld
 	// AlertFileIn is a file they sent, saved in Folder.
 	AlertFileIn
+	// AlertFilesPastedIn is files the person helping put on this
+	// computer's clipboard.
+	AlertFilesPastedIn
+	// AlertFilesCopiedOut is files copied on this computer that went to
+	// them.
+	AlertFilesCopiedOut
+	// AlertFilesTooLarge is files copied on this computer that were not
+	// sent, being over what a copy carries.
+	AlertFilesTooLarge
 )
 
 // Alert is one thing the owner is told about. Name, Size and Folder are the
-// file's, for the file kinds; Size is the text's for the clipboard ones.
+// file's, for AlertFileIn; Files are the names copied, for the clipboard's
+// file kinds; Size is what was copied, for the clipboard ones.
 type Alert struct {
 	Kind   AlertKind
 	Name   string
+	Files  []string
 	Size   int64
 	Folder string
 }
@@ -94,8 +105,31 @@ func alertText(name string, a Alert) string {
 		return trf("A password you copied was not shared with %s.", who)
 	case AlertFileIn:
 		return trf("Received “%s” (%s) from %s. It's in %s.", claim(a.Name), sizeText(a.Size), who, shortFolder(a.Folder))
+	case AlertFilesPastedIn:
+		if one, size := oneFile(a); one != "" {
+			return trf("“%s” (%s) pasted into this computer by %s.", one, size, who)
+		}
+		return trf("%d files (%s) pasted into this computer by %s.", len(a.Files), sizeText(a.Size), who)
+	case AlertFilesCopiedOut:
+		if one, size := oneFile(a); one != "" {
+			return trf("“%s” (%s) you copied went to %s.", one, size, who)
+		}
+		return trf("%d files (%s) you copied went to %s.", len(a.Files), sizeText(a.Size), who)
+	case AlertFilesTooLarge:
+		if one, size := oneFile(a); one != "" {
+			return trf("“%s” (%s) you copied was not sent to %s: copies go up to 25 MB. Use Send a file.", one, size, who)
+		}
+		return trf("%d files (%s) you copied were not sent to %s: copies go up to 25 MB. Use Send a file.", len(a.Files), sizeText(a.Size), who)
 	}
 	return ""
+}
+
+// oneFile is the name and size of the only file copied, or "" for several.
+func oneFile(a Alert) (name, size string) {
+	if len(a.Files) != 1 {
+		return "", ""
+	}
+	return claim(a.Files[0]), sizeText(a.Size)
 }
 
 // sizeText is a size as people say it, in whole units.

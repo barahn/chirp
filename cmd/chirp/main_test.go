@@ -220,10 +220,17 @@ func TestEveryClipboardSyncBecomesAnAlert(t *testing.T) {
 		{stream.ClipboardEvent{Direction: stream.ClipboardToHost, Size: 3}, ui.AlertPastedIn},
 		{stream.ClipboardEvent{Direction: stream.ClipboardFromHost, Size: 3}, ui.AlertCopiedOut},
 		{stream.ClipboardEvent{Direction: stream.ClipboardFromHost, Concealed: true}, ui.AlertPasswordHeld},
+		{stream.ClipboardEvent{Direction: stream.ClipboardToHost, Size: 3, Files: []string{"a.txt"}}, ui.AlertFilesPastedIn},
+		{stream.ClipboardEvent{Direction: stream.ClipboardFromHost, Size: 3, Files: []string{"a.txt"}}, ui.AlertFilesCopiedOut},
+		{stream.ClipboardEvent{Direction: stream.ClipboardFromHost, Size: 30 << 20, Files: []string{"a.iso"}, TooLarge: true}, ui.AlertFilesTooLarge},
 	} {
 		if a, ok := clipboardAlert(tc.ev); !ok || a.Kind != tc.want {
 			t.Errorf("%+v alerts %+v, %v; want kind %v", tc.ev, a, ok, tc.want)
 		}
+	}
+	files := stream.ClipboardEvent{Direction: stream.ClipboardToHost, Size: 3, Files: []string{"a.txt", "b.txt"}}
+	if a, _ := clipboardAlert(files); a.Size != 3 || len(a.Files) != 2 || a.Files[1] != "b.txt" {
+		t.Errorf("the files' alert %+v lost their names or size", a)
 	}
 	if _, ok := clipboardAlert(stream.ClipboardEvent{}); ok {
 		t.Error("an event with no direction alerted")

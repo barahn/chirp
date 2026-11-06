@@ -75,6 +75,12 @@ func TestEveryControllerActionNotifiesTheOwner(t *testing.T) {
 		{Alert{Kind: AlertCopiedOut, Size: 40}, "Text you copied went to “Ana”."},
 		{Alert{Kind: AlertPasswordHeld}, "A password you copied was not shared with “Ana”."},
 		{Alert{Kind: AlertFileIn, Name: "report.pdf", Size: 2_200_000, Folder: "/home/o/Downloads/Chirp"}, "Received “report.pdf” (2 MB) from “Ana”. It's in Downloads/Chirp."},
+		{Alert{Kind: AlertFilesPastedIn, Files: []string{"report.pdf"}, Size: 2_200_000}, "“report.pdf” (2 MB) pasted into this computer by “Ana”."},
+		{Alert{Kind: AlertFilesPastedIn, Files: []string{"a.txt", "b.txt", "c.txt"}, Size: 3_000}, "3 files (3 KB) pasted into this computer by “Ana”."},
+		{Alert{Kind: AlertFilesCopiedOut, Files: []string{"photo.jpg"}, Size: 900_000}, "“photo.jpg” (900 KB) you copied went to “Ana”."},
+		{Alert{Kind: AlertFilesCopiedOut, Files: []string{"a.txt", "b.txt"}, Size: 2_000}, "2 files (2 KB) you copied went to “Ana”."},
+		{Alert{Kind: AlertFilesTooLarge, Files: []string{"video.mp4"}, Size: 40_000_000}, "“video.mp4” (40 MB) you copied was not sent to “Ana”: copies go up to 25 MB. Use Send a file."},
+		{Alert{Kind: AlertFilesTooLarge, Files: []string{"a.iso", "b.iso"}, Size: 90_000_000}, "2 files (90 MB) you copied were not sent to “Ana”: copies go up to 25 MB. Use Send a file."},
 	} {
 		n := len(*sent)
 		w.Alert("s1", tc.alert)

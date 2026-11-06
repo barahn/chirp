@@ -6,6 +6,9 @@ body:
   - type: markdown
     attributes:
       value: |
+        > [!IMPORTANT]
+        > **Applications are suspended** until the network's design is approved as a whole. An application opened now waits until then, and its rules may change before it is reviewed.
+
         Read [Joining the public network](https://github.com/barahn/chirp/blob/main/docs/joining-the-network.md) first: what joining means today, what your relay needs, and what you agree to.
 
         > [!WARNING]

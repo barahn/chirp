@@ -245,6 +245,9 @@ in a Chirp folder in Downloads at either end, never replacing one already
 there. Everything the person helping does with the clipboard and files --
 each paste into the computer, each copy that leaves it, each file, a password
 that was held back -- is told in a system notification (barahn/chirp#134).
+Copied files count as pastes and copies, named or counted with their size;
+files copied on this computer that total more than 25 MB are not sent, and the
+owner is told to use *Send a file* instead.
 
 While a session is on, Chirp has an icon in the tray, at either end, with
 *Open Chirp* and *End session*; closing the main window then hides it there
@@ -273,6 +276,18 @@ With a bird:
 
 - **It lands** by the tray when the session starts, and its balloon, borderless
   above it, opens to say who is in, then folds away.
+- **It walks** along the taskbar from there, as the site's bird walks on its
+  app window (barahn/chirp#187): small hops to the left of its spot, a rest
+  between them, now and then two short hops in a row, a chirp now and then.
+  The pointer passing over it three times within four seconds shoos it: to
+  the far end of its stretch, or, half the time, up onto the top edge of a
+  window that shows -- not minimized, not maximized, not Chirp's, with room
+  above it -- and it walks along that. Shooed again, or when that window
+  moves, shuts or is covered, it flies back to its spot by the tray. While
+  its balloon is open it stands still. Where the system asks for less motion
+  (Windows' *Animation effects*, GNOME's *enable-animations*) it only
+  perches. The rules are `cmd/chirp/internal/perch/walk.go`, the site's in
+  Go; `cmd/chirp/stroll.go` drives them the same on every OS.
 - **Tapping the bird** opens the balloon -- who, the clock, *End*, the switches
   that only turn off, Send a file -- until it is tapped again.
 - **Each alert** (a paste, a copy, a file, a password held back) is said in the
@@ -299,7 +314,7 @@ streams, and a switch it refuses is said. *Send a file* (Pigeon Post)
 sends one file, or several dropped on the window, one at a time, with the
 progress as the owner's Chirp acknowledges it, while the owner allows files.
 The clipboard needs no button: while the owner allows it, it syncs both ways
-on its own. Closing the window ends the session too. The mouse and keyboard over the
+on its own, text and copied files up to 25 MB, if files are allowed too. Closing the window ends the session too. The mouse and keyboard over the
 picture go to the other computer, keys as the physical keys they are, so its
 own layout decides what they type.
 
@@ -376,8 +391,14 @@ needs the same, mostly on the machine being controlled:
   remotekit's `screen` on macOS.
 - **Wayland portals.** After *Allow*, the system asks once more which screen
   to share. The prompt's last line says so, so the second dialog is expected.
-- **Windows administrator prompts** appear on a secure desktop the helper
-  cannot see. A help article tells both people what is happening.
+- **Windows administrator prompts.** On a default session, they appear on a
+  secure desktop the helper cannot see. Under the hybrid elevation model
+  (decision 7, barahn/chirp#117), the helper can request elevation during the
+  session. When approved, Chirp installs the auxiliary remotekit service,
+  explaining clearly to the owner: *"To allow remote control of Windows security
+  prompts and administrative tasks, an auxiliary remotekit service will be
+  permanently installed on this computer. Chirp will never use this service
+  autonomously or unattended."*
 
 ## Help: "Getting to know Chirp"
 
