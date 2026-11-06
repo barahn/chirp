@@ -179,15 +179,15 @@
   // Each page's title and description, by the id of its <main>.
   var META = {
     home: {
-      en: [document.title, ""],
+      en: ["Chirp — remote help", "Remote help between two people who trust each other. Nothing to install, no account, and nothing happens on your screen until you press Allow."],
       "pt-BR": ["Chirp — ajuda remota", "Ajuda remota entre duas pessoas que confiam uma na outra. Nada para instalar, nenhuma conta, e nada acontece na sua tela até você apertar Permitir."]
     },
     link: {
-      en: [document.title, ""],
+      en: ["A Chirp link — remote help", "Someone sent you a Chirp link. Paste it into Chirp to help them; they'll be asked on their own screen first."],
       "pt-BR": ["Um link do Chirp — ajuda remota", "Alguém te mandou um link do Chirp. Cole no Chirp para ajudar essa pessoa; ela vai ser perguntada na própria tela antes."]
     },
     status: {
-      en: [document.title, ""],
+      en: ["Network status — Chirp", "Every server in Chirp's public network, probed from outside every 30 seconds: whether it is up, since when it has been off-line, and how much of each day it answered."],
       "pt-BR": ["Status da rede — Chirp", "Cada servidor da rede pública do Chirp, sondado de fora a cada 30 segundos: se está no ar, desde quando está fora, e quanto de cada dia respondeu."]
     }
   };
@@ -196,13 +196,14 @@
   var lang = "en";
   var page = document.querySelector("main").id;
   var metaDesc = document.querySelector('meta[name="description"]');
-  META[page].en[1] = metaDesc ? metaDesc.getAttribute("content") : "";
 
-  // A choice made on the page wins; otherwise the first language the
-  // browser prefers that the page has. Any Portuguese gets pt-BR.
+  // A choice made on the page wins; otherwise a page whose markup already
+  // names Portuguese (/pt/) starts in Portuguese; otherwise the first language
+  // the browser prefers that the page has. Any Portuguese gets pt-BR.
   function detectLang() {
     var saved = store.get("chirp-site-lang");
     if (LANGS.indexOf(saved) >= 0) return saved;
+    if (document.documentElement.lang === "pt-BR") return "pt-BR";
     var prefs = (navigator.languages && navigator.languages.length) ? navigator.languages : [navigator.language || ""];
     for (var i = 0; i < prefs.length; i++) {
       var l = String(prefs[i]).toLowerCase();

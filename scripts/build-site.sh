@@ -30,13 +30,43 @@ mkdir -p "$out/assets/fonts"
 cp "$warm"/fonts/*.ttf "$warm"/fonts/OFL-*.txt "$out/assets/fonts/"
 cp "$warm/bird/icon.svg" "$out/favicon.svg"
 
+# Social preview crawlers read <head> without running site.js, so /pt/ and
+# /pt/l/ are built from the English pages with the Portuguese Open Graph and
+# Twitter Card tags and og-chirp-pt.png rather than kept twice in site/.
+mkdir -p "$out/pt/l"
+sed \
+  -e 's|<html lang="en"|<html lang="pt-BR"|' \
+  -e 's|<title>Chirp — remote help</title>|<title>Chirp — ajuda remota</title>|' \
+  -e 's|content="Remote help between two people who trust each other. Nothing to install, no account, and nothing happens on your screen until you press Allow."|content="Ajuda remota entre duas pessoas que confiam uma na outra. Nada para instalar, nenhuma conta, e nada acontece na sua tela até você apertar Permitir."|g' \
+  -e 's|content="Remote help between two people who trust each other. Nothing to install, no account."|content="Ajuda remota entre duas pessoas que confiam uma na outra. Nada para instalar, nenhuma conta."|g' \
+  -e 's|content="Chirp — Remote help"|content="Chirp — Ajuda remota"|g' \
+  -e 's|content="https://usechirp.app/"|content="https://usechirp.app/pt/"|g' \
+  -e 's|https://usechirp.app/assets/og-chirp.png|https://usechirp.app/assets/og-chirp-pt.png|g' \
+  -e 's|<meta property="og:locale" content="en_US">|<meta property="og:locale" content="pt_BR">|' \
+  -e 's|<meta property="og:locale:alternate" content="pt_BR">|<meta property="og:locale:alternate" content="en_US">|' \
+  -e 's|href="/"|href="/pt/"|g' \
+  -e 's|href="/#|href="/pt/#|g' \
+  "$out/index.html" > "$out/pt/index.html"
+
+sed \
+  -e 's|<html lang="en"|<html lang="pt-BR"|' \
+  -e 's|A Chirp link — remote help|Um link do Chirp — ajuda remota|g' \
+  -e 's|content="Someone sent you a Chirp link. Paste it into Chirp to help them; they'\''ll be asked on their own screen first."|content="Alguém te mandou um link do Chirp. Cole no Chirp para ajudar essa pessoa; ela vai ser perguntada na própria tela antes."|g' \
+  -e 's|content="https://usechirp.app/l/"|content="https://usechirp.app/pt/l/"|g' \
+  -e 's|https://usechirp.app/assets/og-chirp.png|https://usechirp.app/assets/og-chirp-pt.png|g' \
+  -e 's|<meta property="og:locale" content="en_US">|<meta property="og:locale" content="pt_BR">|' \
+  -e 's|<meta property="og:locale:alternate" content="pt_BR">|<meta property="og:locale:alternate" content="en_US">|' \
+  -e 's|href="/"|href="/pt/"|g' \
+  -e 's|href="/#|href="/pt/#|g' \
+  "$out/l/index.html" > "$out/pt/l/index.html"
+
 # Cloudflare tells browsers to keep /assets/ for hours, under the same names
 # from one deploy to the next, while the pages expire in minutes. A page from
 # a new deploy could then show an old screenshot, or run an old site.js that
 # lacks its new translations. Each reference a page makes to an asset, or to
 # the favicon, which browsers keep longer still, carries a hash of that file's
 # content, so a changed file gets a new URL and an unchanged one stays cached.
-for page in "$out"/index.html "$out"/l/index.html "$out"/status/index.html; do
+for page in "$out"/index.html "$out"/l/index.html "$out"/pt/index.html "$out"/pt/l/index.html "$out"/status/index.html; do
   for ref in $(grep -oE '"/(assets/[^"?]*|favicon\.svg)"' "$page" | tr -d '"' | sort -u); do
     file="$out$ref"
     [ -f "$file" ] || { echo "$page refers to $ref, which is not in the site" >&2; exit 1; }
