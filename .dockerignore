@@ -6,6 +6,7 @@
 !go.mod
 !go.sum
 !cmd/chirp-relay/
+!node/
 !session/
 !signalling/
 **/*_test.go

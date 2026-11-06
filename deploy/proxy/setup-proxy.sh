@@ -108,6 +108,8 @@ $MANAGED
 # Peer IDs, session IDs and link tokens travel in the relay's request paths
 # and query strings, and each is a credential. Caddy logs the request URI with
 # every error, whatever a site's own log says, so the default logger drops it.
+# Client addresses are dropped as well, so the log keeps no record of who
+# looked a code or link up (docs/relay.md, "Logs").
 {
 	log default {
 		output stderr
@@ -115,6 +117,9 @@ $MANAGED
 			wrap console
 			request>uri delete
 			request>headers delete
+			request>remote_ip delete
+			request>remote_port delete
+			request>client_ip delete
 		}
 	}
 }
@@ -150,13 +155,16 @@ $name {
 		Referrer-Policy "no-referrer"
 	}
 
-	# Address, method, status and timing; never the URI or the headers.
+	# Method, status and timing; never the client's address, the URI or the headers.
 	log {
 		output stderr
 		format filter {
 			wrap console
 			request>uri delete
 			request>headers delete
+			request>remote_ip delete
+			request>remote_port delete
+			request>client_ip delete
 			resp_headers delete
 		}
 	}

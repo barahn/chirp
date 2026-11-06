@@ -36,7 +36,7 @@ func teapot() http.Handler {
 }
 
 func TestLandingPage(t *testing.T) {
-	h := routes(teapot(), "")
+	h := routes(teapot(), "", nil)
 	r := get(t, h, http.MethodGet, "/")
 	if r.StatusCode != http.StatusOK || !strings.HasPrefix(r.Header.Get("Content-Type"), "text/html") {
 		t.Fatalf("GET /: %d %s", r.StatusCode, r.Header.Get("Content-Type"))
@@ -88,14 +88,14 @@ func TestLandingPage(t *testing.T) {
 }
 
 func TestRobotsTxtKeepsCrawlersOut(t *testing.T) {
-	r := get(t, routes(teapot(), ""), http.MethodGet, "/robots.txt")
+	r := get(t, routes(teapot(), "", nil), http.MethodGet, "/robots.txt")
 	if r.StatusCode != http.StatusOK || body(t, r) != "User-agent: *\nDisallow: /\n" {
 		t.Fatalf("robots.txt: %d", r.StatusCode)
 	}
 }
 
 func TestSecurityTxt(t *testing.T) {
-	if r := get(t, routes(http.NotFoundHandler(), ""), http.MethodGet, "/.well-known/security.txt"); r.StatusCode != http.StatusNotFound {
+	if r := get(t, routes(http.NotFoundHandler(), "", nil), http.MethodGet, "/.well-known/security.txt"); r.StatusCode != http.StatusNotFound {
 		t.Errorf("without a contact: %d, want 404", r.StatusCode)
 	}
 

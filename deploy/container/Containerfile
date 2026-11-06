@@ -21,6 +21,7 @@ WORKDIR /src
 # never compiled, so the build needs no cgo and fetches none of their modules.
 COPY go.mod go.sum ./
 COPY cmd/chirp-relay/ cmd/chirp-relay/
+COPY node/ node/
 COPY session/ session/
 COPY signalling/ signalling/
 

@@ -5,8 +5,12 @@
 // consent, and the signalling between the two ends of a session
 // (signalling.Server).
 //
-// It is the relay its users run or trust that the first runnable Chirp ships
-// with (docs/product-model.md, decision 5), not a public one. It speaks plain
+// By default it is private: the relay its users run or trust, which the
+// first runnable Chirp ships with (docs/product-model.md, decision 5). With
+// -mode public it is a node of the public network
+// (docs/status-page-proposal.md): it only looks up how an owner can be
+// reached over Nostr, relays no session, and proves its identity at
+// /.well-known/chirp-node with a key kept in -node-key. It speaks plain
 // HTTP: put a TLS-terminating proxy in front of it for anything beyond one
 // machine, and see docs/relay.md for running it and docs/stun-turn.md for the
 // STUN and TURN servers a session also needs.
@@ -22,14 +26,16 @@
 //	chirp-relay -addr localhost:8080
 //	chirp-relay -addr unix:/run/chirp-relay/relay.sock
 //	chirp-relay -addr 10.0.0.5:8080 -trusted-proxies 10.0.0.1
+//	chirp-relay -mode public -node-key /var/lib/chirp-relay/node.key
 //	chirp-relay -healthcheck
 //
 // A browser at the relay's address gets a page saying what it is
 // (pages.go), robots.txt, and with -security-contact a security.txt.
 //
 // Each flag can also be set in the environment: CHIRP_RELAY_ADDR,
-// CHIRP_RELAY_SOCKET_MODE, CHIRP_RELAY_TRUSTED_PROXIES and
-// CHIRP_RELAY_SECURITY_CONTACT. A flag given on the command line wins.
+// CHIRP_RELAY_SOCKET_MODE, CHIRP_RELAY_TRUSTED_PROXIES,
+// CHIRP_RELAY_SECURITY_CONTACT, CHIRP_RELAY_MODE and CHIRP_RELAY_NODE_KEY. A
+// flag given on the command line wins.
 package main
 
 import (
@@ -48,6 +54,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/barahn/chirp/node"
 	"github.com/barahn/chirp/session"
 	"github.com/barahn/chirp/signalling"
 )
@@ -60,6 +67,8 @@ func main() {
 	healthcheck := flag.Bool("healthcheck", false, "ask the relay listening on -addr whether it is up, and exit 0 if it is")
 	contactFlag := flag.String("security-contact", os.Getenv("CHIRP_RELAY_SECURITY_CONTACT"),
 		"where to report a security problem with this relay: an email address or an https: URL, served as /.well-known/security.txt")
+	modeFlag := flag.String("mode", envOr("CHIRP_RELAY_MODE", "private"), "private, or public for a node of the public network")
+	nodeKey := flag.String("node-key", os.Getenv("CHIRP_RELAY_NODE_KEY"), "in public mode, the file holding the node's key; created on first start")
 	flag.Parse()
 
 	if *healthcheck {
@@ -73,6 +82,10 @@ func main() {
 	contact, err := securityContact(*contactFlag)
 	if err != nil {
 		log.Fatalf("chirp-relay: -security-contact: %v", err)
+	}
+	m, err := relayMode(*modeFlag, *nodeKey)
+	if err != nil {
+		log.Fatalf("chirp-relay: %v", err)
 	}
 	trusted, err := signalling.ParsePrefixes(*proxies)
 	if err != nil {
@@ -91,12 +104,13 @@ func main() {
 	sm := session.NewSessionManager(0)
 	defer sm.Close()
 	relay := signalling.NewServer(sm)
+	relay.LookupOnly = m.public
 	if unix || len(trusted) > 0 {
 		relay.ClientIP = signalling.ForwardedFor(trusted)
 	}
 
 	srv := &http.Server{
-		Handler:           routes(relay.Handler(), contact),
+		Handler:           routes(relay.Handler(), contact, m.identity),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
@@ -109,6 +123,9 @@ func main() {
 		_ = srv.Shutdown(shutdown)
 	}()
 
+	if m.public {
+		log.Printf("chirp-relay: public mode, lookup only, node key in %s", *nodeKey)
+	}
 	switch {
 	case unix:
 		log.Printf("chirp-relay: listening on %s, trusting X-Forwarded-For from whoever can open it", *addr)
@@ -125,11 +142,37 @@ func main() {
 	}
 }
 
-// routes adds the relay's own health check, and the pages a browser finds,
-// in front of the signalling routes. None of them reads any state.
-func routes(relay http.Handler, contact string) http.Handler {
+type mode struct {
+	public   bool
+	identity http.Handler
+}
+
+func relayMode(name, keyPath string) (mode, error) {
+	switch name {
+	case "private":
+		return mode{}, nil
+	case "public":
+		if keyPath == "" {
+			return mode{}, errors.New("-mode public needs -node-key, the file that holds the node's key")
+		}
+		key, err := node.LoadOrCreateKey(keyPath)
+		if err != nil {
+			return mode{}, fmt.Errorf("-node-key: %w", err)
+		}
+		return mode{public: true, identity: node.Handler(key)}, nil
+	}
+	return mode{}, fmt.Errorf("-mode: %q is neither private nor public", name)
+}
+
+// routes adds the relay's own health check, the pages a browser finds and,
+// for a public node, its identity, in front of the signalling routes. Only
+// the identity reads anything: the node's key.
+func routes(relay http.Handler, contact string, identity http.Handler) http.Handler {
 	mux := http.NewServeMux()
 	pages(mux, contact, time.Now)
+	if identity != nil {
+		mux.Handle("GET "+node.Path, identity)
+	}
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		_, _ = io.WriteString(w, "ok\n")
