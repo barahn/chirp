@@ -21,8 +21,10 @@ import (
 // The owner's session bar (barahn/chirp#77, docs/ux.md, During a session):
 // for as long as someone is let in, a window of its own says who, for how
 // long, and offers End. Like the consent prompt it carries no bird and no
-// brand word. End acts at once, without asking, and closing the bar ends the
-// session too: a bar the owner wants gone is a session they want over.
+// brand word. End acts at once, without asking, and closing the bar or
+// pressing Esc twice in a row ends the session too: a bar the owner wants
+// gone is a session they want over, even when the person helping has the
+// pointer.
 //
 // Under that line, each permission allowed besides Screen view is a switch
 // that only turns off (barahn/chirp#52): the owner can take one back at any
@@ -52,6 +54,7 @@ type sessionBar struct {
 	closed  func()
 	done    bool
 	stop    chan struct{}
+	lastEsc time.Time
 
 	// The balloon, with a bird (bird.go): news is the alert it says now,
 	// queue those still to say. shown is whether the window is out; held,
@@ -120,6 +123,7 @@ func (w *Window) showSessionBar(s client.ActiveSession) {
 	b.win.SetContent(container.NewPadded(content))
 	b.closed = b.endNow
 	b.win.SetCloseIntercept(b.closed)
+	b.win.Canvas().SetOnTypedKey(b.key)
 	b.win.SetFixedSize(true)
 	b.fit()
 	switch {
@@ -221,7 +225,25 @@ func (b *sessionBar) tick() {
 	b.clock.SetText(elapsedText(int(b.now().Sub(b.start).Seconds())))
 }
 
-// endNow is End, or the bar's close button: the session ends at once.
+// escWindow is how close together two Escape presses must be to end the
+// session. One press alone does nothing, so a stray Escape does not drop a
+// call; two in quick succession end it without reaching for the pointer.
+const escWindow = 500 * time.Millisecond
+
+// key ends the session when Escape is pressed twice within escWindow.
+func (b *sessionBar) key(ev *fyne.KeyEvent) {
+	if b.done || ev == nil || ev.Name != fyne.KeyEscape {
+		return
+	}
+	at := b.now()
+	if !b.lastEsc.IsZero() && at.Sub(b.lastEsc) <= escWindow {
+		b.endNow()
+		return
+	}
+	b.lastEsc = at
+}
+
+// endNow is End, double-Esc, or the bar's close button: the session ends at once.
 func (b *sessionBar) endNow() {
 	if b.done {
 		return

@@ -154,6 +154,7 @@ func (b *sessionBar) tapped() {
 	}
 	b.held = true
 	b.show()
+	b.win.RequestFocus()
 }
 
 // announce says text in the balloon, after whatever it is saying now.

@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/test"
 
 	"github.com/barahn/chirp/client"
@@ -112,5 +113,53 @@ func TestANewSessionReplacesTheBar(t *testing.T) {
 	started(w, "Bo")
 	if w.bar == first || !first.done || w.bar.session.Name != "Bo" {
 		t.Error("the new session did not replace the bar")
+	}
+}
+
+func TestDoubleEscapeEndsTheSessionAtOnce(t *testing.T) {
+	w := newWindow(t)
+	ended := 0
+	w.OnEndSession = func() { ended++ }
+	started(w, "Ana")
+
+	at := w.bar.start
+	w.bar.now = func() time.Time { return at }
+	esc := &fyne.KeyEvent{Name: fyne.KeyEscape}
+
+	// A single Escape, or a second one after escWindow, leaves the session on.
+	if fn := w.bar.win.Canvas().OnTypedKey(); fn != nil {
+		fn(esc)
+	}
+	if ended != 0 || w.bar == nil {
+		t.Fatalf("one Escape ended the session: ended=%d, bar=%v", ended, w.bar != nil)
+	}
+	at = at.Add(escWindow + 10*time.Millisecond)
+	if fn := w.bar.win.Canvas().OnTypedKey(); fn != nil {
+		fn(esc)
+	}
+	if ended != 0 || w.bar == nil {
+		t.Fatalf("a late second Escape ended the session: ended=%d, bar=%v", ended, w.bar != nil)
+	}
+
+	// A second Escape within escWindow ends the session at once.
+	at = at.Add(200 * time.Millisecond)
+	if fn := w.bar.win.Canvas().OnTypedKey(); fn != nil {
+		fn(esc)
+	}
+	if ended != 1 || w.bar != nil {
+		t.Fatalf("double Escape on the bar: ended=%d, bar=%v", ended, w.bar != nil)
+	}
+
+	// The same double Escape on the main window while a session is on ends it too.
+	started(w, "Bo")
+	at = w.bar.start
+	w.bar.now = func() time.Time { return at }
+	if fn := w.win.Canvas().OnTypedKey(); fn != nil {
+		fn(esc)
+		at = at.Add(150 * time.Millisecond)
+		fn(esc)
+	}
+	if ended != 2 || w.bar != nil {
+		t.Fatalf("double Escape on the main window: ended=%d, bar=%v", ended, w.bar != nil)
 	}
 }
