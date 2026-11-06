@@ -416,6 +416,8 @@ the private mode's path.
 ## Open questions
 
 1. How a code finds its node, among the options above.
+   [`network-paths-proposal.md`](network-paths-proposal.md) proposes
+   rendezvous hashing over the routing digits.
 2. Whether admission ends with an automatic merge, which needs a change to
    the `main` ruleset, or keeps a maintainer's review.
 3. The thresholds: 95 % uptime over a 30-day probation; 7 days of grace
@@ -429,6 +431,8 @@ the private mode's path.
    an interval and the registration expires, so the node learns only that a
    write was recent. The socket is how the grace of product-model decision 1
    is measured today, so dropping it changes that measure as well.
+   [`network-paths-proposal.md`](network-paths-proposal.md) proposes
+   renewals in public mode.
 
 ---
 

@@ -701,6 +701,8 @@ TURN stays off until the relay hands out per-session credentials
 one credential built into every binary would let anyone who unpacks one relay
 through the node. Until then, two Chirps that are both behind a symmetric NAT
 or a carrier-grade NAT do not connect.
+[`network-paths-proposal.md`](network-paths-proposal.md), part 1, proposes how
+the relay hands them out.
 
 ## Operations
 
