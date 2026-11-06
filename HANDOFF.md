@@ -313,6 +313,7 @@ site/assets/images/window-dark-pt.webp
 site/assets/images/window-dark.webp
 site/assets/images/window-light-pt.webp
 site/assets/images/window-light.webp
+site/assets/og-chirp.png
 site/assets/site.css
 site/assets/site.js
 site/assets/status.js
