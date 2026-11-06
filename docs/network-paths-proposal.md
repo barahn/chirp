@@ -345,8 +345,8 @@ Each step is test-first, and each lands only once this proposal is approved.
    and it lets two Chirps behind carrier-grade NAT connect. Moves Chirp to
    remotekit v0.8.0.
 2. **The session key after the PAKE** (3.1). Client only.
-3. **Renewals instead of the socket in public mode** (part 4), in
-   barahn/chirp#170.
+3. **Renewals instead of the socket in public mode** (part 4), replacing the
+   owner's socket that barahn/chirp#170 kept.
 4. **Rendezvous hashing** (part 2), with phase 6's signed list and the miss
    budget divided by its length. Needs origins counted per IPv6 /64.
 5. **Requests through another node** (3.2).

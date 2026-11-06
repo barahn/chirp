@@ -404,8 +404,13 @@ cmd/chirp/internal/ui/  its Fyne window (docs/ux.md), the consent prompt
 cmd/chirp/internal/warm/ the Warm look (barahn/chirp#53): Fyne theme, tokens,
                         fonts (third-party, OFL; see fonts/README.md), the
                         bird's poses as SVG, the app icon
-cmd/chirp-relay/        serves signalling.Server, for a self-hosted relay, with
-                        a Unix socket, /healthz, -healthcheck, -trusted-proxies
+cmd/chirp-relay/        serves signalling.Server, for a self-hosted relay or a
+                        public node (-mode private|public, -node-key), with a
+                        Unix socket, /healthz, -healthcheck, -trusted-proxies
+cmd/chirp-status/       serves status.Service, probing the public network's
+                        servers and answering /v1/servers and /healthz
+node/                   a public node's ed25519 identity key (LoadOrCreateKey)
+                        and /.well-known/chirp-node handler (docs/status-page-proposal.md)
 session/consent.go      ConsentDecision, DefaultPermissions
 session/lookup.go       Contact, SetContact, Lookup, LookupLink (the blind lookup, §4.6)
 session/session.go      Peer, Session, SessionState machine, SessionManager (in-memory),
@@ -413,10 +418,12 @@ session/session.go      Peer, Session, SessionState machine, SessionManager (in-
 signalling/hub.go       opaque two-peer relay (roles controller / owner)
 signalling/lookup.go    the lookup's HTTP endpoints (§4.6)
 signalling/relay.go     the relay's own chirp.* messages
-signalling/http.go      HTTP + WebSocket surface (§4.5)
+signalling/http.go      HTTP + WebSocket surface (§4.5; LookupOnly in public mode)
 signalling/clientip.go  ForwardedFor: Server.ClientIP behind trusted proxies
-deploy/                 running the relay: container image, Podman Quadlet,
-                        systemd, Caddy, Proxmox LXC (docs/relay.md)
+status/                 the public network's server registry, 30 s prober,
+                        SQLite store, uptime rolls and HTTP API
+deploy/                 running the relay and status service: container image,
+                        Podman Quadlet, systemd, Caddy, Proxmox LXC (docs/relay.md)
 ```
 
 ### The state machine (already implemented)

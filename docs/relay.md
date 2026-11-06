@@ -566,8 +566,10 @@ at the relay. Then:
    `CHIRP_RELAY_TRUSTED_PROXIES` to the proxy's address as the relay sees it.
 3. Make the proxy pass WebSocket upgrades, set `X-Forwarded-For`, and not
    time out idle connections quickly.
-4. Keep request URIs out of the proxy's logs. They carry peer IDs, session
-   IDs and link tokens.
+4. Keep request URIs out of the proxy's logs — they carry peer IDs, session
+   IDs and link tokens — and, in public mode, client addresses too
+   ([*Logs*](#logs); nginx's default `access_log` records both `$request_uri`
+   and `$remote_addr`).
 5. Restart the relay with `systemctl restart chirp-relay`.
 
 For nginx:
@@ -762,7 +764,11 @@ client's address and the time are a record of who tried a code or a link and
 whether it worked, and a node of the public network must keep no such record
 anywhere, its proxy included
 ([`status-page-proposal.md`](status-page-proposal.md), *What a node still
-sees*). If you change the Caddyfile's `log` blocks, keep them filtered.
+sees*). `deploy/caddy/Caddyfile` drops those three address fields by default
+so switching a relay to `-mode public` leaves no lookup log; an operator of a
+`private` relay who wants client addresses in the access log may remove those
+three lines, while keeping `request>uri` and `request>headers` deleted. If
+you change the Caddyfile's `log` blocks, keep them filtered.
 
 The relay also hands out each running Chirp's Nostr key to whoever looks its
 code up. Chirp makes that key for one registration, makes a new one if every
@@ -786,8 +792,12 @@ codes afterwards.
 - **LXC or VM:** build a new bundle, copy it in (`pct push <ctid> <file>
   <dest>` from the node, or `scp`), and run `./install.sh --binary
   ./chirp-relay` from it again. Your `relay.env` and Caddy configuration are
-  kept. Upgrade the system itself with `apt` as usual. `unattended-upgrades`
-  is a good idea in the container.
+  kept. (`install.sh` rewrites `/etc/caddy/Caddyfile` only when given
+  `--domain`, so when upgrading an earlier installation to `-mode public`,
+  pass `--domain <domain>` again — or re-run `deploy/proxy/setup-proxy.sh
+  --relay …` if sharing a proxy — so Caddy drops client addresses from its
+  logs.) Upgrade the system itself with `apt` as usual.
+  `unattended-upgrades` is a good idea in the container.
 - **Podman:** build or load the new image with the same tag, then run
   `systemctl --user restart chirp-relay`. To update Caddy, change the digest
   on the `Image=` line of `caddy.container` (the current one is listed on
