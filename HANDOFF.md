@@ -1170,15 +1170,31 @@ may become):
 
   The GitHub Release carries the notes, and the SBOM workflow attached its
   output to it.
+- **v0.4.0** (tag `v0.4.0` on `main`, 2026-10-17):
+  - first release binaries for Windows and Linux (`chirp-windows-amd64.exe`,
+    `chirp-linux-amd64`, `chirp-relay-linux-amd64`, `chirp-relay-linux-arm64`)
+    with Sigstore-signed `SHA256SUMS` and build attestations (#131, `docs/release.md`);
+  - the public network (`https://relay.usechirp.app` and `stun:relay.usechirp.app:3478`)
+    used by default when no `-relay` is given (#130);
+  - refusal to run as administrator unless `-allow-elevated` is given, and the
+    consent prompt stating whose rights the helper gets (#117, #129, GHSA-r385-j539-p738).
+- **v0.5.0** (tag `v0.5.0` on `main`, 2026-10-19):
+  - automatic bidirectional clipboard sync when allowed, with owner alerts and
+    password-manager concealer (#134);
+  - bidirectional file transfer into `Downloads/Chirp` with `Open folder` (#134);
+  - system tray icon during a session, and session bar kept topmost off the taskbar
+    on Windows and X11 (#140, #146);
+  - validated end-to-end across Windows 11 and Linux (X11).
 
-**On `main`, not yet released:**
+**On `main`, after `v0.5.0`:**
 
-- the app in Brazilian Portuguese when the system speaks it, English
-  otherwise (barahn/chirp#80);
-- the site's pages hash their asset references (`?v=…`) past Cloudflare's
-  cache, and `scripts/check-live-site.sh` compares usechirp.app with that
-  build;
-- the app icon's bird drawn closer, for near-round icon masks.
+- the Chirp bird by the taskbar (`cmd/chirp/internal/perch`, `perch_linux.go`,
+  `perch_windows.go`, `stroll.go`) and synthesized notification sounds
+  (`cmd/chirp/internal/chirpsound`, #81, #136, #187);
+- copied files on the clipboard up to 25 MB, multi-monitor picker (#79), and
+  `cmd/chirp-status` (`status.usechirp.app`);
+- `chirp-relay` `-trusted-proxies` (`signalling.ForwardedFor`, #170), macOS
+  `.app` bundle & signing tooling (#180, #181), and `remotekit v0.8.1` (#183).
 
 Since v0.3.0 there is no `develop`: work lands on `main` by pull request, and
 a release is a tag on `main` (`docs/branching.md`).

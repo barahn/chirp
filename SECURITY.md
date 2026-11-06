@@ -39,17 +39,15 @@ advisory unless they ask not to be.
 
 ## Supported versions
 
-Chirp is **not yet a runnable product** (see [README.md](README.md)):
-`cmd/chirp` shares the screen through remotekit, but a session has been tried
-on one machine only, not yet between two (barahn/chirp#12). Until it is, only
-the tip of `main` and the last release tag are supported, and the answer to
-"which versions get fixes" is "the one you get by pulling".
+Chirp is **pre-1.0** (see [README.md](README.md)): only the tip of `main` and
+the last release tag (`v0.5.0`) are supported, and fixes land on `main` and
+ship in the next release tag without backports to older `v0.x` tags.
 
 | Version | Supported |
 | --- | --- |
 | `main` (tip) | ✅ |
-| `v0.3.0` tag (last release) | ✅ |
-| `v0.2.0` tag | fixes land on `main` and ship in the next release tag; no backports. |
+| `v0.5.0` tag (last release) | ✅ |
+| `v0.4.0`, `v0.3.x`, `v0.2.0` tags | fixes land on `main` and ship in the next release tag; no backports. |
 | `v0.1.0` | no. It predates the product model, the reaper deadlock fix and the redemption throttle — do not run it. |
 
 ## What is in scope
