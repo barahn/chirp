@@ -212,17 +212,45 @@ Decided by the maintainer:
    - **On Linux (Wayland):** Respects compositor-mediated isolation and
      portals (`xdg-desktop-portal`: `ScreenCast` and `RemoteDesktop`).
      Privileged prompts (polkit/pkexec) remain bound to compositor security.
-   - **On Windows:** Because UIPI and the Secure Desktop isolate unprivileged
-     processes, an auxiliary Windows service provided by remotekit
-     (`NT AUTHORITY\SYSTEM`) is installed permanently upon first approval. The
-     elevation prompt explicitly discloses this installation and makes an
-     unambiguous commitment: *Chirp will never use this service autonomously or
-     unattended.*
-   - **Anti-LPE shielding:** The service enforces caller verification over IPC
-     via Authenticode (`WinVerifyTrust`). Only executables digitally signed by
-     Fabrintek Engenharia Digital Ltda (Chirp or Barahn) belonging to the active
-     console session are authorized to command it. Under remotekit's Apache-2.0
-     license, this verification is implemented as an extensible `CallerPolicy`.
+   - **On Windows, the service lives only as long as the session.** UIPI and
+     the secure desktop keep an unprivileged process away from administrator
+     prompts, so reaching them takes a helper service provided by remotekit,
+     running as `NT AUTHORITY\SYSTEM`. Chirp installs it when the owner
+     approves elevation and removes it when the session ends, as PsExec does
+     with its own service. Nothing stays installed afterwards, so there is
+     nothing Chirp, Barahn or anyone else could use unattended later: the
+     commitment is kept by the mechanism, not by a promise.
+     - *Installing it is a second consent.* Creating a service needs
+       administrator rights, so Windows shows its UAC prompt on the secure
+       desktop, which only the owner can see and answer.
+     - *It cannot outlive the session.* It is created to start on demand, so
+       it never starts with Windows. It holds a handle to the Chirp that
+       created it and, when that process exits for any reason (the session
+       ends, Chirp crashes or is killed), marks itself for deletion and stops.
+       A Chirp that starts removes any service a power cut left behind.
+     - *Its executable is out of the user's reach.* Chirp copies it to a
+       directory only administrators can write, and checks its hash, before
+       creating the service. Pointing the service at a binary in Downloads
+       would let anything running as the user swap it for its own and run as
+       SYSTEM.
+   - **Only the Chirp that created the service can command it.** The Chirp
+     that creates it passes a one-time secret in the arguments of
+     `StartService`, which Windows does not store. The service listens on a
+     named pipe with a random name and an ACL for that session only, and takes
+     commands only from the process that created it and presents the secret.
+     No other executable is trusted because of who signed it: an older Chirp,
+     a Barahn binary or a process merely in the same console session gets
+     nothing. remotekit's `CallerPolicy` keeps this extensible under its
+     Apache-2.0 licence. Authenticode (`WinVerifyTrust`) is then a second
+     check, once Fabrintek holds a code-signing certificate, not the barrier.
+   - **What remains.** Code already running as the owner could inject itself
+     into the elevated Chirp while a session is on. The ephemeral service
+     limits that to the time the owner has approved, with the session bar
+     showing the elevated state, instead of any time afterwards.
+   - **Antivirus may object.** Creating and deleting a service is also what
+     attackers do (Windows logs event 7045), and an unsigned binary doing it
+     is more likely to be blocked. This is tested on Windows Defender before
+     the feature ships.
 
 ## Where the pieces live
 
