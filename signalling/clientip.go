@@ -14,8 +14,8 @@ import (
 // only the hops that trusted vouches for.
 //
 // A request from an address outside trusted is its own origin, whatever its
-// headers say: anyone who can reach the relay directly can write the header,
-// and choosing a fresh origin per request would escape the throttle. A request
+// headers say: untrusted direct connections cannot spoof client identity.
+// A request
 // from a trusted proxy is attributed to the rightmost forwarded address that is
 // not itself trusted, which is the last hop a trusted proxy saw. Addresses
 // further left were written by the client and are ignored.

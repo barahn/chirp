@@ -8,10 +8,9 @@ package client
 // owner's side has to decide this itself: a permission dropped here is never
 // shown in the consent prompt, and so never granted.
 //
-// None is withheld now. The clipboard was from v0.3.1, because it went to the
-// controller without the owner being asked or told (GHSA-8jh9-jw95-3v27). It
-// is now a switch in the prompt, off until the owner turns it on, every sync
-// is told to the owner, and passwords never leave (barahn/chirp#134).
+// None is withheld now. The clipboard is a switch in the prompt, off until
+// the owner turns it on, every sync is told to the owner, and passwords
+// never leave.
 var withheld = map[string]bool{}
 
 // Grantable returns the permissions in requested that this Chirp may grant,

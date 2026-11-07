@@ -105,8 +105,8 @@ func main() {
 
 	// Whoever is let in acts with this process's rights. As administrator,
 	// that is full control of the machine, past every UAC prompt, so Chirp
-	// will not show a code unless told to on purpose (barahn/chirp#117,
-	// option 1; GHSA-r385-j539-p738); and then the prompt says so.
+	// enforces unprivileged execution and will not show a code unless told
+	// to explicitly via -allow-elevated; and then the consent prompt states so.
 	if privilege.Elevated() {
 		if !*allowElevated {
 			w.ShowElevated()

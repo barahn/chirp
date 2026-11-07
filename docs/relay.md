@@ -725,14 +725,13 @@ coturn in STUN-only mode, from [`deploy/coturn/`](../deploy/coturn/):
 `turnserver.conf` answers binding requests and ignores every TURN request,
 and `install.sh` installs it, starts it and checks that it answers.
 
-On `pve-dc` it runs in the proxy container, where the node's forwards already
-land. The name is the relay's, a DNS-only record to the node's public
-address. It needs one more forward, for both protocols, at each NAT:
+In the reference deployment it runs alongside the proxy container, where the node's forwards
+land. The name is the relay's, a DNS-only record to the node's public address.
+Any perimeter gateway forwards port 3478 (both UDP and TCP) to the service container:
 
-| Where | Forward | To |
+| Port | Protocol | Purpose |
 | --- | --- | --- |
-| ONT (public address) | `3478/udp`, `3478/tcp` | the MikroTik |
-| MikroTik | `3478/udp`, `3478/tcp` | the proxy container |
+| `3478` | UDP, TCP | STUN binding requests |
 
 From outside, `turnutils_stunclient relay.usechirp.app` prints the address it
 was seen from.
