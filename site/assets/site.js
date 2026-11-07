@@ -110,7 +110,6 @@
     by: "Por Fabrintek · AGPL-3.0",
     source: "Código-fonte",
     howChirpWorks: "Como o Chirp funciona",
-    wiki: "Docs &amp; Wiki",
     discussions: "Comunidade",
     conduct: "Código de Conduta",
     security: "Vulnerabilidades:",
@@ -202,21 +201,6 @@
     conductEnforceText: "Casos de comportamento abusivo, de assédio ou inaceitável podem ser reportados confidencialmente para security@fabrintek.com.br. Todas as denúncias serão analisadas e investigadas de forma rápida e imparcial.",
     conductGuideTitle: "4. Diretrizes de aplicação",
     conductGuideText: "<li><b>1. Correção:</b> aviso verbal ou escrito privado explicando o impacto do comportamento inadequado.</li><li><b>2. Advertência:</b> advertência formal com consequências em caso de reincidência.</li><li><b>3. Suspensão temporária:</b> afastamento temporário de qualquer interação pública com a comunidade.</li><li><b>4. Banimento permanente:</b> exclusão permanente da comunidade em razão de violações graves ou reiteradas.</li>",
-    docsKicker: "Base de Conhecimento &amp; Wiki",
-    docsTitle: "Documentação",
-    docsLede: "Documentação técnica, especificações de arquitetura, guias de auto-hospedagem e padrões de segurança para o Chirp e seu ecossistema de código aberto.",
-    docsNavArch: "Arquitetura",
-    docsNavRelays: "Relays &amp; Hospedagem",
-    docsNavSec: "Segurança &amp; DevSecOps",
-    docsNavDev: "Desenvolvimento &amp; CI",
-    docsArchTitle: "1. Arquitetura e Modelo de Produto",
-    docsArchText: "<p>O Chirp fornece assistência remota segura e intuitiva entre duas pessoas que confiam uma na outra. Sua arquitetura central é deliberadamente simples:</p><ul><li><b>Executável Único:</b> um mesmo arquivo executável para Windows, macOS e Linux. Sem serviços em segundo plano, sem drivers de sistema e sem criação de contas.</li><li><b>Ponto a Ponto em Primeiro Lugar:</b> conexões estabelecem canais criptografados WebRTC diretos sempre que a topologia de rede permitir, recorrendo a relays sem estado apenas quando a travessia de NAT exigir.</li><li><b>Direção Estrita Unidirecional:</b> quem precisa de ajuda fornece um código de conexão. Quem ajuda digita o código e só visualiza ou controla após autorização explícita na tela do outro computador.</li><li><b>Códigos Efêmeros de Uso Único:</b> códigos e links são tokens de uso único que expiram imediatamente após a conexão. Mesmo que um código seja interceptado depois do início da sessão, ele não pode ser reutilizado.</li></ul><p>Para mais detalhes sobre o fluxo de interação, veja o <a href=\"/how/\">Modelo de Produto</a>.</p>",
-    docsRelayTitle: "2. Relays e Auto-Hospedagem",
-    docsRelayText: "<p>A rede pública do Chirp é composta por relays sem estado (stateless) projetados para persistência zero e minimização radical de dados:</p><ul><li><b>Apenas Memória Volátil:</b> os relays mantêm o estado de encontro de conexões estritamente na memória RAM. Dados de sessão nunca são gravados em disco, banco de dados ou armazenamento de objetos.</li><li><b>Zero Decriptografia de Tráfego:</b> imagens da tela, áudio, comandos de teclado/mouse e arquivos são criptografados ponta a ponta. Os relays retransmitem pacotes de dados às cegas, sem acesso ao conteúdo em texto claro.</li><li><b>Rode o Seu Próprio Relay:</b> qualquer organização ou pessoa pode hospedar o próprio relay sem restrições de licença. O binário do relay é compilado diretamente a partir de <code>deploy/relay</code> e roda atrás de qualquer terminação TLS ou proxy reverso.</li><li><b>Status de Rede Independente:</b> a saúde dos relays públicos é monitorada a cada 30 segundos por sondas externas em <a href=\"https://status.usechirp.app/\">status.usechirp.app</a>.</li></ul>",
-    docsSecTitle: "3. Segurança, Privacidade e DevSecOps",
-    docsSecText: "<p>A segurança é o alicerce do projeto Chirp, nunca uma camada secundária:</p><ul><li><b>Zero Telemetria e Sem Cookies:</b> não existem ferramentas analíticas, rastreadores ou SDKs de terceiros no aplicativo ou no site.</li><li><b>CSP Estrito e Trusted Types:</b> o site impõe <code>default-src 'none'</code>, proíbe injeções de HTML (zero <code>innerHTML</code>) e exige <code>trusted-types 'none'</code> para eliminar Cross-Site Scripting (XSS).</li><li><b>Assinatura Criptográfica:</b> executáveis de release são verificados e assinados via Sigstore Cosign, garantindo transparência criptográfica e procedência da compilação.</li><li><b>Proteção de Área de Transferência:</b> senhas copiadas de gerenciadores de senhas são higienizadas e nunca sincronizadas entre computadores remotos.</li><li><b>Divulgação Responsável:</b> relatórios de vulnerabilidade seguem o RFC 9116 e devem ser enviados para security@fabrintek.com.br.</li></ul><p>Consulte nossas diretrizes completas em <a href=\"/privacy/\">Privacidade e Termos</a> e no <a href=\"/conduct/\">Código de Conduta</a>.</p>",
-    docsDevTitle: "4. Desenvolvimento, CI e Contribuição",
-    docsDevText: "<p>O Chirp é 100% código aberto sob a licença AGPL-3.0. Aceitamos contribuições alinhadas aos nossos objetivos de segurança e simplicidade:</p><ul><li><b>Estratégia de Branches:</b> todo o desenvolvimento ativo ocorre em branches de funcionalidade isoladas (<code>feature/*</code>, <code>fix/*</code>) direcionadas para a <code>main</code> via pull requests.</li><li><b>Certificado de Origem do Desenvolvedor (DCO):</b> todo commit exige assinatura obrigatória (<code>git commit -s</code>) certificando conformidade de licença e autoria.</li><li><b>Portões Automatizados de CI:</b> cada pull request passa por análise estática (CodeQL, SAST com <code>gosec</code>, <code>govulncheck</code>), varredura de segredos (Gitleaks), verificação de licenças e auditoria Aikido Security.</li><li><b>Participe da Comunidade:</b> discuta propostas arquiteturais, compartilhe casos de uso ou tire dúvidas técnicas no nosso <a href=\"/community/\">Hub da Comunidade</a>.</li></ul>",
     commKicker: "Comunidade &amp; Crescimento",
     commTitle: "Comunidade Chirp",
     commLede: "Um espaço colaborativo e de alto nível dedicado ao uso no mundo real, evolução arquitetural e crescimento saudável do projeto. Priorizamos privacidade, segurança e colaboração respeitosa.",
@@ -286,10 +270,6 @@
     conduct: {
       en: ["Code of Conduct — Chirp", "Chirp community standards, pledge, and enforcement guidelines adapted from the Contributor Covenant 2.1."],
       "pt-BR": ["Código de Conduta — Chirp", "Padrões da comunidade Chirp, compromisso e diretrizes de moderação adaptados do Contributor Covenant 2.1."]
-    },
-    docshub: {
-      en: ["Documentation — Chirp", "Technical documentation, architecture specifications, self-hosting guides, and security standards for Chirp."],
-      "pt-BR": ["Documentação — Chirp", "Documentação técnica, especificações de arquitetura, guias de auto-hospedagem e padrões de segurança para o Chirp."]
     },
     community: {
       en: ["Community — Chirp", "A constructive space dedicated to the growth, real-world usage, and architectural evolution of Chirp."],
