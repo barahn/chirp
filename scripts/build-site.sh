@@ -31,10 +31,10 @@ cp "$warm"/fonts/*.ttf "$warm"/fonts/OFL-*.txt "$out/assets/fonts/"
 cp "$warm/bird/icon.svg" "$out/favicon.svg"
 
 # Social preview crawlers read <head> without running site.js, so /pt/,
-# /pt/l/, /pt/privacy/, /pt/how/, /pt/conduct/, /pt/docs/, and /pt/community/
+# /pt/l/, /pt/privacy/, /pt/how/, /pt/conduct/, and /pt/community/
 # are built from the English pages with the Portuguese Open Graph and Twitter
 # Card tags and og-chirp-pt.png rather than kept twice in site/.
-mkdir -p "$out/pt/l" "$out/pt/privacy" "$out/pt/how" "$out/pt/conduct" "$out/pt/docs" "$out/pt/community"
+mkdir -p "$out/pt/l" "$out/pt/privacy" "$out/pt/how" "$out/pt/conduct" "$out/pt/community"
 sed \
   -e 's|<html lang="en"|<html lang="pt-BR"|' \
   -e 's|<title>Chirp — remote help</title>|<title>Chirp — ajuda remota</title>|' \
@@ -50,7 +50,6 @@ sed \
   -e 's|href="/privacy/"|href="/pt/privacy/"|g' \
   -e 's|href="/how/"|href="/pt/how/"|g' \
   -e 's|href="/conduct/"|href="/pt/conduct/"|g' \
-  -e 's|href="/docs/"|href="/pt/docs/"|g' \
   -e 's|href="/community/"|href="/pt/community/"|g' \
   "$out/index.html" > "$out/pt/index.html"
 
@@ -67,7 +66,6 @@ sed \
   -e 's|href="/privacy/"|href="/pt/privacy/"|g' \
   -e 's|href="/how/"|href="/pt/how/"|g' \
   -e 's|href="/conduct/"|href="/pt/conduct/"|g' \
-  -e 's|href="/docs/"|href="/pt/docs/"|g' \
   -e 's|href="/community/"|href="/pt/community/"|g' \
   "$out/l/index.html" > "$out/pt/l/index.html"
 
@@ -85,7 +83,6 @@ sed \
   -e 's|href="/privacy/"|href="/pt/privacy/"|g' \
   -e 's|href="/how/"|href="/pt/how/"|g' \
   -e 's|href="/conduct/"|href="/pt/conduct/"|g' \
-  -e 's|href="/docs/"|href="/pt/docs/"|g' \
   -e 's|href="/community/"|href="/pt/community/"|g' \
   "$out/privacy/index.html" > "$out/pt/privacy/index.html"
 
@@ -103,7 +100,6 @@ sed \
   -e 's|href="/privacy/"|href="/pt/privacy/"|g' \
   -e 's|href="/how/"|href="/pt/how/"|g' \
   -e 's|href="/conduct/"|href="/pt/conduct/"|g' \
-  -e 's|href="/docs/"|href="/pt/docs/"|g' \
   -e 's|href="/community/"|href="/pt/community/"|g' \
   "$out/how/index.html" > "$out/pt/how/index.html"
 
@@ -121,26 +117,8 @@ sed \
   -e 's|href="/privacy/"|href="/pt/privacy/"|g' \
   -e 's|href="/how/"|href="/pt/how/"|g' \
   -e 's|href="/conduct/"|href="/pt/conduct/"|g' \
-  -e 's|href="/docs/"|href="/pt/docs/"|g' \
   -e 's|href="/community/"|href="/pt/community/"|g' \
   "$out/conduct/index.html" > "$out/pt/conduct/index.html"
-
-sed \
-  -e 's|<html lang="en"|<html lang="pt-BR"|' \
-  -e 's|Documentation — Chirp|Documentação — Chirp|g' \
-  -e 's|content="Technical documentation, architecture guides, self-hosting specifications, and security policies for Chirp."|content="Documentação técnica, especificações de arquitetura, guias de auto-hospedagem e padrões de segurança para o Chirp."|g' \
-  -e 's|content="https://usechirp.app/docs/"|content="https://usechirp.app/pt/docs/"|g' \
-  -e 's|https://usechirp.app/assets/og-chirp.png|https://usechirp.app/assets/og-chirp-pt.png|g' \
-  -e 's|<meta property="og:locale" content="en_US">|<meta property="og:locale" content="pt_BR">|' \
-  -e 's|<meta property="og:locale:alternate" content="pt_BR">|<meta property="og:locale:alternate" content="en_US">|' \
-  -e 's|href="/"|href="/pt/"|g' \
-  -e 's|href="/#|href="/pt/#|g' \
-  -e 's|href="/privacy/"|href="/pt/privacy/"|g' \
-  -e 's|href="/how/"|href="/pt/how/"|g' \
-  -e 's|href="/conduct/"|href="/pt/conduct/"|g' \
-  -e 's|href="/docs/"|href="/pt/docs/"|g' \
-  -e 's|href="/community/"|href="/pt/community/"|g' \
-  "$out/docs/index.html" > "$out/pt/docs/index.html"
 
 sed \
   -e 's|<html lang="en"|<html lang="pt-BR"|' \
@@ -155,7 +133,6 @@ sed \
   -e 's|href="/privacy/"|href="/pt/privacy/"|g' \
   -e 's|href="/how/"|href="/pt/how/"|g' \
   -e 's|href="/conduct/"|href="/pt/conduct/"|g' \
-  -e 's|href="/docs/"|href="/pt/docs/"|g' \
   -e 's|href="/community/"|href="/pt/community/"|g' \
   "$out/community/index.html" > "$out/pt/community/index.html"
 
@@ -165,7 +142,7 @@ sed \
 # lacks its new translations. Each reference a page makes to an asset, or to
 # the favicon, which browsers keep longer still, carries a hash of that file's
 # content, so a changed file gets a new URL and an unchanged one stays cached.
-for page in "$out"/index.html "$out"/l/index.html "$out"/privacy/index.html "$out"/how/index.html "$out"/conduct/index.html "$out"/docs/index.html "$out"/community/index.html "$out"/pt/index.html "$out"/pt/l/index.html "$out"/pt/privacy/index.html "$out"/pt/how/index.html "$out"/pt/conduct/index.html "$out"/pt/docs/index.html "$out"/pt/community/index.html "$out"/status/index.html; do
+for page in "$out"/index.html "$out"/l/index.html "$out"/privacy/index.html "$out"/how/index.html "$out"/conduct/index.html "$out"/community/index.html "$out"/pt/index.html "$out"/pt/l/index.html "$out"/pt/privacy/index.html "$out"/pt/how/index.html "$out"/pt/conduct/index.html "$out"/pt/community/index.html "$out"/status/index.html; do
   for ref in $(grep -oE '"/(assets/[^"?]*|favicon\.svg)"' "$page" | tr -d '"' | sort -u); do
     file="$out$ref"
     [ -f "$file" ] || { echo "$page refers to $ref, which is not in the site" >&2; exit 1; }
