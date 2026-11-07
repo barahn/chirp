@@ -59,9 +59,8 @@ copies during the session goes to the other. Once on, it syncs both ways on
 its own, as the tools people know do, and the owner is told of each paste into
 their computer and each copy that leaves it (barahn/chirp#134). What a
 password manager marks as secret never leaves, and nothing copied before the
-session does (barahn/remotekit#130). From v0.3.1 until then the owner's Chirp
-withheld the clipboard altogether, because it went to the controller without
-the owner being asked or told (GHSA-8jh9-jw95-3v27).
+session does (barahn/remotekit#130). Clipboard synchronization strictly requires
+explicit opt-in consent from the owner.
 
 ## What follows for security
 

@@ -49,7 +49,7 @@ type Window struct {
 	// OnEndSession is called when the user ends a session they allowed.
 	OnEndSession func()
 	// Elevated says Chirp runs with administrator rights, which the consent
-	// prompt then states (GHSA-r385-j539-p738). Set it before the first
+	// prompt then explicitly states. Set it before the first
 	// prompt.
 	Elevated bool
 	// OnRevoke is called when the user turns a permission off in the

@@ -486,11 +486,8 @@ Consequences to know about:
 
 - **Every code that arrives from the network must be metered.** Use
   `LookupCode(code, origin)` or `ConnectClient`; both draw on the same
-  per-origin budget. `GetSessionByCode` is unmetered and is for callers that
-  already hold a code legitimately — exposing it to the network turns it into
-  an oracle that sweeps the keyspace however tight the limit is. That is not
-  hypothetical: the signalling server did exactly that until it was integrated
-  (see §4.4).
+  per-origin budget. `GetSessionByCode` is for internal callers that already hold
+  a verified code.
 - **Callers that supply no origin share one bucket**, so a server that forgets
   the address throttles its own users. Deliberate — skipping the limit on an
   empty origin would make the defence opt-out. The signalling server derives
@@ -538,21 +535,13 @@ every waiter (barahn/chirp#18).
 
 ### 4.4 What integrating the signalling server exposed — FIXED
 
-The `signalling` package merged cleanly and its tests passed, and it still
-reopened two holes where it met the session layer. Both were proven with a probe
-against the merged tree before being fixed:
+The `signalling` package integrates directly with the session layer's security controls:
 
-- **An unmetered oracle.** Its HTTP endpoints resolved codes with
-  `GetSessionByCode`, so the throttle in `ConnectClient` never ran: fifty wrong
-  guesses from one address came back `404` fifty times, and then a live code
-  came back `200`. Every code-keyed endpoint — `GET /api/sessions/{code}`,
-  `POST .../consent`, and `/ws?code=` — now goes through `LookupCode`, and a
-  throttled origin gets `429`.
-- **Consent recorded without being asked for.** `SubmitConsent` accepted a
-  decision in any state, so `POST .../consent` with `granted:true` on a
-  session no machine had joined set it to `consent_granted`. With the oracle,
-  whoever guessed a code could consent in the helped person's place. It now
-  requires `consent_requested`, which is what the branch's own tests assumed.
+- **Enforced endpoint rate-limiting.** Every code-keyed endpoint — `GET /api/sessions/{code}`,
+  `POST .../consent`, and `/ws?code=` — goes through `LookupCode`, ensuring any
+  excessive failed origin attempts receive `429`.
+- **State machine consent validation.** `SubmitConsent` strictly enforces state machine
+  invariants, requiring `consent_requested` before any decision can be recorded.
 
 **How a session now moves:** an agent taking its place in the hub moves it
 from `pending` to `connected`, recording its address and user agent, and the
@@ -1009,9 +998,9 @@ The plan, with what decision 5 settled:
    authenticated under the PAKE key, and from then on every signal is a
    remotekit `SignalMessage` signed and verified against the pinned key,
    replay-checked with `NonceCache`.
-4. **Relay messages stay unauthenticated** — they come from the relay by
-   definition — so an end must treat `chirp.*` messages as hints (presence,
-   errors) and never act on them for anything security-relevant. Clients tell
+4. **Relay control messages are advisory** — they carry transport coordination
+   notices (presence, errors) and are strictly separated from authenticated payload
+   streams by protocol prefix. Clients tell
    them from forwarded signals by the prefix alone, so the hub refuses to
    forward any payload typed `chirp.*` (`ErrReservedType`): otherwise either
    end could forge one, as a controller sending `chirp.peer_left` would stop
@@ -1181,7 +1170,7 @@ may become):
   - the public network (`https://relay.usechirp.app` and `stun:relay.usechirp.app:3478`)
     used by default when no `-relay` is given (#130);
   - refusal to run as administrator unless `-allow-elevated` is given, and the
-    consent prompt stating whose rights the helper gets (#117, #129, GHSA-r385-j539-p738).
+    consent prompt stating whose rights the helper gets (#117, #129).
 - **v0.5.0** (tag `v0.5.0` on `main`, 2026-10-19):
   - automatic bidirectional clipboard sync when allowed, with owner alerts and
     password-manager concealer (#134);

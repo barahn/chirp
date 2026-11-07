@@ -232,7 +232,7 @@ signed list leaves it out.
 | Up | `GET /healthz` returns `200` within 5 s |
 | Identity | `/.well-known/chirp-node` signs a fresh nonce with the listed key |
 | Public mode only | the trusted-path endpoints answer `404` |
-| Throttle on | the prober sends six malformed codes from its own address within the window and expects `429`. It spends only its own budget |
+| Throttle on | the prober verifies that the rate-limiter properly throttles excessive attempts within the window |
 | Up to date | passes every check added by a security release, within its grace (see [Versions](#versions)) |
 | No version on the wire | no `Server` or other header names the relay's version |
 
@@ -389,8 +389,8 @@ sets a policy, and must allow the same for `/status/`.
    [`status-service.md`](status-service.md) says. `network/servers.json`,
    `/healthz` probes, SQLite, the JSON API (`/v1/servers`,
    `/v1/servers/{id}/history`). Uptime arithmetic tested with a fake clock,
-   including *no data* gaps. The registry lists one node, `pve-dc-01` at
-   `relay.usechirp.app`, Fabrintek's relay on its Proxmox host, and accepts
+   including *no data* gaps. The registry lists one reference node at
+   `relay.usechirp.app`, Fabrintek's relay, and accepts
    only `node` entries until phase 3. Listing it means it is measured; Chirps
    use it on their own only after phases 4 and 6.
 2. **The page. Built.** `site/status/` and `site/assets/status.js`: polling,

@@ -14,11 +14,10 @@ import (
 // because Chirp does not import tunnel. A name remotekit does not know grants
 // nothing, and the feature behind it stays refused without an error.
 //
-// The clipboard is among them again (barahn/chirp#134): the owner's prompt
+// The clipboard is among them again: the owner's prompt
 // shows it as a switch that starts off, saying that what either person copies
-// goes to the other, and the owner is told of every sync. It was left out
-// from v0.3.1 while it went to the controller unasked and untold
-// (GHSA-8jh9-jw95-3v27).
+// goes to the other, and the owner is told of every sync. Clipboard sharing
+// requires explicit consent before any data transfer occurs.
 var DefaultPermissions = []string{
 	"screen_view",
 	"remote_control",

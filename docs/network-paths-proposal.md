@@ -82,7 +82,7 @@ allocation to a registration.
 Abuse is bounded by registrations: one origin holds at most 30 peers
 (`DefaultMaxPeersPerOrigin`), so at most 30 × 8 credentials an hour, each
 capped by `max-bps`, all capped by `bps-capacity`. TURN carries every byte of
-a relayed session, so on `pve-dc` the caps come from its uplink, not from a
+a relayed session, so on the reference deployment the caps come from its host uplink, not from a
 round number.
 
 ### A session outlives its credential
@@ -119,10 +119,9 @@ without it answers `404` on the TURN route.
 ### Fabrintek's node
 
 `deploy/coturn/turnserver.conf` drops `stun-only` and gains
-`use-auth-secret`, the quotas above and a narrow relay range, so the two NATs
-in front of `pve-dc` (ONT and MikroTik) forward a few hundred UDP ports rather
-than 16,384. TURN over TLS on 443, for networks that allow only HTTPS, is
-left for later.
+`use-auth-secret`, the quotas above and a narrow relay range, so gateway NATs
+forward a few hundred UDP ports rather than 16,384. TURN over TLS on 443, for
+networks that allow only HTTPS, is left for later.
 
 ### What TURN still sees
 
