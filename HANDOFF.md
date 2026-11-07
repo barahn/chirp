@@ -320,6 +320,8 @@ site/assets/site.css
 site/assets/site.js
 site/assets/status.js
 site/assets/theme.js
+site/conduct/index.html
+site/how/index.html
 site/index.html
 site/l/index.html
 site/privacy/index.html
