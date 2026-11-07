@@ -152,7 +152,33 @@
     dLatency: "Latência",
     dLatencyText: "Quanto levou a sonda mais recente, quando ela acertou, contando uma negociação TLS nova. Depende de onde o monitor está.",
     defsMore: "As regras, e como um servidor entra na rede, estão <a href=\"https://github.com/barahn/chirp/blob/main/docs/status-page-proposal.md\">na proposta</a>. Os números brutos estão <a href=\"https://status.usechirp.app/v1/servers\">na API</a>.",
-    noToken: "<b>Este link está incompleto.</b> Peça para quem enviou copiar de novo do Chirp, inteiro."
+    noToken: "<b>Este link está incompleto.</b> Peça para quem enviou copiar de novo do Chirp, inteiro.",
+    navPrivacy: "Privacidade e Termos",
+    navSecurityTxt: "security.txt",
+    trustLabel: "Garantias de segurança e privacidade",
+    trustP2PTitle: "Criptografia ponta a ponta",
+    trustP2PDesc: "Tela e entrada ficam entre os computadores; o servidor nunca vê nem grava conteúdo.",
+    trustPrivacyTitle: "Zero telemetria e sem cookies",
+    trustPrivacyDesc: "Sem contas, sem analytics, sem rastreadores, com CSP estrita e Trusted Types.",
+    trustSourceTitle: "100% código aberto",
+    trustSourceDesc: "Licença AGPL-3.0, com releases assinadas via Sigstore Cosign.",
+    trustComplianceTitle: "Conformidade LGPD e GDPR",
+    trustComplianceDesc: "Roteamento efêmero em memória pela Fabrintek; minimização radical de dados.",
+    privKicker: "Transparência e conformidade",
+    privTitle: "Privacidade e Termos de Uso",
+    privLede: "O Chirp foi construído sob o princípio da privacidade por design e da minimização radical de dados: sem contas, sem rastreamento, processamento de rede efêmero em memória e sessões criptografadas ponta a ponta.",
+    privCoreTitle: "1. Princípios fundamentais",
+    privCoreText: "<li><b>Você não cria conta:</b> não pedimos email, telefone ou dados de pagamento.</li><li><b>Zero telemetria:</b> o aplicativo não contém rastreadores analíticos, medição de uso ou envio de relatórios em segundo plano.</li><li><b>Sem cookies:</b> o site não utiliza cookies de rastreamento nem scripts de terceiros.</li>",
+    privControllerTitle: "2. Identificação do controlador",
+    privControllerText: "O software e a infraestrutura pública do Chirp são mantidos pela <b>Fabrintek Engenharia Digital Ltda</b>. Para qualquer questão ou reporte relacionado a privacidade e segurança, o contato oficial é security@fabrintek.com.br.",
+    privDataTitle: "3. Como os dados de rede são tratados",
+    privDataText: "<p>Para que dois computadores se conectem pela Internet sem configuração complexa:</p><ul><li><b>Endereços de rede (IP):</b> os servidores processam temporariamente os endereços IP exclusivamente para viabilizar o encontro entre os computadores e proteger o serviço contra abusos e ataques de negação de serviço. Esse tratamento é transitório e volátil, nunca utilizado para rastrear, perfilar ou identificar pessoas.</li><li><b>Conteúdo da sessão (tela, mouse/teclado e arquivos):</b> o tráfego direto é criptografado ponta a ponta. Os servidores da Fabrintek <b>não têm acesso</b>, não interceptam e não gravam imagens da tela, teclas, área de transferência ou arquivos transferidos.</li><li><b>Zero venda de dados:</b> nenhum dado é vendido, alugado ou compartilhado com redes de publicidade ou corretores comerciais.</li></ul>",
+    privBasisTitle: "4. Bases legais (LGPD e GDPR)",
+    privBasisText: "O processamento técnico mínimo fundamenta-se estritamente na <b>execução do serviço</b> solicitado ativamente pelas partes (LGPD Art. 7º, V; GDPR Art. 6º(1)(b)) e no <b>legítimo interesse</b> na segurança e estabilidade operacional da rede contra fraudes e ataques (LGPD Art. 7º, IX; GDPR Art. 6º(1)(f)).",
+    privTermsTitle: "5. Termos de uso e prevenção a golpes",
+    privTermsText: "<li><b>Finalidade exclusiva:</b> o Chirp destina-se apenas ao suporte remoto mútuo e consentido entre pessoas que se conhecem e confiam expressamente uma na outra.</li><li><b>Alerta contra fraudes:</b> a Fabrintek e a equipe do Chirp <b>nunca</b> ligam, mandam mensagens ou enviam emails solicitando códigos de conexão.</li><li><b>Uso proibido:</b> é expressamente proibido usar o Chirp para fraudes, golpes de suporte técnico falso ou qualquer acesso não autorizado. O software é licenciado sob a AGPL-3.0-only.</li>",
+    privRightsTitle: "6. Direitos do titular e contato",
+    privRightsText: "Como não mantemos contas nem registros persistentes de usuários, os dados efêmeros se extinguem com a própria sessão. Para esclarecimentos, requisições de privacidade ou relatórios de vulnerabilidade, contate security@fabrintek.com.br."
   };
 
   // Words the script itself writes.
@@ -189,6 +215,10 @@
     status: {
       en: ["Network status — Chirp", "Every server in Chirp's public network, probed from outside every 30 seconds: whether it is up, since when it has been off-line, and how much of each day it answered."],
       "pt-BR": ["Status da rede — Chirp", "Cada servidor da rede pública do Chirp, sondado de fora a cada 30 segundos: se está no ar, desde quando está fora, e quanto de cada dia respondeu."]
+    },
+    privacy: {
+      en: ["Privacy & Terms — Chirp", "Chirp is built on radical data minimization: no accounts, no trackers, ephemeral memory-only connection handling, and end-to-end encrypted screen sharing."],
+      "pt-BR": ["Privacidade e Termos — Chirp", "O Chirp foi construído sob minimização radical de dados: sem contas, sem rastreamento, processamento de rede efêmero em memória e sessões criptografadas ponta a ponta."]
     }
   };
 
@@ -219,7 +249,7 @@
   // would parse a string as HTML. A translation with markup outside the
   // list, or unbalanced, keeps its English, and says so in the console. Write
   // characters, not entities, except &lt; &gt; and &amp; for < > and &.
-  var TAGS = { a: 1, b: 1, em: 1, h3: 1, li: 1, p: 1, span: 1, ul: 1 };
+  var TAGS = { a: 1, b: 1, em: 1, h2: 1, h3: 1, li: 1, p: 1, span: 1, ul: 1 };
   var TAG_ATTRS = { a: { href: /^https:\/\// }, span: { "class": /^chirp$/ } };
   var ENTITIES = { lt: "<", gt: ">", amp: "&" };
   function text(t) {
