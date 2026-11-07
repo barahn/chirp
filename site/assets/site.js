@@ -154,7 +154,6 @@
     defsMore: "As regras, e como um servidor entra na rede, estão <a href=\"https://github.com/barahn/chirp/blob/main/docs/status-page-proposal.md\">na proposta</a>. Os números brutos estão <a href=\"https://status.usechirp.app/v1/servers\">na API</a>.",
     noToken: "<b>Este link está incompleto.</b> Peça para quem enviou copiar de novo do Chirp, inteiro.",
     navPrivacy: "Privacidade e Termos",
-    navSecurityTxt: "security.txt",
     trustLabel: "Garantias de segurança e privacidade",
     trustP2PTitle: "Criptografia ponta a ponta",
     trustP2PDesc: "Tela e entrada ficam entre os computadores; o servidor nunca vê nem grava conteúdo.",
@@ -178,7 +177,31 @@
     privTermsTitle: "5. Termos de uso e prevenção a golpes",
     privTermsText: "<li><b>Finalidade exclusiva:</b> o Chirp destina-se apenas ao suporte remoto mútuo e consentido entre pessoas que se conhecem e confiam expressamente uma na outra.</li><li><b>Alerta contra fraudes:</b> a Fabrintek e a equipe do Chirp <b>nunca</b> ligam, mandam mensagens ou enviam emails solicitando códigos de conexão.</li><li><b>Uso proibido:</b> é expressamente proibido usar o Chirp para fraudes, golpes de suporte técnico falso ou qualquer acesso não autorizado. O software é licenciado sob a AGPL-3.0-only.</li>",
     privRightsTitle: "6. Direitos do titular e contato",
-    privRightsText: "Como não mantemos contas nem registros persistentes de usuários, os dados efêmeros se extinguem com a própria sessão. Para esclarecimentos, requisições de privacidade ou relatórios de vulnerabilidade, contate security@fabrintek.com.br."
+    privRightsText: "Como não mantemos contas nem registros persistentes de usuários, os dados efêmeros se extinguem com a própria sessão. Para esclarecimentos, requisições de privacidade ou relatórios de vulnerabilidade, contate security@fabrintek.com.br.",
+    howKicker: "Arquitetura e Modelo de Produto",
+    howTitle: "Como o Chirp Funciona",
+    howLede: "Um único programa, idêntico nas duas pontas. Ajuda remota entre duas pessoas que confiam uma na outra, sem contas, sem instalação e com consentimento explícito antes de qualquer ação.",
+    how1Title: "1. Um executável único, idêntico nos dois lados",
+    how1Text: "Qualquer pessoa baixa o Chirp e o executa. Não há nada para instalar, nenhum serviço rodando em segundo plano e nenhuma conta para criar. Cada Chirp aberto é exatamente igual: não existe \"versão do técnico\" ou \"versão do cliente\". Quem ajuda quem é decidido unicamente por quem lê o código para quem, não por qual programa foi instalado.",
+    how2Title: "2. Direção de controle e consentimento explícito",
+    how2Text: "Quem precisa de ajuda compartilha o seu código; quem vai ajudar digita esse código. O controle flui estritamente em uma direção: o ajudante controla o computador de quem pediu ajuda, mas <b>apenas depois que o proprietário autorizar expressamente</b> em um diálogo nativo na sua própria tela. O controle nunca se inverte como efeito colateral. O consentimento ocorre diretamente na tela do usuário — nunca silenciosamente e nunca em um navegador.",
+    how3Title: "3. Duas formas de conectar: código ou link",
+    how3Text: "Você pode se conectar lendo o código curto na tela ou enviando um link. Cada uso de um link gera um <b>código novo e de uso único</b> que se invalida imediatamente após a conexão. Um código que vaze após o uso não abre nada. Se quem abrir o link ainda não tiver o Chirp, basta baixar o aplicativo e colar o link nele para começar a ajudar.",
+    how4Title: "4. Permissões granulares e minimização radical de dados",
+    how4Text: "<p>A caixa de diálogo de consentimento oferece interruptores independentes para visualização da tela, controle remoto de mouse e teclado, sincronização de área de transferência e transferência de arquivos:</p><ul><li><b>Interruptores independentes:</b> apenas <i>Ver sua tela</i> inicia ativado; mouse/teclado e arquivos só são concedidos se ativados ativamente.</li><li><b>Proteção de privacidade:</b> senhas copiadas de gerenciadores de senhas nunca saem da máquina.</li><li><b>Roteamento efêmero em memória:</b> a rede pública processa o encontro entre dispositivos em memória volátil, sem reter históricos nem traçar perfis de usuários.</li></ul>",
+    how5Title: "5. Compromissos fundamentais do projeto",
+    how5Text: "<li><b>Sem recursos bloqueados:</b> tela, controle, área de transferência e arquivos fazem parte do núcleo gratuito e livre, permanentemente.</li><li><b>Zero telemetria:</b> sem SDKs de rastreamento, sem cookies, sem analytics.</li><li><b>100% código aberto:</b> sob a licença AGPL-3.0-only, com compilações reproduzíveis assinadas criptograficamente via Sigstore Cosign.</li>",
+    conductKicker: "Comunidade e Padrões",
+    conductTitle: "Código de Conduta",
+    conductLede: "Assumimos o compromisso de tornar a participação na comunidade do Chirp uma experiência acolhedora, inclusiva e livre de assédio para todas as pessoas.",
+    conductPledgeTitle: "1. Nosso compromisso",
+    conductPledgeText: "Como membros, colaboradores e líderes, comprometemo-nos a fazer da nossa comunidade um ambiente aberto, diverso e respeitoso, independentemente de idade, deficiência, etnia, identidade de gênero, nacionalidade, aparência física, raça, religião ou nível de experiência.",
+    conductStandardsTitle: "2. Nossos padrões",
+    conductStandardsText: "<p>Exemplos de comportamentos que contribuem para um ambiente positivo:</p><ul><li><b>Comportamento positivo:</b> demonstrar empatia, gentileza, colaboração respeitosa e aceitação cortês de críticas construtivas.</li><li><b>Comportamento inaceitável:</b> assédio, provocações destrutivas, comentários depreciativos ou insultuosos, ataques pessoais e publicação de informações privadas alheias sem autorização expressa.</li></ul>",
+    conductEnforceTitle: "3. Aplicação e canal de denúncia",
+    conductEnforceText: "Casos de comportamento abusivo, de assédio ou inaceitável podem ser reportados confidencialmente para security@fabrintek.com.br. Todas as denúncias serão analisadas e investigadas de forma rápida e imparcial.",
+    conductGuideTitle: "4. Diretrizes de aplicação",
+    conductGuideText: "<li><b>1. Correção:</b> aviso verbal ou escrito privado explicando o impacto do comportamento inadequado.</li><li><b>2. Advertência:</b> advertência formal com consequências em caso de reincidência.</li><li><b>3. Suspensão temporária:</b> afastamento temporário de qualquer interação pública com a comunidade.</li><li><b>4. Banimento permanente:</b> exclusão permanente da comunidade em razão de violações graves ou reiteradas.</li>"
   };
 
   // Words the script itself writes.
@@ -219,6 +242,14 @@
     privacy: {
       en: ["Privacy & Terms — Chirp", "Chirp is built on radical data minimization: no accounts, no trackers, ephemeral memory-only connection handling, and end-to-end encrypted screen sharing."],
       "pt-BR": ["Privacidade e Termos — Chirp", "O Chirp foi construído sob minimização radical de dados: sem contas, sem rastreamento, processamento de rede efêmero em memória e sessões criptografadas ponta a ponta."]
+    },
+    howpage: {
+      en: ["How Chirp Works — Chirp", "One binary on both sides, instant connection codes, explicit on-screen consent, and zero telemetry: the definitive product model of Chirp."],
+      "pt-BR": ["Como o Chirp Funciona — Chirp", "Um executável único nas duas pontas, códigos de conexão efêmeros, consentimento explícito na tela e zero telemetria: o modelo de produto definitivo do Chirp."]
+    },
+    conduct: {
+      en: ["Code of Conduct — Chirp", "Chirp community standards, pledge, and enforcement guidelines adapted from the Contributor Covenant 2.1."],
+      "pt-BR": ["Código de Conduta — Chirp", "Padrões da comunidade Chirp, compromisso e diretrizes de moderação adaptados do Contributor Covenant 2.1."]
     }
   };
 
@@ -249,7 +280,7 @@
   // would parse a string as HTML. A translation with markup outside the
   // list, or unbalanced, keeps its English, and says so in the console. Write
   // characters, not entities, except &lt; &gt; and &amp; for < > and &.
-  var TAGS = { a: 1, b: 1, em: 1, h2: 1, h3: 1, li: 1, p: 1, span: 1, ul: 1 };
+  var TAGS = { a: 1, b: 1, em: 1, h2: 1, h3: 1, i: 1, li: 1, p: 1, span: 1, ul: 1 };
   var TAG_ATTRS = { a: { href: /^https:\/\// }, span: { "class": /^chirp$/ } };
   var ENTITIES = { lt: "<", gt: ">", amp: "&" };
   function text(t) {
