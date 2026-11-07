@@ -302,6 +302,7 @@ signalling/hub_test.go
 signalling/lookup.go
 signalling/lookuponly_test.go
 signalling/relay.go
+site/.well-known/security.txt
 site/CNAME
 site/assets/hop.js
 site/assets/hop.test.js
@@ -321,6 +322,7 @@ site/assets/status.js
 site/assets/theme.js
 site/index.html
 site/l/index.html
+site/privacy/index.html
 site/status/index.html
 status/probe.go
 status/probe_test.go
