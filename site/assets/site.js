@@ -111,7 +111,6 @@
     source: "Código-fonte",
     howChirpWorks: "Como o Chirp funciona",
     discussions: "Comunidade",
-    conduct: "Código de Conduta",
     security: "Vulnerabilidades:",
     networkStatus: "Status da rede",
     stKicker: "Rede pública",
@@ -190,22 +189,11 @@
     how4Text: "<p>A caixa de diálogo de consentimento oferece interruptores independentes para visualização da tela, controle remoto de mouse e teclado, sincronização de área de transferência e transferência de arquivos:</p><ul><li><b>Interruptores independentes:</b> apenas <i>Ver sua tela</i> inicia ativado; mouse/teclado e arquivos só são concedidos se ativados ativamente.</li><li><b>Proteção de privacidade:</b> senhas copiadas de gerenciadores de senhas nunca saem da máquina.</li><li><b>Roteamento efêmero em memória:</b> a rede pública processa o encontro entre dispositivos em memória volátil, sem reter históricos nem traçar perfis de usuários.</li></ul>",
     how5Title: "5. Compromissos fundamentais do projeto",
     how5Text: "<li><b>Sem recursos bloqueados:</b> tela, controle, área de transferência e arquivos fazem parte do núcleo gratuito e livre, permanentemente.</li><li><b>Zero telemetria:</b> sem SDKs de rastreamento, sem cookies, sem analytics.</li><li><b>100% código aberto:</b> sob a licença AGPL-3.0-only, com compilações reproduzíveis assinadas criptograficamente via Sigstore Cosign.</li>",
-    conductKicker: "Comunidade e Padrões",
-    conductTitle: "Código de Conduta",
-    conductLede: "Assumimos o compromisso de tornar a participação na comunidade do Chirp uma experiência acolhedora, inclusiva e livre de assédio para todas as pessoas.",
-    conductPledgeTitle: "1. Nosso compromisso",
-    conductPledgeText: "Como membros, colaboradores e líderes, comprometemo-nos a fazer da nossa comunidade um ambiente aberto, diverso e respeitoso, independentemente de idade, deficiência, etnia, identidade de gênero, nacionalidade, aparência física, raça, religião ou nível de experiência.",
-    conductStandardsTitle: "2. Nossos padrões",
-    conductStandardsText: "<p>Exemplos de comportamentos que contribuem para um ambiente positivo:</p><ul><li><b>Comportamento positivo:</b> demonstrar empatia, gentileza, colaboração respeitosa e aceitação cortês de críticas construtivas.</li><li><b>Comportamento inaceitável:</b> assédio, provocações destrutivas, comentários depreciativos ou insultuosos, ataques pessoais e publicação de informações privadas alheias sem autorização expressa.</li></ul>",
-    conductEnforceTitle: "3. Aplicação e canal de denúncia",
-    conductEnforceText: "Casos de comportamento abusivo, de assédio ou inaceitável podem ser reportados confidencialmente para security@fabrintek.com.br. Todas as denúncias serão analisadas e investigadas de forma rápida e imparcial.",
-    conductGuideTitle: "4. Diretrizes de aplicação",
-    conductGuideText: "<li><b>1. Correção:</b> aviso verbal ou escrito privado explicando o impacto do comportamento inadequado.</li><li><b>2. Advertência:</b> advertência formal com consequências em caso de reincidência.</li><li><b>3. Suspensão temporária:</b> afastamento temporário de qualquer interação pública com a comunidade.</li><li><b>4. Banimento permanente:</b> exclusão permanente da comunidade em razão de violações graves ou reiteradas.</li>",
     commKicker: "Comunidade &amp; Crescimento",
     commTitle: "Comunidade Chirp",
     commLede: "Um espaço colaborativo e de alto nível dedicado ao uso no mundo real, evolução arquitetural e crescimento saudável do projeto. Priorizamos privacidade, segurança e colaboração respeitosa.",
     commPrinTitle: "1. Princípios de Participação",
-    commPrinText: "<p>O Chirp é fundamentado na confiança humana e no respeito mútuo. Para garantir discussões construtivas e voltadas ao crescimento do projeto:</p><ul><li><b>Alto Sinal e Feedback Construtivo:</b> acolhemos ideias ponderadas, reprodução precisa de bugs, melhorias de acessibilidade e otimizações de desempenho.</li><li><b>Código de Conduta em Primeiro Lugar:</b> esperamos que todas as pessoas sigam os padrões do nosso <a href=\"/conduct/\">Código de Conduta</a>. Comportamentos desrespeitosos ou provocações são moderados imediatamente.</li><li><b>Divulgação Responsável de Segurança:</b> vulnerabilidades potenciais <b>nunca</b> devem ser publicadas em discussões abertas. Relate-as diretamente para security@fabrintek.com.br sob nosso processo de divulgação coordenada.</li></ul>",
+    commPrinText: "<p>O Chirp é fundamentado na confiança humana e no respeito mútuo. Para garantir discussões construtivas e voltadas ao crescimento do projeto:</p><ul><li><b>Alto Sinal e Feedback Construtivo:</b> acolhemos ideias ponderadas, reprodução precisa de bugs, melhorias de acessibilidade e otimizações de desempenho.</li><li><b>Respeito Mútuo e Colaboração:</b> esperamos que todas as pessoas mantenham uma convivência respeitosa e civil. Comportamentos desrespeitosos ou provocações são moderados imediatamente.</li><li><b>Divulgação Responsável de Segurança:</b> vulnerabilidades potenciais <b>nunca</b> devem ser publicadas em discussões abertas. Relate-as diretamente para security@fabrintek.com.br sob nosso processo de divulgação coordenada.</li></ul>",
     commChanTitle: "2. Canais de Discussão e Contribuição",
     commChanDesc: "Participe das conversas nas categorias estruturadas do GitHub Discussions:",
     commChanIdeasTitle: "Ideias e Sugestões de Recursos",
@@ -266,10 +254,6 @@
     howpage: {
       en: ["How Chirp Works — Chirp", "One binary on both sides, instant connection codes, explicit on-screen consent, and zero telemetry: the definitive product model of Chirp."],
       "pt-BR": ["Como o Chirp Funciona — Chirp", "Um executável único nas duas pontas, códigos de conexão efêmeros, consentimento explícito na tela e zero telemetria: o modelo de produto definitivo do Chirp."]
-    },
-    conduct: {
-      en: ["Code of Conduct — Chirp", "Chirp community standards, pledge, and enforcement guidelines adapted from the Contributor Covenant 2.1."],
-      "pt-BR": ["Código de Conduta — Chirp", "Padrões da comunidade Chirp, compromisso e diretrizes de moderação adaptados do Contributor Covenant 2.1."]
     },
     community: {
       en: ["Community — Chirp", "A constructive space dedicated to the growth, real-world usage, and architectural evolution of Chirp."],
