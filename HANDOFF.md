@@ -322,7 +322,6 @@ site/assets/status.js
 site/assets/theme.js
 site/assets/translations.test.js
 site/community/index.html
-site/conduct/index.html
 site/how/index.html
 site/index.html
 site/l/index.html
