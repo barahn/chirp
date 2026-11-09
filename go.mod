@@ -12,7 +12,7 @@ require (
 	github.com/jezek/xgb v1.3.1
 	github.com/tc-hib/winres v0.3.1
 	golang.org/x/sys v0.49.0
-	modernc.org/sqlite v1.61.0
+	modernc.org/sqlite v1.61.1
 )
 
 require (
