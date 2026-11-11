@@ -42,7 +42,7 @@
   "No Chirp server is set": "Nenhum servidor do Chirp configurado",
   "Nothing starts without their OK. They're seeing your request on their own screen now.": "Nada começa sem o OK da pessoa. Ela está vendo o seu pedido na tela dela agora.",
   "Nothing was shared. Ask them for a new code.": "Nada foi compartilhado. Peça um código novo à pessoa.",
-  "Nothing was shared. If they meant to let you in, ask them for a new code.": "Nada foi compartilhado. Se a pessoa queria deixar você entrar, peça um código novo.",
+  "Nothing was shared. If they meant to let you in, try again: a link works again as it is, a code needs a new one.": "Nada foi compartilhado. Se a pessoa queria deixar você entrar, tente de novo: um link funciona de novo como está, um código precisa ser novo.",
   "Offline": "Sem conexão",
   "Open Chirp": "Abrir o Chirp",
   "Open folder": "Abrir pasta",

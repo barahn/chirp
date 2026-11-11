@@ -8,6 +8,8 @@ import (
 	"errors"
 	"testing"
 	"time"
+
+	"github.com/barahn/chirp/signalling"
 )
 
 // await returns the first value from ch that ok accepts, failing the test if
@@ -291,6 +293,84 @@ func TestTheOwnerIsToldWhenASessionStartsAndEnds(t *testing.T) {
 	}
 	o.NewCode()
 	await(t, events, "the session ending", func(ev OwnerEvent) bool { return ev.Ended })
+}
+
+// A helper that ends the session -- the user's End cancels Help -- frees its
+// owner at once, not after the relay's grace for a dropped connection, so the
+// owner can be helped again right away (barahn/chirp#190).
+func TestAHelperThatEndsFreesItsOwnerAtOnce(t *testing.T) {
+	r := newRelay(t, func(s *signalling.Server) { s.ControllerGrace = time.Hour })
+	serve := func(ctx context.Context, conn *SessionConn) {
+		for {
+			if _, err := conn.ReadMessage(); err != nil {
+				return
+			}
+		}
+	}
+	o, events, _, _ := runOwnerServing(t, newClient(t, r), serve)
+	shown := await(t, events, "a code", ready).Peer
+
+	ctx, cancel := context.WithCancel(context.Background())
+	helped := make(chan struct{})
+	go func() {
+		defer close(helped)
+		newClient(t, r).Help(ctx, shown.Code, "Ana", func(HelperEvent) {})
+	}()
+	asked := await(t, events, "the request", func(ev OwnerEvent) bool { return ev.Consent != nil }).Consent
+	if _, err := o.Answer(context.Background(), asked.SessionID, asked.Permissions); err != nil {
+		t.Fatal(err)
+	}
+	await(t, events, "the session starting", func(ev OwnerEvent) bool { return ev.Started != nil })
+
+	cancel()
+	<-helped
+	await(t, events, "the session ending once the helper ended it", func(ev OwnerEvent) bool { return ev.Ended })
+	next, err := newClient(t, r).Peer(context.Background(), shown.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	again := make(chan HelperEvent, 64)
+	go newClient(t, r).Help(t.Context(), next.Code, "Bruno", func(ev HelperEvent) { again <- ev })
+	if ev := await(t, again, "the next helper to be asked about or refused", func(ev HelperEvent) bool {
+		return ev.Phase == HelperAsking || ev.Phase == HelperFailed
+	}); ev.Phase != HelperAsking {
+		t.Fatalf("the next helper got %+v: the owner was still busy after the first ended the session", ev)
+	}
+}
+
+// An owner that ends the session is free at once too: its new code reaches
+// it, and the next helper is asked about (barahn/chirp#190).
+func TestAnOwnerThatEndsIsFreeAtOnce(t *testing.T) {
+	r := newRelay(t, func(s *signalling.Server) { s.ControllerGrace = time.Hour })
+	serve := func(ctx context.Context, conn *SessionConn) {
+		for {
+			if _, err := conn.ReadMessage(); err != nil {
+				return
+			}
+		}
+	}
+	o, events, _, _ := runOwnerServing(t, newClient(t, r), serve)
+	shown := await(t, events, "a code", ready).Peer
+	go newClient(t, r).Help(t.Context(), shown.Code, "Ana", func(HelperEvent) {})
+	asked := await(t, events, "the request", func(ev OwnerEvent) bool { return ev.Consent != nil }).Consent
+	if _, err := o.Answer(context.Background(), asked.SessionID, asked.Permissions); err != nil {
+		t.Fatal(err)
+	}
+	await(t, events, "the session starting", func(ev OwnerEvent) bool { return ev.Started != nil })
+
+	o.NewCode()
+	await(t, events, "the session ending", func(ev OwnerEvent) bool { return ev.Ended })
+	next := await(t, events, "the new code", func(ev OwnerEvent) bool {
+		return ev.Phase == OwnerReady && ev.Peer.Code != "" && ev.Peer.Code != shown.Code
+	}).Peer
+	again := make(chan HelperEvent, 64)
+	go newClient(t, r).Help(t.Context(), next.Code, "Bruno", func(ev HelperEvent) { again <- ev })
+	if ev := await(t, again, "the next helper to be asked about or refused", func(ev HelperEvent) bool {
+		return ev.Phase == HelperAsking || ev.Phase == HelperFailed
+	}); ev.Phase != HelperAsking {
+		t.Fatalf("the next helper got %+v: the owner was still busy after ending the session", ev)
+	}
 }
 
 func TestAQueuedApprovalForASessionThatIsGoneStartsNothing(t *testing.T) {
