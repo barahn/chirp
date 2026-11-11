@@ -10,6 +10,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"sync"
 	"time"
@@ -235,7 +236,7 @@ func (n *nostrOwner) run(ctx context.Context) {
 			}
 		}
 		first = false
-		conn, err := nostr.Listen(ctx, nostr.Config{Relays: n.cfg.Relays, Dialer: n.client.dialer, MaxViewers: 4})
+		conn, err := nostr.Listen(ctx, nostr.Config{Relays: n.cfg.Relays, Dialer: n.client.dialer, MaxViewers: 4, Clock: n.client.Now, OnStale: staleNostr})
 		if err != nil {
 			continue
 		}
@@ -682,7 +683,7 @@ func (c *Client) helpOverNostr(ctx context.Context, t Target, name string, emit 
 		fail(err)
 		return
 	}
-	conn, err := nostr.Dial(ctx, nostr.Config{Relays: ct.Relays, Dialer: c.dialer}, ct.Key)
+	conn, err := nostr.Dial(ctx, nostr.Config{Relays: ct.Relays, Dialer: c.dialer, Clock: c.Now, OnStale: staleNostr}, ct.Key)
 	if err != nil {
 		fail(ErrUnavailable)
 		return
@@ -843,7 +844,7 @@ func (c *Client) helpOverNostr(ctx context.Context, t Target, name string, emit 
 					if c.View == nil {
 						continue
 					}
-					cn := newSessionConn(head.SessionID, nil, send)
+					cn := newSessionConn(head.SessionID, nil, send, c.Now)
 					cn.Nostr = true
 					cn.SigningKey, cn.PeerKey, cn.ViewerID = signKey, ownerKey, conn.PublicKey()
 					sc, scDone = cn, cn.Done()
@@ -875,4 +876,10 @@ func (c *Client) helpOverNostr(ctx context.Context, t Target, name string, emit 
 			}
 		}
 	}
+}
+
+// staleNostr logs a Nostr message dropped for its time: the other end's
+// clock, or this one's, is off from the relay's by more than messages allow.
+func staleNostr(off time.Duration) {
+	log.Printf("chirp: dropped a Nostr message %v off this machine's clock", off.Round(time.Second))
 }
