@@ -470,7 +470,7 @@ func (o *Owner) startSession(ctx context.Context, sessionID string) {
 	if s, key := o.nostrSender(sessionID); s != nil {
 		send, viaNostr, peerKey = s, true, key
 	}
-	conn := newSessionConn(req.SessionID, granted, send)
+	conn := newSessionConn(req.SessionID, granted, send, o.client.Now)
 	conn.Nostr = viaNostr
 	if peerKey != nil {
 		conn.SigningKey, conn.PeerKey = o.signKey, peerKey

@@ -49,6 +49,8 @@ func remoteNotice(kind string) string {
 		return tr("They haven't allowed you to see their screen.")
 	case "capture_unavailable":
 		return tr("Their computer can't share its screen right now. Ask them whether it allows screen recording.")
+	case "clock_off":
+		return tr("Your computer's clock and theirs disagree, so their screen can't reach you. Check that both clocks are set right, then try again.")
 	}
 	return ""
 }

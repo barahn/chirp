@@ -344,7 +344,7 @@ func clipboardAlert(ev stream.ClipboardEvent) (ui.Alert, bool) {
 // main tells the owner of each sync. Files the person helping sends land in
 // the Chirp folder in the owner's Downloads.
 func newRunner(s *client.SessionConn, ice webrtc.PeerConfig) *stream.Runner {
-	r := stream.New(stream.Config{ID: s.ID, PeerConfig: &ice, SigningKey: s.SigningKey, DownloadDir: receivedDir()})
+	r := stream.New(runnerConfig(s, ice))
 	r.RequireScreenViewConsent(true)
 	r.DisableRelayFallback(true)
 	r.RequireDataChannel(s.Nostr)
@@ -355,6 +355,12 @@ func newRunner(s *client.SessionConn, ice webrtc.PeerConfig) *stream.Runner {
 	// permission it did not get through the prompt.
 	r.Grant(client.Grantable(s.Permissions)...)
 	return r
+}
+
+// runnerConfig is how this machine serves a session it allowed: its signed
+// signals on the relay's time, which the session carries.
+func runnerConfig(s *client.SessionConn, ice webrtc.PeerConfig) stream.Config {
+	return stream.Config{ID: s.ID, PeerConfig: &ice, SigningKey: s.SigningKey, DownloadDir: receivedDir(), Clock: s.Clock}
 }
 
 // nostrConfig turns signalling over Nostr on when relays are given. The
@@ -417,7 +423,7 @@ func splitList(list string) []string {
 // answers only from the owner's (barahn/chirp#21); it goes by the name the
 // owner's runner addresses it by, which its signed answers carry.
 func viewerConfig(conn *client.SessionConn, ice webrtc.PeerConfig) stream.ViewerConfig {
-	cfg := stream.ViewerConfig{ID: "chirp-controller", AgentID: conn.ID, PeerConfig: &ice, DownloadDir: receivedDir()}
+	cfg := stream.ViewerConfig{ID: "chirp-controller", AgentID: conn.ID, PeerConfig: &ice, DownloadDir: receivedDir(), Clock: conn.Clock}
 	if conn.PeerKey != nil {
 		cfg.ID, cfg.SigningKey, cfg.AgentKey = conn.ViewerID, conn.SigningKey, conn.PeerKey
 	}
