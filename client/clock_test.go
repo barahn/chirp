@@ -43,13 +43,13 @@ func TestTheClientKeepsTheRelaysTime(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !near(c.Now(), time.Now()) {
-		t.Fatalf("before asking the relay anything, Now is %v off the machine's clock", c.Now().Sub(time.Now()))
+		t.Fatalf("before asking the relay anything, Now is %v off the machine's clock", time.Until(c.Now()))
 	}
 	if _, err := c.Register(context.Background(), ""); err != nil {
 		t.Fatal(err)
 	}
 	if !near(c.Now(), time.Now().Add(4*time.Hour)) {
-		t.Fatalf("after the relay answered, Now is %v off the machine's clock, want the relay's 4h ahead", c.Now().Sub(time.Now()))
+		t.Fatalf("after the relay answered, Now is %v off the machine's clock, want the relay's 4h ahead", time.Until(c.Now()))
 	}
 }
 

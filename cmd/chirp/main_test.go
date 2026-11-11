@@ -209,7 +209,7 @@ func TestSessionsRunOnTheRelaysTime(t *testing.T) {
 		"runner": runnerConfig(conn, webrtc.PeerConfig{}).Clock,
 		"viewer": viewerConfig(conn, webrtc.PeerConfig{}).Clock,
 	} {
-		if clock == nil || clock().Sub(time.Now()) < 4*time.Hour-time.Minute {
+		if clock == nil || time.Until(clock()) < 4*time.Hour-time.Minute {
 			t.Errorf("the %s is not on the session's clock", side)
 		}
 	}
