@@ -272,7 +272,7 @@ func outcome(p client.HelperPhase) (title, text, button string) {
 	case client.HelperAllowed:
 		return tr("You're in"), tr("Their screen is open in its own window. End the session there or here when you're done."), tr("End")
 	case client.HelperDeclined:
-		return tr("They declined"), tr("Nothing was shared. If they meant to let you in, ask them for a new code."), tr("Try again")
+		return tr("They declined"), tr("Nothing was shared. If they meant to let you in, try again: a link works again as it is, a code needs a new one."), tr("Try again")
 	case client.HelperExpired:
 		return tr("They didn't answer in time"), tr("Nothing was shared. Ask them for a new code."), tr("Try again")
 	default:

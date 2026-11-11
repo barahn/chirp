@@ -575,9 +575,11 @@ func (s *Server) serveController(w http.ResponseWriter, r *http.Request) {
 	// session more time. Only a controller that joined schedules a new one,
 	// when it leaves.
 	held := s.holdSession(id)
-	joined := false
+	joined, ended := false, false
 	defer func() {
 		switch {
+		case ended:
+			s.scheduleEnd(id, time.Now())
 		case joined:
 			s.scheduleEnd(id, time.Now().Add(s.controllerGrace()))
 		case held != nil:
@@ -620,6 +622,9 @@ func (s *Server) serveController(w http.ResponseWriter, r *http.Request) {
 	for {
 		_, data, err := conn.ReadMessage()
 		if err != nil {
+			// A normal close is the controller ending the session; anything
+			// else may be a dropped connection, which gets the grace.
+			ended = websocket.IsCloseError(err, websocket.CloseNormalClosure)
 			return
 		}
 		if err := s.hub.Forward(sess.ID, RoleController, data); err != nil {
