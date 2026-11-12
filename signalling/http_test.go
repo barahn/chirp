@@ -675,6 +675,36 @@ func TestALeftSessionWaitsForTheControllerWithinTheGrace(t *testing.T) {
 	}
 }
 
+// A controller that ends the session -- a normal close of its socket -- frees
+// its owner at once: the grace is for a controller whose connection dropped,
+// and one that said goodbye is not coming back (barahn/chirp#190).
+func TestAControllerThatEndsFreesTheOwnerAtOnce(t *testing.T) {
+	srv, ts := newServer(t)
+	srv.ControllerGrace = time.Hour
+	owner := register(t, ts, "Ana")
+	ownerWS := dialOwner(t, ts, owner.PeerID)
+	sess, _ := redeem(t, ts, owner.Code, "Bruno")
+	ctrl := dialController(t, ts, sess.SessionID)
+	awaitPeer(t, ctrl, RoleOwner)
+	awaitPeer(t, ownerWS, RoleController)
+	awaitConsentRequest(t, ownerWS)
+	_ = consent(t, ts, owner.PeerID, sess.SessionID, true)
+
+	bye := websocket.FormatCloseMessage(websocket.CloseNormalClosure, "")
+	if err := ctrl.WriteControl(websocket.CloseMessage, bye, time.Now().Add(time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	_ = ctrl.Close()
+	waitFor(t, "the session to end", func() bool {
+		return state(t, ts, sess.SessionID) == string(session.StateTerminated)
+	})
+	var p peerView
+	call(t, ts, "GET", "/api/peers/"+owner.PeerID, "", &p)
+	if _, st := redeem(t, ts, p.Code, "Carla"); st != http.StatusCreated {
+		t.Fatalf("redeeming the owner's next code after an end: status %d, want 201", st)
+	}
+}
+
 // A message past MaxMessageSize closes the socket that sent it, unread and
 // unforwarded, whichever end it comes from.
 func TestAnOversizedMessageClosesTheSocket(t *testing.T) {

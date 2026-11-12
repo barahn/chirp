@@ -138,7 +138,8 @@ Chirp is in pre-1.0 active development (`v0.5.0` is the latest release).
   the server only code lookup and blind to signalling traffic. The code then
   has ten digits, `482-913-5071`: the server sees the first six, and the last
   four bind the two Chirps through a PAKE, so a relay in the middle cannot
-  pose as either end.
+  pose as either end. Both Chirps keep time by the server's clock, from its
+  answers' `Date`, so a computer whose own clock is off still gets through.
 
 **Not here yet:**
 

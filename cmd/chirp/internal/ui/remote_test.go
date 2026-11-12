@@ -6,6 +6,7 @@ package ui
 import (
 	"image"
 	"math"
+	"strings"
 	"testing"
 	"time"
 
@@ -185,6 +186,15 @@ func TestAFrameClearsTheNotice(t *testing.T) {
 	r.notice.Show()
 	r.Show(frame(64, 48, 10))
 	waitUntil(t, func() bool { return !r.notice.Visible() })
+}
+
+// When the two computers' clocks disagree by more than a session allows,
+// the helper is told to check them, instead of watching a screen that never
+// comes (barahn/chirp#191).
+func TestAClockOffNoticeSaysToCheckTheClocks(t *testing.T) {
+	if got := remoteNotice("clock_off"); !strings.Contains(got, "clock") {
+		t.Fatalf("the clock notice says %q", got)
+	}
 }
 
 // waitUntil polls cond until it holds, failing the test after a few seconds.
