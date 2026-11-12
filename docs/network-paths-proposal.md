@@ -18,6 +18,10 @@ Four parts, in the order they can be built:
 3. [Metadata split between operators](#3-metadata-split-between-operators).
 4. [The owner's socket](#4-the-owners-socket) in public mode.
 
+A fifth part, [Volunteers in front](#5-volunteers-in-front), is a direction
+rather than a design: it is outside the order of work until its open
+questions are answered.
+
 ## 1. TURN on the relay
 
 ### Why it is off
@@ -359,6 +363,46 @@ like the rest, while a WebSocket would tie the owner's address to its
 registration for as long as it ran. Private mode keeps the socket, since the
 trusted path uses it to tell the owner a controller arrived.
 
+## 5. Volunteers in front
+
+Section 3 is as strong as the number of operators who would have to act
+together. Dedicated relays grow that number slowly: each needs a server, a
+domain and someone to keep it. A Chirp on a desktop that is on and reachable
+can add to it, if its user chooses, as Snowflake's volunteers do for Tor.
+
+**What a volunteer does.** Only the part of the node in front, A in 3.2: it
+forwards sealed requests to nodes of the list and counts misses per origin.
+It cannot open what it forwards, it sees addresses and sizes as any A does,
+and a Chirp whose volunteer leaves picks another.
+
+**What a volunteer does not do.**
+
+- **Hold codes.** Rendezvous hashing needs a list that changes rarely, and a
+  node that leaves loses its codes (part 2). Desktops come and go.
+- **Relay sessions.** Bandwidth is what a session costs, and the network's
+  answer to that cost is the dedicated relays and their TURN (part 1), run
+  by whoever offers one. A home uplink is not asked to carry a stranger's
+  screen.
+
+So volunteers add operators, which is what section 3 needs, and add no
+capacity, which the relays provide.
+
+**What it would change.**
+
+- **A class of its own in the signed list**, never in the rendezvous set. A
+  node bounds the misses of the whole class together, not of each volunteer:
+  a volunteer costs a click, and a bound for each would hand an attacker one
+  budget per click.
+- **Reached by address and port, known by its key.** A desktop has no domain
+  or certificate, which joining asks of a node today
+  ([`joining-the-network.md`](joining-the-network.md)). Requests are already
+  sealed to the node's key, so a volunteer needs none for what it carries.
+- **Consent that says what is published.** The list is public and signed,
+  so a volunteer's home address is in it.
+
+None of this is designed yet. Open questions 4 to 8 are what stands between
+this section and a step in the order of work.
+
 ## Order of work
 
 Each step is test-first, and each lands only once this proposal is approved.
@@ -384,6 +428,21 @@ Each step is test-first, and each lands only once this proposal is approved.
    option.
 3. Whether section 3's requests go through a node of the network, or also
    through relays outside it.
+
+4. Volunteers: whether their addresses are published in the signed list, or
+   handed out one at a time by a node, which then chooses each Chirp's node
+   in front.
+5. Volunteers: the bound a node sets on the whole class, and whether a
+   Chirp may use a volunteer when a dedicated node of another operator is
+   free.
+6. Volunteers: how one is reached. Chirp opens no port today; a mapping
+   asked of the router (PCP, UPnP) leaves out everyone behind a
+   carrier-grade NAT, and a WebRTC path as in Snowflake does not, at a
+   price in complexity.
+7. Volunteers: what replaces 95 % uptime for a machine that sleeps, and
+   what probation means for one.
+8. Volunteers: how one stays current with security releases without an
+   operator watching it.
 
 Settled here, and no longer open: spending other people's codes (part 2),
 and anonymous tokens against counting misses in the node in front (3.2).
