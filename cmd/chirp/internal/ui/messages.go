@@ -49,6 +49,8 @@ func remoteNotice(kind string) string {
 		return tr("They haven't allowed you to see their screen.")
 	case "capture_unavailable":
 		return tr("Their computer can't share its screen right now. Ask them whether it allows screen recording.")
+	case "clock_off":
+		return tr("Your computer's clock and theirs disagree, so their screen can't reach you. Check that both clocks are set right, then try again.")
 	}
 	return ""
 }
@@ -270,7 +272,7 @@ func outcome(p client.HelperPhase) (title, text, button string) {
 	case client.HelperAllowed:
 		return tr("You're in"), tr("Their screen is open in its own window. End the session there or here when you're done."), tr("End")
 	case client.HelperDeclined:
-		return tr("They declined"), tr("Nothing was shared. If they meant to let you in, ask them for a new code."), tr("Try again")
+		return tr("They declined"), tr("Nothing was shared. If they meant to let you in, try again: a link works again as it is, a code needs a new one."), tr("Try again")
 	case client.HelperExpired:
 		return tr("They didn't answer in time"), tr("Nothing was shared. Ask them for a new code."), tr("Try again")
 	default:

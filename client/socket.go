@@ -146,8 +146,14 @@ func (s *Socket) Send(data []byte) error {
 	return s.conn.WriteMessage(websocket.TextMessage, data)
 }
 
-// Close ends the socket.
-func (s *Socket) Close() error { return s.conn.Close() }
+// Close ends the socket, saying so: a normal close tells the relay this end
+// left on purpose, so it ends a session at once rather than waiting for a
+// dropped connection to come back (barahn/chirp#190).
+func (s *Socket) Close() error {
+	bye := websocket.FormatCloseMessage(websocket.CloseNormalClosure, "")
+	_ = s.conn.WriteControl(websocket.CloseMessage, bye, time.Now().Add(time.Second))
+	return s.conn.Close()
+}
 
 // decode reads a relay message, and leaves anything else raw.
 func decode(data []byte) Message {

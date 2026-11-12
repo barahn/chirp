@@ -318,3 +318,13 @@ func TestAWrongCodeIsSaidOnTheOwnersSideToo(t *testing.T) {
 		t.Errorf("note = %q (visible %v)", w.note.Text, w.note.Visible())
 	}
 }
+
+// After a decline the helper is told what to try next whichever way they
+// came: a link works again as it is, a code needs a new one
+// (barahn/chirp#190).
+func TestADeclineSaysWhatToTryNext(t *testing.T) {
+	_, text, _ := outcome(client.HelperDeclined)
+	if !strings.Contains(text, "link") || !strings.Contains(text, "code") {
+		t.Fatalf("after a decline the helper reads %q", text)
+	}
+}

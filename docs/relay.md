@@ -776,6 +776,14 @@ though, every code and link of it returns the same key. With it, the relay's
 operator can watch when that Chirp receives signalling on the public Nostr
 relays, and how much, for as long as it stays registered.
 
+Every Chirp also takes the relay's time from the `Date` header of its
+answers. Over Nostr, both ends write and check their messages, and sign
+their session's signals, on that clock rather than their machines', which
+may be hours off; messages a few minutes or seconds out of step are
+dropped. So the relay's clock must be right: keep it synchronised (NTP).
+A relay that lied about the time could make sessions fail, which it can
+already do by refusing a lookup, and nothing more.
+
 ### Restarts and upgrades
 
 The state is in memory, so a restart:

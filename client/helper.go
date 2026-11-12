@@ -136,7 +136,7 @@ func (c *Client) follow(ctx context.Context, sock *Socket, sess Session, emit fu
 		if c.View == nil {
 			return
 		}
-		cn := newSessionConn(s.ID, nil, sock.Send)
+		cn := newSessionConn(s.ID, nil, sock.Send, c.Now)
 		for _, m := range early {
 			cn.deliver(m)
 		}

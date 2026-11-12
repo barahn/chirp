@@ -18,6 +18,10 @@ Four parts, in the order they can be built:
 3. [Metadata split between operators](#3-metadata-split-between-operators).
 4. [The owner's socket](#4-the-owners-socket) in public mode.
 
+A fifth part, [Volunteers in front](#5-volunteers-in-front), is a direction
+rather than a design: it is outside the order of work until its open
+questions are answered.
+
 ## 1. TURN on the relay
 
 ### Why it is off
@@ -199,12 +203,8 @@ every node already holds the list, and nodes whose copies differ by a version
 differ in their window by a little.
 
 It holds as long as the node sees the client's address. Once requests go
-through another node (3.2), the node sees only that node's address, and how
-to count misses then is open question 2.
-
-The rule bounds origins, so an origin must be one subscriber. An IPv6
-client is one origin per /64, not per address; today the relay counts each
-address, so a single /64 escapes every per-origin limit.
+through another node (3.2), the node sees only that node's address, and the
+node in front counts the misses instead (3.2, *Who counts the misses*).
 
 Two other ways were set aside. Proof of work per lookup: a cloud core spends
 dozens of codes an hour for cents. Letting the node check part of the
@@ -265,12 +265,39 @@ has `crypto/hpke`, so this adds no dependency.
 - The Chirp picks A from a different operator than B (the list carries
   `operator`).
 
-**What it costs.** The throttle on guessing is per origin, and B no longer
-sees the origin. A takes over the per-address limit, counting every request it
-forwards, since it cannot tell a failure from a success; B limits each A as a
-whole. That is a coarser throttle than today's, and open question 2 asks
-whether anonymous tokens (Privacy Pass, RFC 9576) should replace it. A lookup
-also takes one more hop.
+**What it costs.** A lookup takes one more hop, and the throttle on guessing
+moves: it is per origin, and B no longer sees the origin.
+
+#### Who counts the misses
+
+A sees the origin and B knows whether a lookup missed, so B tells A. Next to
+the sealed answer, in the clear, B marks a lookup that missed.
+
+- **A counts misses per origin**, by part 2's rule unchanged: 5 per window of
+  10 minutes × N. A Chirp picks A anew for each request, so its misses spread
+  across nodes as they do without A.
+- **B bounds the misses that arrive through each A**, with a window that
+  grows with N likewise. The bound is sized for a node's worth of users, and
+  its value waits for measurements. An A that does not limit its clients
+  uses the bound up, and its own users are the ones refused.
+- **Conformance measures A.** The prober sends six misses in a row through A
+  from one origin and expects the sixth refused. An A that forwards it is
+  non-conforming, as in the other proposal's *Conformance*.
+
+What A learns is whether a lookup missed. It could already tell: a contact
+and a `404` differ in size, and A sees sizes and times. What remains is an
+operator using its own node as A, which skips its own limit. B's bound still
+holds it, and the node went through probation under a known key and
+operator.
+
+**Anonymous tokens were set aside** (Privacy Pass, RFC 9576). Someone has to
+issue them against an address. A central issuer is what this network is
+built to do without. If each node issues the tokens it will later check, a
+Chirp cannot know which node its next code lands on, so it fetches tokens
+from every node, and every node then sees every user's address and when
+they are online; today only A does. Tokens would hide the miss from A at
+that price, and only once every answer is padded to one size. If
+measurements show the miss is a leak that matters, this is where to return.
 
 ### 3.3 Two TURN servers in a chain
 
@@ -297,7 +324,7 @@ registration.
 
 **What it costs.** One more hop of latency, and the network carries every
 relayed byte twice. Whether a chain is the default whenever TURN is needed, or
-an option, is open question 3.
+an option, is open question 2.
 
 ### 3.4 Relay only
 
@@ -336,6 +363,46 @@ like the rest, while a WebSocket would tie the owner's address to its
 registration for as long as it ran. Private mode keeps the socket, since the
 trusted path uses it to tell the owner a controller arrived.
 
+## 5. Volunteers in front
+
+Section 3 is as strong as the number of operators who would have to act
+together. Dedicated relays grow that number slowly: each needs a server, a
+domain and someone to keep it. A Chirp on a desktop that is on and reachable
+can add to it, if its user chooses, as Snowflake's volunteers do for Tor.
+
+**What a volunteer does.** Only the part of the node in front, A in 3.2: it
+forwards sealed requests to nodes of the list and counts misses per origin.
+It cannot open what it forwards, it sees addresses and sizes as any A does,
+and a Chirp whose volunteer leaves picks another.
+
+**What a volunteer does not do.**
+
+- **Hold codes.** Rendezvous hashing needs a list that changes rarely, and a
+  node that leaves loses its codes (part 2). Desktops come and go.
+- **Relay sessions.** Bandwidth is what a session costs, and the network's
+  answer to that cost is the dedicated relays and their TURN (part 1), run
+  by whoever offers one. A home uplink is not asked to carry a stranger's
+  screen.
+
+So volunteers add operators, which is what section 3 needs, and add no
+capacity, which the relays provide.
+
+**What it would change.**
+
+- **A class of its own in the signed list**, never in the rendezvous set. A
+  node bounds the misses of the whole class together, not of each volunteer:
+  a volunteer costs a click, and a bound for each would hand an attacker one
+  budget per click.
+- **Reached by address and port, known by its key.** A desktop has no domain
+  or certificate, which joining asks of a node today
+  ([`joining-the-network.md`](joining-the-network.md)). Requests are already
+  sealed to the node's key, so a volunteer needs none for what it carries.
+- **Consent that says what is published.** The list is public and signed,
+  so a volunteer's home address is in it.
+
+None of this is designed yet. Open questions 4 to 8 are what stands between
+this section and a step in the order of work.
+
 ## Order of work
 
 Each step is test-first, and each lands only once this proposal is approved.
@@ -347,7 +414,7 @@ Each step is test-first, and each lands only once this proposal is approved.
 3. **Renewals instead of the socket in public mode** (part 4), replacing the
    owner's socket that barahn/chirp#170 kept.
 4. **Rendezvous hashing** (part 2), with phase 6's signed list and the miss
-   budget divided by its length. Needs origins counted per IPv6 /64.
+   budget divided by its length.
 5. **Requests through another node** (3.2).
 6. **The TURN chain** (3.3), with remotekit's relay selection.
 
@@ -357,13 +424,28 @@ Each step is test-first, and each lands only once this proposal is approved.
    network changes midway. Not needed for step 1. (A credential's lifetime
    against long sessions was open here, and so was where the credential
    generator comes from; part 1 settles both.)
-2. Whether anonymous tokens replace the per-address throttle once requests go
-   through another node, where the rule in part 2 no longer holds.
-   (Spending other people's codes was open here; part 2 settles it.)
-3. Whether the TURN chain is the default whenever TURN is needed, or an
+2. Whether the TURN chain is the default whenever TURN is needed, or an
    option.
-4. Whether section 3's requests go through a node of the network, or also
+3. Whether section 3's requests go through a node of the network, or also
    through relays outside it.
+
+4. Volunteers: whether their addresses are published in the signed list, or
+   handed out one at a time by a node, which then chooses each Chirp's node
+   in front.
+5. Volunteers: the bound a node sets on the whole class, and whether a
+   Chirp may use a volunteer when a dedicated node of another operator is
+   free.
+6. Volunteers: how one is reached. Chirp opens no port today; a mapping
+   asked of the router (PCP, UPnP) leaves out everyone behind a
+   carrier-grade NAT, and a WebRTC path as in Snowflake does not, at a
+   price in complexity.
+7. Volunteers: what replaces 95 % uptime for a machine that sleeps, and
+   what probation means for one.
+8. Volunteers: how one stays current with security releases without an
+   operator watching it.
+
+Settled here, and no longer open: spending other people's codes (part 2),
+and anonymous tokens against counting misses in the node in front (3.2).
 
 ---
 

@@ -7,8 +7,8 @@ require github.com/google/uuid v1.6.0
 require github.com/gorilla/websocket v1.5.3
 
 require (
-	github.com/barahn/remotekit v0.8.1
-	github.com/barahn/remotekit/signal/nostr v0.2.0
+	github.com/barahn/remotekit v0.8.2-0.20261111211253-bd772485fa61
+	github.com/barahn/remotekit/signal/nostr v0.2.1-0.20261111211253-bd772485fa61
 	github.com/jezek/xgb v1.3.1
 	github.com/tc-hib/winres v0.3.1
 	golang.org/x/sys v0.49.0
