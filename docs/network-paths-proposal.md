@@ -202,10 +202,6 @@ It holds as long as the node sees the client's address. Once requests go
 through another node (3.2), the node sees only that node's address, and how
 to count misses then is open question 2.
 
-The rule bounds origins, so an origin must be one subscriber. An IPv6
-client is one origin per /64, not per address; today the relay counts each
-address, so a single /64 escapes every per-origin limit.
-
 Two other ways were set aside. Proof of work per lookup: a cloud core spends
 dozens of codes an hour for cents. Letting the node check part of the
 secret: it would cut the hits, and give the node a shortcut to sit in the
@@ -347,7 +343,7 @@ Each step is test-first, and each lands only once this proposal is approved.
 3. **Renewals instead of the socket in public mode** (part 4), replacing the
    owner's socket that barahn/chirp#170 kept.
 4. **Rendezvous hashing** (part 2), with phase 6's signed list and the miss
-   budget divided by its length. Needs origins counted per IPv6 /64.
+   budget divided by its length.
 5. **Requests through another node** (3.2).
 6. **The TURN chain** (3.3), with remotekit's relay selection.
 
