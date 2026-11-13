@@ -69,4 +69,4 @@ body:
     id: logs
     attributes:
       label: Relevant logs or screenshots
-      description: Paste any sanitized log output or attach screenshots (ensure all codes, links, and sensitive tokens are redacted).
+      description: Paste any sanitized log output or attach screenshots. Redact codes, links, tokens, IP addresses, hostnames and internet provider names (see "What is published" in CONTRIBUTING.md).
