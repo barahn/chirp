@@ -130,5 +130,6 @@
   "“%s” is a folder. Send the files in it instead.": "“%s” é uma pasta. Envie os arquivos que estão nela.",
   "“%s” is controlling this computer": "“%s” está controlando este computador",
   "“%s” is seeing this screen": "“%s” está vendo esta tela",
-  "“%s” wasn't sent. They may have taken files back, or the connection dropped.": "“%s” não foi enviado. A pessoa pode ter desligado os arquivos, ou a conexão caiu."
+  "“%s” wasn't sent. They may have taken files back, or the connection dropped.": "“%s” não foi enviado. A pessoa pode ter desligado os arquivos, ou a conexão caiu.",
+  "Your computer and theirs couldn't connect to each other. Try again, or try from another network, such as your phone's mobile data.": "Seu computador e o da outra pessoa não conseguiram se conectar. Tente de novo, ou tente por outra rede, como os dados móveis do celular."
 }
