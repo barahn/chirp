@@ -138,11 +138,18 @@ The fix is per-session credentials that expire, in the format coturn's
 `use-auth-secret` already accepts: `username = "<expiry>:<id>"`,
 `password = base64(HMAC-SHA1(secret, username))`. The shared secret stays on
 the server that hands them out, and each Chirp only ever sees a pair that
-stops working on its own. remotekit is adding the generator
-(barahn/remotekit#64). Something trusted also has to hand the pairs out. The
-natural place is Chirp's relay, which already speaks to both ends, but nothing
-in Chirp does it yet;
-[`network-paths-proposal.md`](network-paths-proposal.md) proposes how.
+stops working on its own.
+
+Chirp's relay hands them out (barahn/chirp#222): start it with
+`-turn-secret-file`, a file of mode 600 holding the same value as coturn's
+`static-auth-secret`, and `-turn-urls`, the `turn:` URLs to hand out. An owner
+then gets two credentials at `POST /api/peers/{peer}/turn`, one for itself and
+one for the controller it lets in, each good for five minutes and at most
+eight an hour per registration. Without those settings the route answers
+`404`, and Chirps stay on STUN. Chirps ask for credentials once
+barahn/chirp#223 and #224 are in;
+[`network-paths-proposal.md`](network-paths-proposal.md), part 1, has the
+design.
 
 ## What TURN can see
 
