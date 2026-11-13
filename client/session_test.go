@@ -119,6 +119,11 @@ func TestAnAllowedSessionIsServedOverTheOwnerSocket(t *testing.T) {
 		t.Error("the session was served with no permissions")
 	}
 
+	// Before anything of the session, the owner says whether the controller
+	// has a TURN credential; this relay has no TURN.
+	if got := signal(t, ctrl); got != `{"type":"chirp_turn"}` {
+		t.Errorf("the controller first got %s, want the owner's TURN word", got)
+	}
 	if err := ctrl.Send([]byte(`{"type":"offer","sdp":"v=0"}`)); err != nil {
 		t.Fatal(err)
 	}
@@ -210,6 +215,9 @@ func TestRemotekitsRunnerServesOverTheOwnerSocket(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if got := signal(t, ctrl); got != `{"type":"chirp_turn"}` {
+		t.Fatalf("the controller first got %s, want the owner's TURN word", got)
+	}
 	var hello struct {
 		Type      string `json:"type"`
 		SessionID string `json:"session_id"`
