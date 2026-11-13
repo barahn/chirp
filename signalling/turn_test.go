@@ -51,18 +51,10 @@ func checkTURNCredential(t *testing.T, who string, c turnCredential, peerID stri
 	if strings.Join(c.URLs, ",") != strings.Join(testTURNURLs, ",") {
 		t.Errorf("%s: urls = %v, want %v", who, c.URLs, testTURNURLs)
 	}
-	expiry, id, ok := strings.Cut(c.Username, ":")
-	if !ok || id == "" {
-		t.Fatalf("%s: username %q is not <expiry>:<id>", who, c.Username)
-	}
 	if strings.Contains(c.Username, peerID) {
 		t.Errorf("%s: username %q carries the peer ID, which would tie coturn's records to a registration", who, c.Username)
 	}
-	at, err := strconv.ParseInt(expiry, 10, 64)
-	if err != nil {
-		t.Fatalf("%s: expiry %q: %v", who, expiry, err)
-	}
-	if left := time.Until(time.Unix(at, 0)); left < DefaultTURNLifetime-time.Minute || left > DefaultTURNLifetime+time.Second {
+	if left := time.Until(turnExpiry(t, who, c.Username)); left < DefaultTURNLifetime-time.Minute || left > DefaultTURNLifetime+time.Second {
 		t.Errorf("%s: expires in %v, want about %v", who, left, DefaultTURNLifetime)
 	}
 	if c.ExpiresIn != int(DefaultTURNLifetime.Seconds()) {
@@ -73,6 +65,20 @@ func checkTURNCredential(t *testing.T, who string, c turnCredential, peerID stri
 	if want := base64.StdEncoding.EncodeToString(mac.Sum(nil)); c.Credential != want {
 		t.Errorf("%s: credential does not verify under the shared secret", who)
 	}
+}
+
+// turnExpiry reads the expiry out of a "<expiry>:<id>" username.
+func turnExpiry(t *testing.T, who, username string) time.Time {
+	t.Helper()
+	expiry, id, ok := strings.Cut(username, ":")
+	if !ok || id == "" {
+		t.Fatalf("%s: username %q is not <expiry>:<id>", who, username)
+	}
+	at, err := strconv.ParseInt(expiry, 10, 64)
+	if err != nil {
+		t.Fatalf("%s: expiry %q: %v", who, expiry, err)
+	}
+	return time.Unix(at, 0)
 }
 
 func TestARelayWithoutTURNHasNoCredentialRoute(t *testing.T) {
