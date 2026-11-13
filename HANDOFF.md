@@ -290,6 +290,7 @@ scripts/sign-macos-app.sh
 session/consent.go
 session/lookup.go
 session/lookup_test.go
+session/origin_test.go
 session/permissions_test.go
 session/reaper_internal_test.go
 session/session.go
@@ -497,6 +498,11 @@ Consequences to know about:
   empty origin would make the defence opt-out. The signalling server derives
   the origin from the connection; behind a reverse proxy set
   `Server.ClientIP`, or every user shares the proxy's budget.
+- **An IPv6 origin is its /64**, IPv4 its address (IPv4-mapped addresses
+  unmapped first). `session` derives it from whatever address it is handed,
+  for the throttle and both per-origin caps, so every `Server.ClientIP` gets
+  it; `ClientInfo.RemoteIP` keeps the full address. Without it one IPv6 home
+  or VPS had 2^64 budgets.
 - A throttled origin is refused even when its next guess is a live code.
 - Malformed codes count, so probing has no unmetered channel.
 - The limiter's records are reaped alongside expired sessions.

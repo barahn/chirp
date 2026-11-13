@@ -77,12 +77,12 @@ Nostr, and a PAKE (barahn/chirp#21, #43).
 
 It speaks plain HTTP. Put a TLS-terminating proxy in front of it for anything
 beyond one machine. `chirp-relay` counts every per-origin limit against the
-connection's address, so behind a proxy all of its users share one origin and
-are throttled together. A program that embeds `signalling.Server` can set
-`Server.ClientIP` to read the proxy's forwarded header instead, but only when
-that proxy is the sole way in: a client that can reach the relay directly can
-write the header itself and dodge every limit. STUN and TURN are yours to
-bring: [docs/stun-turn.md](docs/stun-turn.md).
+connection's address, an IPv6 address by its /64, so behind a proxy all of its
+users share one origin and are throttled together. A program that embeds
+`signalling.Server` can set `Server.ClientIP` to read the proxy's forwarded
+header instead, but only when that proxy is the sole way in: a client that can
+reach the relay directly can write the header itself and dodge every limit.
+STUN and TURN are yours to bring: [docs/stun-turn.md](docs/stun-turn.md).
 
 A weakness in how a relay is meant to be run is in scope, as is any way to get
 past its per-origin limits.

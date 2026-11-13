@@ -19,6 +19,7 @@ package session
 import (
 	"context"
 	"errors"
+	"net/netip"
 	"sync"
 	"time"
 
@@ -115,7 +116,25 @@ func originOf(info *ClientInfo) string {
 	if info == nil {
 		return ""
 	}
-	return info.RemoteIP
+	return throttleKey(info.RemoteIP)
+}
+
+// throttleKey turns the address a request came from into the origin it is
+// throttled as. An IPv6 address stands for its /64: that is what one home or
+// one server is handed, and counting each address in it apart would give a
+// single caller 2^64 budgets. An IPv4 address, unmapped from IPv6 if need be,
+// stands for itself. Anything that is not an address is kept as given.
+func throttleKey(remote string) string {
+	a, err := netip.ParseAddr(remote)
+	if err != nil {
+		return remote
+	}
+	a = a.Unmap()
+	if a.Is4() {
+		return a.String()
+	}
+	p, _ := a.WithZone("").Prefix(64)
+	return p.String()
 }
 
 // Peer is a running Chirp that can be reached: the machine that would be
@@ -380,6 +399,7 @@ func (sm *SessionManager) livePeersFromLocked(origin string, now time.Time) int 
 // SetMaxPeersPerOrigin), and an empty origin is one shared origin rather than
 // an exemption.
 func (sm *SessionManager) RegisterPeer(name, origin string) (*Peer, error) {
+	origin = throttleKey(origin)
 	id := rendezvous.PeerID(uuid.New().String())
 
 	// The count and the allocation happen under one lock, so concurrent
@@ -568,7 +588,7 @@ func (sm *SessionManager) Redeem(code, controllerName string, info *ClientInfo) 
 // MintFromLink creates a fresh single-use code from a peer's link, metered
 // against origin from the same budget as Redeem.
 func (sm *SessionManager) MintFromLink(t rendezvous.Token, origin string) (rendezvous.Code, error) {
-	return sm.reg.MintFromLink(t, origin, sm.codeTTL)
+	return sm.reg.MintFromLink(t, throttleKey(origin), sm.codeTTL)
 }
 
 // ActiveSession returns the session a peer is in, if any.
