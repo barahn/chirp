@@ -135,6 +135,29 @@ Do not disable a gate to get a green build. Fix the finding, suppress it
 narrowly in code with a comment saying why it is not exploitable, or change the
 gate in its own pull request.
 
+## What is published
+
+Chirp's source, its documentation, its releases and their notes are public. So
+is the design: proposals live in [`docs/`](docs/) and are discussed in issues
+and pull requests.
+
+How a release is tested is not public. End-to-end runs, measurements of real
+networks, and the machines, addresses, providers and logs a test used stay in
+a private repository. They describe someone's network more than they describe
+Chirp. The licence does not ask for them either: the AGPL is about source code.
+
+So a public issue carries what someone else needs to reproduce the problem, and
+no more:
+
+- the Chirp version or commit;
+- the operating system and display server;
+- the steps;
+- what happened, and what was expected.
+
+Leave out IP addresses, the names of internet providers, hostnames and network
+captures. If a problem only shows on a particular network, say what kind of
+network it is ("a symmetric NAT", "a mobile network behind CGNAT"), not whose.
+
 ## Reporting security vulnerabilities
 
 Do **not** open a public issue for a security-sensitive bug. Email
