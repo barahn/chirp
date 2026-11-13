@@ -44,6 +44,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -360,6 +361,7 @@ func newRunner(s *client.SessionConn, ice webrtc.PeerConfig) *stream.Runner {
 // runnerConfig is how this machine serves a session it allowed: its signed
 // signals on the relay's time, which the session carries.
 func runnerConfig(s *client.SessionConn, ice webrtc.PeerConfig) stream.Config {
+	ice = sessionICE(ice, s.TURN)
 	return stream.Config{ID: s.ID, PeerConfig: &ice, SigningKey: s.SigningKey, DownloadDir: receivedDir(), Clock: s.Clock}
 }
 
@@ -407,6 +409,19 @@ func iceConfig(list, username, password string) webrtc.PeerConfig {
 	return webrtc.PeerConfig{ICEServers: splitList(list), TURNUsername: username, TURNPassword: password}
 }
 
+// sessionICE adds the session's own TURN credential, from the relay, to the
+// configured servers. PeerConfig holds one credential for all its servers, so
+// a TURN server configured with a credential of its own (CHIRP_TURN_USERNAME)
+// keeps it, and the session's is left out rather than handed to it.
+func sessionICE(base webrtc.PeerConfig, turn *client.TURNCredential) webrtc.PeerConfig {
+	if turn == nil || base.TURNUsername != "" {
+		return base
+	}
+	base.ICEServers = append(slices.Clip(base.ICEServers), turn.URLs...)
+	base.TURNUsername, base.TURNPassword = turn.Username, turn.Credential
+	return base
+}
+
 // splitList reads a comma-separated list, never nil.
 func splitList(list string) []string {
 	items := []string{}
@@ -423,6 +438,7 @@ func splitList(list string) []string {
 // answers only from the owner's (barahn/chirp#21); it goes by the name the
 // owner's runner addresses it by, which its signed answers carry.
 func viewerConfig(conn *client.SessionConn, ice webrtc.PeerConfig) stream.ViewerConfig {
+	ice = sessionICE(ice, conn.TURN)
 	cfg := stream.ViewerConfig{ID: "chirp-controller", AgentID: conn.ID, PeerConfig: &ice, DownloadDir: receivedDir(), Clock: conn.Clock}
 	if conn.PeerKey != nil {
 		cfg.ID, cfg.SigningKey, cfg.AgentKey = conn.ViewerID, conn.SigningKey, conn.PeerKey
