@@ -212,6 +212,8 @@ cmd/chirp/language_test.go
 cmd/chirp/language_windows.go
 cmd/chirp/main.go
 cmd/chirp/main_test.go
+cmd/chirp/nopath.go
+cmd/chirp/nopath_test.go
 cmd/chirp/notify.go
 cmd/chirp/notify_linux.go
 cmd/chirp/notify_linux_test.go
