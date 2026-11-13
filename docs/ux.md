@@ -234,7 +234,9 @@ in. A translation is reviewed as a change to the prompt, not as a string.
 **On the owner's machine,** a bar stays on top of every window for as long as
 the session lasts: *"João da TI" is controlling this computer · 04:12 ·
 End* — or *is seeing this screen*, when the mouse and keyboard were not
-allowed. *End* acts at once, without asking for confirmation. Under that
+allowed. *End* acts at once, without asking for confirmation, and pressing
+*Esc* twice in a row ends the session at once too, without needing the
+pointer. Under that
 line, each permission allowed besides *See your screen* is the same switch
 as in the prompt, and it only turns off: the owner takes one back at any
 moment, it stops at once, and it stays off (*Taken back*) until a new
@@ -276,6 +278,18 @@ With a bird:
 
 - **It lands** by the tray when the session starts, and its balloon, borderless
   above it, opens to say who is in, then folds away.
+- **It walks** along the taskbar from there, as the site's bird walks on its
+  app window (barahn/chirp#187): small hops to the left of its spot, a rest
+  between them, now and then two short hops in a row, a chirp now and then.
+  The pointer passing over it three times within four seconds shoos it: to
+  the far end of its stretch, or, half the time, up onto the top edge of a
+  window that shows -- not minimized, not maximized, not Chirp's, with room
+  above it -- and it walks along that. Shooed again, or when that window
+  moves, shuts or is covered, it flies back to its spot by the tray. While
+  its balloon is open it stands still. Where the system asks for less motion
+  (Windows' *Animation effects*, GNOME's *enable-animations*) it only
+  perches. The rules are `cmd/chirp/internal/perch/walk.go`, the site's in
+  Go; `cmd/chirp/stroll.go` drives them the same on every OS.
 - **Tapping the bird** opens the balloon -- who, the clock, *End*, the switches
   that only turn off, Send a file -- until it is tapped again.
 - **Each alert** (a paste, a copy, a file, a password held back) is said in the
@@ -382,11 +396,14 @@ needs the same, mostly on the machine being controlled:
 - **Windows administrator prompts.** On a default session, they appear on a
   secure desktop the helper cannot see. Under the hybrid elevation model
   (decision 7, barahn/chirp#117), the helper can request elevation during the
-  session. When approved, Chirp installs the auxiliary remotekit service,
-  explaining clearly to the owner: *"To allow remote control of Windows security
-  prompts and administrative tasks, an auxiliary remotekit service will be
-  permanently installed on this computer. Chirp will never use this service
-  autonomously or unattended."*
+  session. Chirp's prompt tells the owner what allowing it means, before
+  Windows asks too: *"They're asking for administrator rights. If you allow
+  it, they'll be able to answer Windows security prompts and change anything
+  on this computer until the session ends. Chirp adds a small helper service
+  for this session only and removes it when the session ends. Windows will
+  ask you to confirm next."* The UAC prompt that follows is expected, and
+  only the owner sees it. The session bar shows the elevated state and can
+  take it back; taking it back, or ending the session, removes the service.
 
 ## Help: "Getting to know Chirp"
 

@@ -566,8 +566,10 @@ at the relay. Then:
    `CHIRP_RELAY_TRUSTED_PROXIES` to the proxy's address as the relay sees it.
 3. Make the proxy pass WebSocket upgrades, set `X-Forwarded-For`, and not
    time out idle connections quickly.
-4. Keep request URIs out of the proxy's logs. They carry peer IDs, session
-   IDs and link tokens.
+4. Keep request URIs out of the proxy's logs — they carry peer IDs, session
+   IDs and link tokens — and, in public mode, client addresses too
+   ([*Logs*](#logs); nginx's default `access_log` records both `$request_uri`
+   and `$remote_addr`).
 5. Restart the relay with `systemctl restart chirp-relay`.
 
 For nginx:
@@ -593,6 +595,8 @@ location / {
 | `-socket-mode` | `CHIRP_RELAY_SOCKET_MODE` | `0660` | Permissions of the Unix socket, in octal. |
 | `-trusted-proxies` | `CHIRP_RELAY_TRUSTED_PROXIES` | none | Over TCP: comma-separated addresses or CIDRs whose `X-Forwarded-For` is believed. |
 | `-security-contact` | `CHIRP_RELAY_SECURITY_CONTACT` | none | Where to report a security problem with this relay: an email address or an `https:` URL. Served as `/.well-known/security.txt`; without it, there is none. |
+| `-mode` | `CHIRP_RELAY_MODE` | `private` | `private`, a relay for your own people, or `public`, a node of Chirp's public network. See [Public mode](#public-mode). |
+| `-node-key` | `CHIRP_RELAY_NODE_KEY` | none | In public mode, the file holding the node's key, created on first start. Required in public mode. |
 | `-healthcheck` | | | Ask the relay on `-addr` for `/healthz`, and exit 0 if it answers. Used by container health checks. |
 
 A flag on the command line overrides the environment. Code lifetimes,
@@ -647,6 +651,43 @@ There are two ways to get this right:
 Either way, the proxy must overwrite a client's `X-Forwarded-For` or append
 to it. Caddy does this by default.
 
+### Public mode
+
+`-mode public` makes the relay a node of Chirp's public network
+([`joining-the-network.md`](joining-the-network.md)). A node must never be
+able to read a session, so it offers only the blind path: an owner says how
+it can be reached over Nostr, and a controller with the code or the link gets
+that back. The trusted path, on which the relay carries the signalling and
+could swap the DTLS fingerprints, is not there: `POST /api/redeem`,
+`POST /api/links/{token}/sessions`, `GET /api/sessions/{id}`,
+`POST /api/peers/{peer}/consent` and a controller's `GET /ws` answer `404`.
+An owner still holds its socket, so the node knows it is running (whether a
+public node keeps that socket is open question 6 of
+[`status-page-proposal.md`](status-page-proposal.md)).
+
+So a Chirp reaches people through a public node only when it signals over
+Nostr. A Chirp pointed at it with `CHIRP_RELAY` alone gets `404` when it
+redeems a code.
+
+A node has an ed25519 key, in the file `-node-key` names. It is created on
+first start, readable only by the relay's user, and refused if anyone else
+can read it. **Keep it, and back it up**: the network knows your node by it,
+and a new key is a new node. The systemd unit keeps it in
+`/var/lib/chirp-relay/` (`StateDirectory`); `relay.env` has the two lines to
+uncomment. With Podman, give the container a volume for it: the lines are in
+`chirp-relay.container`.
+
+The node proves it holds the key at `/.well-known/chirp-node`. Without a
+query it answers the public key. With `?nonce=` and 16 to 64 random bytes in
+base64url, it also signs the nonce together with the host it was asked at,
+so the answer proves control of that domain and of nothing else:
+
+```bash
+curl -fsS "https://relay.example.org/.well-known/chirp-node?nonce=$(head -c 32 /dev/urandom | basenc --base64url | tr -d '=')"
+```
+
+The answer names no version.
+
 ## Pointing Chirp at the relay
 
 Both ends must use the same relay:
@@ -684,14 +725,13 @@ coturn in STUN-only mode, from [`deploy/coturn/`](../deploy/coturn/):
 `turnserver.conf` answers binding requests and ignores every TURN request,
 and `install.sh` installs it, starts it and checks that it answers.
 
-On `pve-dc` it runs in the proxy container, where the node's forwards already
-land. The name is the relay's, a DNS-only record to the node's public
-address. It needs one more forward, for both protocols, at each NAT:
+In the reference deployment it runs alongside the proxy container, where the node's forwards
+land. The name is the relay's, a DNS-only record to the node's public address.
+Any perimeter gateway forwards port 3478 (both UDP and TCP) to the service container:
 
-| Where | Forward | To |
+| Port | Protocol | Purpose |
 | --- | --- | --- |
-| ONT (public address) | `3478/udp`, `3478/tcp` | the MikroTik |
-| MikroTik | `3478/udp`, `3478/tcp` | the proxy container |
+| `3478` | UDP, TCP | STUN binding requests |
 
 From outside, `turnutils_stunclient relay.usechirp.app` prints the address it
 was seen from.
@@ -701,6 +741,8 @@ TURN stays off until the relay hands out per-session credentials
 one credential built into every binary would let anyone who unpacks one relay
 through the node. Until then, two Chirps that are both behind a symmetric NAT
 or a carrier-grade NAT do not connect.
+[`network-paths-proposal.md`](network-paths-proposal.md), part 1, proposes how
+the relay hands them out.
 
 ## Operations
 
@@ -713,18 +755,19 @@ journalctl -u caddy -f
 ```
 
 The relay logs only when it starts, stops and fails. Caddy logs every
-request to the journal: the client's address, the method, the status and the
-timing. It does not log the URI or the headers, because peer IDs, session
-IDs and link tokens travel there, and each one is a credential. If you change
-the Caddyfile's `log` blocks, keep them filtered.
-
-Those lines still say which addresses used the relay, and when. For a lookup,
-that is a record of who tried a code or a link and whether it worked. The
-relay itself keeps no such record, and a node of the public network must keep
-none anywhere, its proxy included: no client addresses in any log
+request to the journal: the method, the status and the timing. It does not
+log the URI or the headers, because peer IDs, session IDs and link tokens
+travel there, and each one is a credential. Nor does it log the client's
+address (`remote_ip`, `remote_port` or `client_ip`): for a lookup, the
+client's address and the time are a record of who tried a code or a link and
+whether it worked, and a node of the public network must keep no such record
+anywhere, its proxy included
 ([`status-page-proposal.md`](status-page-proposal.md), *What a node still
-sees*). The Caddyfile for public mode will log no client address; until it
-ships, a private relay's operator decides whether to keep these lines.
+sees*). `deploy/caddy/Caddyfile` drops those three address fields by default
+so switching a relay to `-mode public` leaves no lookup log; an operator of a
+`private` relay who wants client addresses in the access log may remove those
+three lines, while keeping `request>uri` and `request>headers` deleted. If
+you change the Caddyfile's `log` blocks, keep them filtered.
 
 The relay also hands out each running Chirp's Nostr key to whoever looks its
 code up. Chirp makes that key for one registration, makes a new one if every
@@ -732,6 +775,14 @@ Nostr relay drops it, and never reuses one. While the registration lasts,
 though, every code and link of it returns the same key. With it, the relay's
 operator can watch when that Chirp receives signalling on the public Nostr
 relays, and how much, for as long as it stays registered.
+
+Every Chirp also takes the relay's time from the `Date` header of its
+answers. Over Nostr, both ends write and check their messages, and sign
+their session's signals, on that clock rather than their machines', which
+may be hours off; messages a few minutes or seconds out of step are
+dropped. So the relay's clock must be right: keep it synchronised (NTP).
+A relay that lied about the time could make sessions fail, which it can
+already do by refusing a lookup, and nothing more.
 
 ### Restarts and upgrades
 
@@ -748,8 +799,12 @@ codes afterwards.
 - **LXC or VM:** build a new bundle, copy it in (`pct push <ctid> <file>
   <dest>` from the node, or `scp`), and run `./install.sh --binary
   ./chirp-relay` from it again. Your `relay.env` and Caddy configuration are
-  kept. Upgrade the system itself with `apt` as usual. `unattended-upgrades`
-  is a good idea in the container.
+  kept. (`install.sh` rewrites `/etc/caddy/Caddyfile` only when given
+  `--domain`, so when upgrading an earlier installation to `-mode public`,
+  pass `--domain <domain>` again — or re-run `deploy/proxy/setup-proxy.sh
+  --relay …` if sharing a proxy — so Caddy drops client addresses from its
+  logs.) Upgrade the system itself with `apt` as usual.
+  `unattended-upgrades` is a good idea in the container.
 - **Podman:** build or load the new image with the same tag, then run
   `systemctl --user restart chirp-relay`. To update Caddy, change the digest
   on the `Image=` line of `caddy.container` (the current one is listed on
@@ -765,9 +820,11 @@ Chirp holds one WebSocket. The 256 MiB container leaves room for Caddy and
 
 ### What to keep
 
-Only Caddy's data: the certificates and the ACME account, in
-`/var/lib/caddy` (LXC, VM) or the `chirp-caddy-data` volume (Podman). If they
-are lost, Caddy obtains them again, subject to Let's Encrypt's rate limits.
+Only Caddy's data — the certificates and the ACME account, in
+`/var/lib/caddy` (LXC, VM) or the `chirp-caddy-data` volume (Podman), which
+Caddy obtains again if lost, subject to Let's Encrypt's rate limits — and, in
+public mode, the node key (`/var/lib/chirp-relay/node.key` or the
+`chirp-relay-state` volume).
 
 ## Security checklist
 
@@ -775,8 +832,8 @@ are lost, Caddy obtains them again, subject to Let's Encrypt's rate limits.
       with a firewall that admits only the proxy.
 - [ ] Over TCP, `CHIRP_RELAY_TRUSTED_PROXIES` lists your proxies and nothing
       broader.
-- [ ] No log records request URIs: they carry peer IDs, session IDs and link
-      tokens.
+- [ ] No log records request URIs (they carry peer IDs, session IDs and link
+      tokens) or, in public mode, client addresses.
 - [ ] The relay's DNS record is *DNS only* if the domain is on Cloudflare.
 - [ ] The container or VM receives security updates.
 - [ ] coturn, if it runs, has the `denied-peer-ip` list from

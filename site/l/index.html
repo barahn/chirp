@@ -9,7 +9,26 @@
 <meta name="color-scheme" content="light dark">
 <title>A Chirp link — remote help</title>
 <meta name="description" content="Someone sent you a Chirp link. Paste it into Chirp to help them; they'll be asked on their own screen first.">
+<!-- Open Graph / WhatsApp / Facebook -->
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://usechirp.app/l/">
+<meta property="og:title" content="A Chirp link — remote help">
+<meta property="og:description" content="Someone sent you a Chirp link. Paste it into Chirp to help them; they'll be asked on their own screen first.">
+<meta property="og:image" content="https://usechirp.app/assets/og-chirp.png">
+<meta property="og:image:secure_url" content="https://usechirp.app/assets/og-chirp.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="pt_BR">
+<!-- Twitter / X Cards -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:url" content="https://usechirp.app/l/">
+<meta name="twitter:title" content="A Chirp link — remote help">
+<meta name="twitter:description" content="Someone sent you a Chirp link. Paste it into Chirp to help them; they'll be asked on their own screen first.">
+<meta name="twitter:image" content="https://usechirp.app/assets/og-chirp.png">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="security" href="/.well-known/security.txt">
 <link rel="stylesheet" href="/assets/site.css">
 <script src="/assets/theme.js"></script>
 <script src="/assets/site.js" defer></script>
@@ -109,16 +128,47 @@
 
 <footer>
   <div class="wrap">
-    <a class="brand" href="/"><svg viewBox="0 0 120 120" aria-hidden="true"><use href="#bird-perched"/><use href="#perch-line"/></svg><b>Chirp</b><small data-i18n="descriptor">remote help</small></a>
-    <span data-i18n="by">By Fabrintek · AGPL-3.0</span>
-    <div class="links">
-      <a href="https://github.com/barahn/chirp" data-i18n="source">Source</a>
-      <a href="https://github.com/barahn/chirp/blob/main/docs/product-model.md" data-i18n="howChirpWorks">How Chirp works</a>
-      <a href="https://status.usechirp.app/" data-i18n="networkStatus">Network status</a>
-      <a href="https://github.com/barahn/chirp/wiki" data-i18n="wiki">Wiki</a>
-      <a href="https://github.com/barahn/chirp/discussions" data-i18n="discussions">Discussions</a>
-      <a href="https://github.com/barahn/chirp/blob/main/CODE_OF_CONDUCT.md" data-i18n="conduct">Code of Conduct</a>
-      <span><span data-i18n="security">Security reports:</span> <span class="sel">security@fabrintek.com.br</span></span>
+    <div class="trust-bar" role="region" aria-label="Security and Privacy Guarantees" data-i18n-attr="aria-label:trustLabel">
+      <div class="trust-item">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10zM9 12l2 2 4-4"/></svg>
+        <div>
+          <b data-i18n="trustP2PTitle">End-to-end encrypted</b>
+          <span data-i18n="trustP2PDesc">Screen &amp; input stay between peers; relay never sees or stores content</span>
+        </div>
+      </div>
+      <div class="trust-item">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8zM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM3 3l18 18"/></svg>
+        <div>
+          <b data-i18n="trustPrivacyTitle">Zero telemetry &amp; no cookies</b>
+          <span data-i18n="trustPrivacyDesc">No accounts, no analytics, no trackers, strict CSP &amp; Trusted Types</span>
+        </div>
+      </div>
+      <div class="trust-item">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg>
+        <div>
+          <b data-i18n="trustSourceTitle">100% open source</b>
+          <span data-i18n="trustSourceDesc">AGPL-3.0-only, reproducible releases signed with Sigstore Cosign</span>
+        </div>
+      </div>
+      <div class="trust-item">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"/></svg>
+        <div>
+          <b data-i18n="trustComplianceTitle">LGPD &amp; GDPR compliant</b>
+          <span data-i18n="trustComplianceDesc">Ephemeral memory-only routing by Fabrintek; radical data minimization</span>
+        </div>
+      </div>
+    </div>
+    <div class="footer-row">
+      <a class="brand" href="/"><svg viewBox="0 0 120 120" aria-hidden="true"><use href="#bird-perched"/><use href="#perch-line"/></svg><b>Chirp</b><small data-i18n="descriptor">remote help</small></a>
+      <span data-i18n="by">By Fabrintek · AGPL-3.0</span>
+      <div class="links">
+        <a href="https://github.com/barahn/chirp" data-i18n="source">Source</a>
+        <a href="/how/" data-i18n="howChirpWorks">How Chirp works</a>
+        <a href="https://status.usechirp.app/" data-i18n="networkStatus">Network status</a>
+        <a href="/privacy/" data-i18n="navPrivacy">Privacy &amp; Terms</a>
+        <a href="/community/" data-i18n="discussions">Community</a>
+        <span><span data-i18n="security">Security reports:</span> <span class="sel">security@fabrintek.com.br</span></span>
+      </div>
     </div>
   </div>
 </footer>

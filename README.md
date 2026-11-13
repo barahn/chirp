@@ -21,10 +21,13 @@ account, and nothing happens on your screen until you press *Allow*.
 </div>
 
 > [!IMPORTANT]
-> **Chirp is not ready to use yet.** Two Chirps find each other, the consent
-> prompt works, and an allowed session shows the other screen and takes
-> input, but it has not been tried between two real machines yet and there is
-> nothing to download. [Status](#status) says exactly where it stands.
+> **Chirp is pre-1.0.** Builds for Windows and Linux are on the
+> [Releases](https://github.com/barahn/chirp/releases) page (with Sigstore
+> signatures and build attestations; see [docs/release.md](docs/release.md)),
+> and sessions have been validated end-to-end across Windows 11 and Linux.
+> Before 1.0, code-signed OS binaries, a TURN relay for strict NATs, and making
+> the blind lookup + Nostr path the default are still to come. [Status](#status)
+> says where each part stands.
 
 <p align="center">
   <picture>
@@ -99,17 +102,17 @@ left to ask you.
 
 ## Status
 
-Chirp is not yet a runnable product.
+Chirp is in pre-1.0 active development (`v0.5.0` is the latest release).
 
 **Working and tested today:**
 
 - **The `cmd/chirp` app** — the one program both sides run, in the window
   above. It shows this machine's code and link, and takes someone else's code
   or pasted link; the other machine then asks its user in Chirp's own prompt.
-  Once they allow it, the screen and input go through remotekit's `stream`
-  package, and the owner sees a bar for as long as the session lasts. So far
-  on one machine only: see below. It speaks English and Brazilian Portuguese,
-  following the system's language.
+  Once they allow it, the screen, input, clipboard and files go through
+  remotekit's `stream` package, and the owner sees the session bar or the
+  Chirp bird by the taskbar for as long as the session lasts. It speaks
+  English and Brazilian Portuguese, following the system's language.
 - **The relay** — `cmd/chirp-relay`, for a relay you host yourself. It
   matches the two ends of a session and relays their WebRTC signalling.
   Written for Chirp — no multi-tenancy, no RBAC — rather than taken from the
@@ -121,10 +124,11 @@ Chirp is not yet a runnable product.
   `relay-test.usechirp.app`, which is gone. It is the first node in the
   public network's registry (`network/servers.json`), and the status service
   measures it (to add yours, see
-  [docs/joining-the-network.md](docs/joining-the-network.md)), but it is not yet the blind public server below: until relays
-  get a public mode ([docs/status-page-proposal.md](docs/status-page-proposal.md)),
-  on the default path it sees the whole code and the signalling, as any
-  relay does. Signal over Nostr if that matters to you.
+  [docs/joining-the-network.md](docs/joining-the-network.md)), but it is not the blind public server below: it runs in
+  private mode, which Chirp's default path needs, so on that path it sees the
+  whole code and the signalling, as any relay does. Signal over Nostr if
+  that matters to you. A relay in public mode (`-mode public`,
+  [docs/relay.md](docs/relay.md)) offers only the blind lookup.
 - **The session layer** — codes, share links, the consent rules, and
   per-network limits on guessing codes. Codes, links and the throttle are
   remotekit's `rendezvous` package; the state machine, consent rules and
@@ -134,22 +138,24 @@ Chirp is not yet a runnable product.
   the server only code lookup and blind to signalling traffic. The code then
   has ten digits, `482-913-5071`: the server sees the first six, and the last
   four bind the two Chirps through a PAKE, so a relay in the middle cannot
-  pose as either end.
+  pose as either end. Both Chirps keep time by the server's clock, from its
+  answers' `Date`, so a computer whose own clock is off still gets through.
 
 **Not here yet:**
 
-- **A session tried between two machines.** The screen and input go
-  through remotekit's `stream` package, and the tests show one Chirp's screen
-  decoded in another's through the relay, on one machine. Across two
-  machines, and with a Windows owner, is still to do (barahn/chirp#12).
-- **Downloads.** There are no builds to download yet (signed release builds
-  are barahn/chirp#69); build from source below.
+- **Code-signed OS binaries.** Release builds for Windows and Linux are on the
+  [Releases](https://github.com/barahn/chirp/releases) page with Sigstore-signed
+  `SHA256SUMS` and build provenance attestations ([docs/release.md](docs/release.md)),
+  and macOS `.app` signing scripts are in tree (`scripts/sign-macos-app.sh`),
+  but Windows Authenticode and macOS release downloads are still to come
+  (barahn/chirp#69).
 - **A TURN relay.** Until Chirp ships one, self-hosting means bringing your
   own STUN/TURN (coturn works): see [docs/stun-turn.md](docs/stun-turn.md).
-- **A public server.** When Chirp offers one, it will be blind: it finds the
-  other machine from the first part of the code, and never sees the rest of
-  it or a single signalling message ([decision 5](docs/product-model.md)).
-  The parts it needs, Nostr signalling and the PAKE, are in.
+- **The blind public network by default.** When Chirp's public network is
+  finished, it will be blind by default: it finds the other machine from the
+  first part of the code, and never sees the rest of it or a single signalling
+  message ([decision 5](docs/product-model.md)). The parts it needs, Nostr
+  signalling (`-nostr`) and the PAKE, are in.
 
 Planned work is in this repository's issues and the
 [Chirp roadmap](https://github.com/orgs/barahn/projects/2) project.

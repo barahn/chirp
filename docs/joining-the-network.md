@@ -23,11 +23,12 @@ The network is being built in phases (see the proposal's *Phases*). Today:
 - **Nobody is sent to it yet.** No Chirp picks a relay from the list until
   the network publishes a signed list and Chirp learns to use it (phase 6).
   Until then, people use your relay only if you give them its address.
-- **It sees what any relay sees.** Relays do not have a public mode yet
-  (phase 4). Until they do, a relay on the default path sees the whole code
-  and the signalling, as `relay.md`'s security checklist says. It never sees
-  the screen or the input: those go end to end, encrypted, between the two
-  Chirps.
+- **Run it in public mode.** `-mode public` ([`relay.md`](relay.md),
+  *Public mode*) makes it a blind node: it only looks up how a Chirp can be
+  reached over Nostr, and relays no session, so it never sees the last four
+  digits of a code or the signalling. In private mode a relay on the default
+  path sees both. Neither mode sees the screen or the input: those go end to
+  end, encrypted, between the two Chirps.
 
 Joining now gets your relay a public track record before it is used, which
 is what the later phases will ask for.
@@ -54,6 +55,9 @@ And from [`relay.md`](relay.md):
   then one client can lock out everyone (`relay.md`, *How the pieces
   connect*). If yours is behind one, say so in the entry; it is shown on the
   page.
+- **Public mode** (`-mode public`), with its node key kept and backed up:
+  the network will know your node by it. Joining in private mode is still
+  accepted while the status service does not check the mode.
 - **`-security-contact` set**, so that whoever finds a problem with your
   relay knows where to report it.
 - **Kept up to date** with Chirp's releases. Today this is on your word; the
@@ -67,8 +71,8 @@ Some things cannot be checked from outside. By joining, you agree to:
 - log no request URIs, routing digits or link tokens (the shipped
   Caddyfile's filtered logs, kept as they are);
 - keep no record of lookups: who tried a code or a link, when, or whether it
-  worked. Once phase 4 ships its Caddyfile, this also means no client
-  addresses in any log; the Caddyfile shipped today still logs them;
+  worked, and no client addresses in any log, the proxy's included (the
+  shipped Caddyfile drops them too);
 - run no analytics on the relay's users;
 - not restrict access by country;
 - publish, under the AGPL, any change you make to the relay's code.
@@ -153,10 +157,10 @@ past figures are not republished.
 
 ## What is coming
 
-Phases 4 and 5 make joining automatic, and they replace the form:
+Phase 5 makes joining automatic, and it replaces the form:
 
-1. `chirp-relay -mode public` gives the relay its own key, published at
-   `/.well-known/chirp-node`.
+1. Your node already has its own key, published at
+   `/.well-known/chirp-node` (phase 4).
 2. You apply with the relay's URL and your GitHub handle, and the status
    service checks that the relay holds the key, which proves you control the
    domain. The key only says which relay is answering: it admits nothing.

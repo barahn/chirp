@@ -228,8 +228,7 @@ func TestTheWarningFollowsTheTheme(t *testing.T) {
 }
 
 // The prompt always says the helper acts with this account's rights, and adds
-// that they get full control only when Chirp runs as administrator
-// (GHSA-r385-j539-p738).
+// that they get full control only when Chirp runs as administrator.
 func TestThePromptSaysWhoseRightsTheHelperGets(t *testing.T) {
 	for _, elevated := range []bool{false, true} {
 		w := newWindow(t)

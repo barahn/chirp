@@ -5,7 +5,7 @@
 # Settings live in /etc/chirp-relay/relay.env (see relay.env next to this
 # file), not here, so an upgrade can replace this unit without losing them.
 #
-# The relay holds no files and needs no privilege. It runs as its own system
+# The relay holds no files but a public node's key, and needs no privilege. It runs as its own system
 # user, chirp-relay, in a sandbox that allows little beyond networking, and
 # listens on a Unix socket in /run/chirp-relay/ that only that user's group
 # can open. deploy/install.sh adds Caddy to the group, which makes Caddy the
@@ -37,6 +37,9 @@ User=chirp-relay
 Group=chirp-relay
 RuntimeDirectory=chirp-relay
 RuntimeDirectoryMode=0750
+# Where a public node keeps its key (CHIRP_RELAY_NODE_KEY); empty otherwise.
+StateDirectory=chirp-relay
+StateDirectoryMode=0700
 UMask=0077
 LimitNOFILE=65536
 

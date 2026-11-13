@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/barahn/remotekit/bark"
@@ -143,6 +144,30 @@ type Client struct {
 	// Nostr, when set, carries sessions over Nostr relays and leaves the
 	// relay only the lookup (nostr.go). Set it before Run or Help.
 	Nostr *NostrConfig
+
+	// relayAhead is how far the relay's clock is ahead of this machine's,
+	// in nanoseconds, as its last answer's Date said; see Now.
+	relayAhead atomic.Int64
+}
+
+// Now is the relay's time: the two ends of a session over Nostr write and
+// check their messages on it, so a machine whose clock is off still agrees
+// with the other (barahn/remotekit#179). Until the relay has answered, it is
+// this machine's own.
+func (c *Client) Now() time.Time {
+	return time.Now().Add(time.Duration(c.relayAhead.Load()))
+}
+
+// keepRelayTime takes the relay's time from an answer's Date, which has whole
+// seconds: the relay read its clock somewhere in the second it names, and
+// somewhere between sending and receiving here.
+func (c *Client) keepRelayTime(resp *http.Response, sent, received time.Time) {
+	date, err := http.ParseTime(resp.Header.Get("Date"))
+	if err != nil {
+		return
+	}
+	mid := sent.Add(received.Sub(sent) / 2)
+	c.relayAhead.Store(int64(date.Add(500 * time.Millisecond).Sub(mid)))
 }
 
 // New returns a client for the relay at addr, an http or https address.
@@ -249,6 +274,7 @@ func (c *Client) do(ctx context.Context, method, endpoint string, in, out any) e
 	if in != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
+	sent := time.Now()
 	resp, err := c.http.Do(req)
 	if err != nil {
 		if ctx.Err() != nil {
@@ -257,6 +283,7 @@ func (c *Client) do(ctx context.Context, method, endpoint string, in, out any) e
 		return fmt.Errorf("%w: %v", ErrUnavailable, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
+	c.keepRelayTime(resp, sent, time.Now())
 	if resp.StatusCode >= http.StatusMultipleChoices {
 		return relayError(resp)
 	}

@@ -1,18 +1,18 @@
 module github.com/barahn/chirp
 
-go 1.26.9
+go 1.26.11
 
 require github.com/google/uuid v1.6.0
 
 require github.com/gorilla/websocket v1.5.3
 
 require (
-	github.com/barahn/remotekit v0.8.0
-	github.com/barahn/remotekit/signal/nostr v0.2.0
+	github.com/barahn/remotekit v0.8.2-0.20261111211253-bd772485fa61
+	github.com/barahn/remotekit/signal/nostr v0.2.1-0.20261111211253-bd772485fa61
 	github.com/jezek/xgb v1.3.1
 	github.com/tc-hib/winres v0.3.1
-	golang.org/x/sys v0.49.0
-	modernc.org/sqlite v1.61.0
+	golang.org/x/sys v0.50.0
+	modernc.org/sqlite v1.62.0
 )
 
 require (
@@ -54,7 +54,7 @@ require (
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/crypto v0.58.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
-	modernc.org/libc v1.79.0 // indirect
+	modernc.org/libc v1.80.1 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.12.1 // indirect
 )
@@ -88,7 +88,7 @@ require (
 	github.com/stretchr/testify v1.12.1 // indirect
 	github.com/yuin/goldmark v1.8.2 // indirect
 	golang.org/x/image v0.47.0 // indirect
-	golang.org/x/net v0.60.0 // indirect
+	golang.org/x/net v0.62.0 // indirect
 	golang.org/x/text v0.43.0 // indirect
 )
 

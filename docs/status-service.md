@@ -10,8 +10,8 @@ is how to run it.
 
 **On a machine apart from every server it watches.** A monitor on the same
 host, network or power as a relay goes down with it, and then the page says
-nothing at the moment it matters. For Fabrintek's relay on pve-dc, that rules
-out pve-dc and anything behind its router: a small VPS elsewhere is right.
+nothing at the moment it matters. For the primary relay host, that rules
+out running the monitor on that host or anything behind its router: an independent VPS elsewhere is right.
 
 It needs little: one core, 128 MiB, and a few hundred MiB of disk for 90
 days of probes per server. Debian or Ubuntu with systemd.

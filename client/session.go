@@ -7,6 +7,7 @@ import (
 	"crypto/ed25519"
 	"errors"
 	"sync"
+	"time"
 )
 
 // ErrSessionOver is what a SessionConn returns once its session has ended.
@@ -42,6 +43,10 @@ type SessionConn struct {
 	SigningKey ed25519.PrivateKey
 	PeerKey    ed25519.PublicKey
 	ViewerID   string
+	// Clock is the relay's time (Client.Now), which signed signals are
+	// issued and checked on, so the two ends agree whatever their machines'
+	// clocks say.
+	Clock func() time.Time
 
 	send func([]byte) error
 	in   chan []byte
@@ -52,10 +57,11 @@ type SessionConn struct {
 	queued int // bytes waiting in in
 }
 
-func newSessionConn(id string, permissions []string, send func([]byte) error) *SessionConn {
+func newSessionConn(id string, permissions []string, send func([]byte) error, clock func() time.Time) *SessionConn {
 	return &SessionConn{
 		ID:          id,
 		Permissions: append([]string(nil), permissions...),
+		Clock:       clock,
 		send:        send,
 		in:          make(chan []byte, signalQueue),
 		done:        make(chan struct{}),

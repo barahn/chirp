@@ -200,6 +200,21 @@ func TestTheViewerPinsTheProvedKeys(t *testing.T) {
 	}
 }
 
+// A session's signed signals are issued and checked on the relay's time,
+// which its SessionConn carries, on both sides (barahn/remotekit#179).
+func TestSessionsRunOnTheRelaysTime(t *testing.T) {
+	ahead := func() time.Time { return time.Now().Add(4 * time.Hour) }
+	conn := &client.SessionConn{ID: "s", Clock: ahead}
+	for side, clock := range map[string]func() time.Time{
+		"runner": runnerConfig(conn, webrtc.PeerConfig{}).Clock,
+		"viewer": viewerConfig(conn, webrtc.PeerConfig{}).Clock,
+	} {
+		if clock == nil || time.Until(clock()) < 4*time.Hour-time.Minute {
+			t.Errorf("the %s is not on the session's clock", side)
+		}
+	}
+}
+
 // The runner gets what the owner allowed and nothing else; the clipboard,
 // once allowed, syncs on its own (barahn/chirp#134).
 func TestTheRunnerGetsWhatTheOwnerAllowed(t *testing.T) {

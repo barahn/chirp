@@ -110,9 +110,7 @@
     by: "Por Fabrintek · AGPL-3.0",
     source: "Código-fonte",
     howChirpWorks: "Como o Chirp funciona",
-    wiki: "Wiki",
-    discussions: "Discussões",
-    conduct: "Código de Conduta",
+    discussions: "Comunidade",
     security: "Vulnerabilidades:",
     networkStatus: "Status da rede",
     stKicker: "Rede pública",
@@ -152,7 +150,66 @@
     dLatency: "Latência",
     dLatencyText: "Quanto levou a sonda mais recente, quando ela acertou, contando uma negociação TLS nova. Depende de onde o monitor está.",
     defsMore: "As regras, e como um servidor entra na rede, estão <a href=\"https://github.com/barahn/chirp/blob/main/docs/status-page-proposal.md\">na proposta</a>. Os números brutos estão <a href=\"https://status.usechirp.app/v1/servers\">na API</a>.",
-    noToken: "<b>Este link está incompleto.</b> Peça para quem enviou copiar de novo do Chirp, inteiro."
+    noToken: "<b>Este link está incompleto.</b> Peça para quem enviou copiar de novo do Chirp, inteiro.",
+    navPrivacy: "Privacidade e Termos",
+    trustLabel: "Garantias de segurança e privacidade",
+    trustP2PTitle: "Criptografia ponta a ponta",
+    trustP2PDesc: "Tela e entrada ficam entre os computadores; o servidor nunca vê nem grava conteúdo.",
+    trustPrivacyTitle: "Zero telemetria e sem cookies",
+    trustPrivacyDesc: "Sem contas, sem analytics, sem rastreadores, com CSP estrita e Trusted Types.",
+    trustSourceTitle: "100% código aberto",
+    trustSourceDesc: "Licença AGPL-3.0, com releases assinadas via Sigstore Cosign.",
+    trustComplianceTitle: "Conformidade LGPD e GDPR",
+    trustComplianceDesc: "Roteamento efêmero em memória pela Fabrintek; minimização radical de dados.",
+    privKicker: "Transparência e conformidade",
+    privTitle: "Privacidade e Termos de Uso",
+    privLede: "O Chirp foi construído sob o princípio da privacidade por design e da minimização radical de dados: sem contas, sem rastreamento, processamento de rede efêmero em memória e sessões criptografadas ponta a ponta.",
+    privCoreTitle: "1. Princípios fundamentais",
+    privCoreText: "<li><b>Você não cria conta:</b> não pedimos email, telefone ou dados de pagamento.</li><li><b>Zero telemetria:</b> o aplicativo não contém rastreadores analíticos, medição de uso ou envio de relatórios em segundo plano.</li><li><b>Sem cookies:</b> o site não utiliza cookies de rastreamento nem scripts de terceiros.</li>",
+    privControllerTitle: "2. Identificação do controlador",
+    privControllerText: "O software e a infraestrutura pública do Chirp são mantidos pela <b>Fabrintek Engenharia Digital Ltda</b>. Para qualquer questão ou reporte relacionado a privacidade e segurança, o contato oficial é security@fabrintek.com.br.",
+    privDataTitle: "3. Como os dados de rede são tratados",
+    privDataText: "<p>Para que dois computadores se conectem pela Internet sem configuração complexa:</p><ul><li><b>Endereços de rede (IP):</b> os servidores processam temporariamente os endereços IP exclusivamente para viabilizar o encontro entre os computadores e proteger o serviço contra abusos e ataques de negação de serviço. Esse tratamento é transitório e volátil, nunca utilizado para rastrear, perfilar ou identificar pessoas.</li><li><b>Conteúdo da sessão (tela, mouse/teclado e arquivos):</b> o tráfego direto é criptografado ponta a ponta. Os servidores da Fabrintek <b>não têm acesso</b>, não interceptam e não gravam imagens da tela, teclas, área de transferência ou arquivos transferidos.</li><li><b>Zero venda de dados:</b> nenhum dado é vendido, alugado ou compartilhado com redes de publicidade ou corretores comerciais.</li></ul>",
+    privBasisTitle: "4. Bases legais (LGPD e GDPR)",
+    privBasisText: "O processamento técnico mínimo fundamenta-se estritamente na <b>execução do serviço</b> solicitado ativamente pelas partes (LGPD Art. 7º, V; GDPR Art. 6º(1)(b)) e no <b>legítimo interesse</b> na segurança e estabilidade operacional da rede contra fraudes e ataques (LGPD Art. 7º, IX; GDPR Art. 6º(1)(f)).",
+    privTermsTitle: "5. Termos de uso e prevenção a golpes",
+    privTermsText: "<li><b>Finalidade exclusiva:</b> o Chirp destina-se apenas ao suporte remoto mútuo e consentido entre pessoas que se conhecem e confiam expressamente uma na outra.</li><li><b>Alerta contra fraudes:</b> a Fabrintek e a equipe do Chirp <b>nunca</b> ligam, mandam mensagens ou enviam emails solicitando códigos de conexão.</li><li><b>Uso proibido:</b> é expressamente proibido usar o Chirp para fraudes, golpes de suporte técnico falso ou qualquer acesso não autorizado. O software é licenciado sob a AGPL-3.0-only.</li>",
+    privRightsTitle: "6. Direitos do titular e contato",
+    privRightsText: "Como não mantemos contas nem registros persistentes de usuários, os dados efêmeros se extinguem com a própria sessão. Para esclarecimentos, requisições de privacidade ou relatórios de vulnerabilidade, contate security@fabrintek.com.br.",
+    howKicker: "Arquitetura e Modelo de Produto",
+    howTitle: "Como o Chirp Funciona",
+    howLede: "Um único programa, idêntico nas duas pontas. Ajuda remota entre duas pessoas que confiam uma na outra, sem contas, sem instalação e com consentimento explícito antes de qualquer ação.",
+    how1Title: "1. Um executável único, idêntico nos dois lados",
+    how1Text: "Qualquer pessoa baixa o Chirp e o executa. Não há nada para instalar, nenhum serviço rodando em segundo plano e nenhuma conta para criar. Cada Chirp aberto é exatamente igual: não existe \"versão do técnico\" ou \"versão do cliente\". Quem ajuda quem é decidido unicamente por quem lê o código para quem, não por qual programa foi instalado.",
+    how2Title: "2. Direção de controle e consentimento explícito",
+    how2Text: "Quem precisa de ajuda compartilha o seu código; quem vai ajudar digita esse código. O controle flui estritamente em uma direção: o ajudante controla o computador de quem pediu ajuda, mas <b>apenas depois que o proprietário autorizar expressamente</b> em um diálogo nativo na sua própria tela. O controle nunca se inverte como efeito colateral. O consentimento ocorre diretamente na tela do usuário — nunca silenciosamente e nunca em um navegador.",
+    how3Title: "3. Duas formas de conectar: código ou link",
+    how3Text: "Você pode se conectar lendo o código curto na tela ou enviando um link. Cada uso de um link gera um <b>código novo e de uso único</b> que se invalida imediatamente após a conexão. Um código que vaze após o uso não abre nada. Se quem abrir o link ainda não tiver o Chirp, basta baixar o aplicativo e colar o link nele para começar a ajudar.",
+    how4Title: "4. Permissões granulares e minimização radical de dados",
+    how4Text: "<p>A caixa de diálogo de consentimento oferece interruptores independentes para visualização da tela, controle remoto de mouse e teclado, sincronização de área de transferência e transferência de arquivos:</p><ul><li><b>Interruptores independentes:</b> apenas <i>Ver sua tela</i> inicia ativado; mouse/teclado e arquivos só são concedidos se ativados ativamente.</li><li><b>Proteção de privacidade:</b> senhas copiadas de gerenciadores de senhas nunca saem da máquina.</li><li><b>Roteamento efêmero em memória:</b> a rede pública processa o encontro entre dispositivos em memória volátil, sem reter históricos nem traçar perfis de usuários.</li></ul>",
+    how5Title: "5. Compromissos fundamentais do projeto",
+    how5Text: "<li><b>Sem recursos bloqueados:</b> tela, controle, área de transferência e arquivos fazem parte do núcleo gratuito e livre, permanentemente.</li><li><b>Zero telemetria:</b> sem SDKs de rastreamento, sem cookies, sem analytics.</li><li><b>100% código aberto:</b> sob a licença AGPL-3.0-only, com compilações reproduzíveis assinadas criptograficamente via Sigstore Cosign.</li>",
+    commKicker: "Comunidade &amp; Crescimento",
+    commTitle: "Comunidade Chirp",
+    commLede: "Um espaço colaborativo e de alto nível dedicado ao uso no mundo real, evolução arquitetural e crescimento saudável do projeto. Priorizamos privacidade, segurança e colaboração respeitosa.",
+    commPrinTitle: "1. Princípios de Participação",
+    commPrinText: "<p>O Chirp é fundamentado na confiança humana e no respeito mútuo. Para garantir discussões construtivas e voltadas ao crescimento do projeto:</p><ul><li><b>Alto Sinal e Feedback Construtivo:</b> acolhemos ideias ponderadas, reprodução precisa de bugs, melhorias de acessibilidade e otimizações de desempenho.</li><li><b>Respeito Mútuo e Colaboração:</b> esperamos que todas as pessoas mantenham uma convivência respeitosa e civil. Comportamentos desrespeitosos ou provocações são moderados imediatamente.</li><li><b>Divulgação Responsável de Segurança:</b> vulnerabilidades potenciais <b>nunca</b> devem ser publicadas em discussões abertas. Relate-as diretamente para security@fabrintek.com.br sob nosso processo de divulgação coordenada.</li></ul>",
+    commChanTitle: "2. Canais de Discussão e Contribuição",
+    commChanDesc: "Participe das conversas nas categorias estruturadas do GitHub Discussions:",
+    commChanIdeasTitle: "Ideias e Sugestões de Recursos",
+    commChanIdeasDesc: "Proponha melhorias, ideias de protocolo, aprimoramentos de interface e suporte a novas plataformas.",
+    commChanIdeasBtn: "Propor uma Ideia &rarr;",
+    commChanShowTitle: "Casos de Uso e Demonstrações",
+    commChanShowDesc: "Compartilhe como você usa o Chirp no suporte a familiares, TI remota, acessibilidade ou relays próprios.",
+    commChanShowBtn: "Compartilhar História &rarr;",
+    commChanQATitle: "Perguntas e Respostas Técnicas",
+    commChanQADesc: "Tire dúvidas com mantenedores e outros usuários sobre travessia de NAT, firewalls e compilação.",
+    commChanQABtn: "Fazer uma Pergunta &rarr;",
+    commChanEngTitle: "Engenharia e Arquitetura",
+    commChanEngDesc: "Discussões técnicas aprofundadas sobre relays em memória, sinalização WebRTC, UI em Fyne e segurança.",
+    commChanEngBtn: "Entrar na Discussão &rarr;",
+    commModTitle: "3. Curadoria e Moderação Ativa",
+    commModText: "<p>Para preservar a qualidade do diálogo e manter o foco no roteiro de desenvolvimento:</p><ul><li><b>Prevenção a Golpes e Spam:</b> ferramentas de assistência remota são alvos frequentes de agentes mal-intencionados. Comentários que promovam golpes, ferramentas não verificadas ou spam são removidos com rapidez e as contas restritas.</li><li><b>Priorização por Reações:</b> os mantenedores revisam regularmente e elevam ao roadmap ativo os tópicos que recebem upvotes positivos da comunidade (👍, 🚀, ❤️).</li><li><b>Zero Rastreamento Externo:</b> esta página opera sob HTML estático estrito com 0 scripts ou cookies de rastreamento de terceiros, preservando a sua privacidade.</li></ul>"
   };
 
   // Words the script itself writes.
@@ -179,16 +236,28 @@
   // Each page's title and description, by the id of its <main>.
   var META = {
     home: {
-      en: [document.title, ""],
+      en: ["Chirp — remote help", "Remote help between two people who trust each other. Nothing to install, no account, and nothing happens on your screen until you press Allow."],
       "pt-BR": ["Chirp — ajuda remota", "Ajuda remota entre duas pessoas que confiam uma na outra. Nada para instalar, nenhuma conta, e nada acontece na sua tela até você apertar Permitir."]
     },
     link: {
-      en: [document.title, ""],
+      en: ["A Chirp link — remote help", "Someone sent you a Chirp link. Paste it into Chirp to help them; they'll be asked on their own screen first."],
       "pt-BR": ["Um link do Chirp — ajuda remota", "Alguém te mandou um link do Chirp. Cole no Chirp para ajudar essa pessoa; ela vai ser perguntada na própria tela antes."]
     },
     status: {
-      en: [document.title, ""],
+      en: ["Network status — Chirp", "Every server in Chirp's public network, probed from outside every 30 seconds: whether it is up, since when it has been off-line, and how much of each day it answered."],
       "pt-BR": ["Status da rede — Chirp", "Cada servidor da rede pública do Chirp, sondado de fora a cada 30 segundos: se está no ar, desde quando está fora, e quanto de cada dia respondeu."]
+    },
+    privacy: {
+      en: ["Privacy & Terms — Chirp", "Chirp is built on radical data minimization: no accounts, no trackers, ephemeral memory-only connection handling, and end-to-end encrypted screen sharing."],
+      "pt-BR": ["Privacidade e Termos — Chirp", "O Chirp foi construído sob minimização radical de dados: sem contas, sem rastreamento, processamento de rede efêmero em memória e sessões criptografadas ponta a ponta."]
+    },
+    howpage: {
+      en: ["How Chirp Works — Chirp", "One binary on both sides, instant connection codes, explicit on-screen consent, and zero telemetry: the definitive product model of Chirp."],
+      "pt-BR": ["Como o Chirp Funciona — Chirp", "Um executável único nas duas pontas, códigos de conexão efêmeros, consentimento explícito na tela e zero telemetria: o modelo de produto definitivo do Chirp."]
+    },
+    community: {
+      en: ["Community — Chirp", "A constructive space dedicated to the growth, real-world usage, and architectural evolution of Chirp."],
+      "pt-BR": ["Comunidade — Chirp", "Um espaço construtivo dedicado ao crescimento, uso no mundo real e evolução arquitetural do Chirp."]
     }
   };
 
@@ -196,13 +265,14 @@
   var lang = "en";
   var page = document.querySelector("main").id;
   var metaDesc = document.querySelector('meta[name="description"]');
-  META[page].en[1] = metaDesc ? metaDesc.getAttribute("content") : "";
 
-  // A choice made on the page wins; otherwise the first language the
-  // browser prefers that the page has. Any Portuguese gets pt-BR.
+  // A choice made on the page wins; otherwise a page whose markup already
+  // names Portuguese (/pt/) starts in Portuguese; otherwise the first language
+  // the browser prefers that the page has. Any Portuguese gets pt-BR.
   function detectLang() {
     var saved = store.get("chirp-site-lang");
     if (LANGS.indexOf(saved) >= 0) return saved;
+    if (document.documentElement.lang === "pt-BR") return "pt-BR";
     var prefs = (navigator.languages && navigator.languages.length) ? navigator.languages : [navigator.language || ""];
     for (var i = 0; i < prefs.length; i++) {
       var l = String(prefs[i]).toLowerCase();
@@ -218,8 +288,11 @@
   // would parse a string as HTML. A translation with markup outside the
   // list, or unbalanced, keeps its English, and says so in the console. Write
   // characters, not entities, except &lt; &gt; and &amp; for < > and &.
-  var TAGS = { a: 1, b: 1, em: 1, h3: 1, li: 1, p: 1, span: 1, ul: 1 };
-  var TAG_ATTRS = { a: { href: /^https:\/\// }, span: { "class": /^chirp$/ } };
+  var TAGS = { a: 1, b: 1, code: 1, em: 1, h2: 1, h3: 1, i: 1, li: 1, p: 1, span: 1, ul: 1 };
+  var TAG_ATTRS = {
+    a: { href: /^(https:\/\/|\/)/, rel: /^noopener noreferrer$/, target: /^_blank$/ },
+    span: { "class": /^chirp$/ }
+  };
   var ENTITIES = { lt: "<", gt: ">", amp: "&" };
   function text(t) {
     return document.createTextNode(t.replace(/&(lt|gt|amp);/g, function (e, n) { return ENTITIES[n]; }));

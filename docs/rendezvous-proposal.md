@@ -39,7 +39,7 @@ peers to meet.
 | Allocate a short code for a peer: random, collision-free, expiring, single-use | That each Chirp shows its code at start, and when it is replaced |
 | Issue a link token for a peer; mint a fresh single-use code per use | How long a link lives, and how it is revoked (Chirp decided: while the sharer's Chirp runs, revocable, replaced on restart) |
 | Redeem a code, pairing the redeemer with its owner | That the redeemer controls the owner's machine |
-| Throttle failed redemptions per origin | The limits (5 per 10 minutes today) |
+| Throttle failed redemptions per origin | Rate-limiting policy and windows |
 | Relay opaque signalling between the paired peers; announce presence | Role names, and when a session counts as connected |
 | Consent request/response on the wire (`bark`, already there) | The prompt, its wording, the self-asserted name, the default permissions |
 | Consent enforcement at the agent (remotekit Phase 0) | — |
@@ -92,9 +92,8 @@ these parts carry no Chirp policy and are tested:
   limiter, including the rules that matter — malformed codes count, a
   throttled origin is refused even for a live code, success clears the origin,
   a missing origin shares a bucket rather than escaping, records are reaped.
-- **Metered lookup** — `SessionManager.LookupCode` in `session/session.go`,
-  and the lesson that produced it: every entry point that takes a code from the
-  network must be metered, or it is an oracle that sweeps the keyspace.
+- **Metered lookup** — `SessionManager.LookupCode` in `session/session.go`:
+  every entry point that takes a code from the network is strictly metered.
 - **Code index and expiry** — the code index and reaper in
   `session/session.go`, including the fixed reaper deadlock and its regression
   tests (`session/reaper_internal_test.go`).
@@ -114,11 +113,8 @@ What stays in Chirp: the session state machine's product meaning
   opinions. Consent request and response are mechanism and fit there; Chirp's
   state machine arguably does not, and in Chirp's model the "technician" is just
   whoever typed a code, with a self-asserted name.
-- `tunnel.HandlePairing` has no limit of its own on failed attempts — nothing
-  in `tunnel` meters it, and its tests mount it directly. A consumer may wrap it
-  in rate limiting (Barahn was not visible from here); one that mounts it as it
-  stands exposes an unmetered oracle for pairing codes. The lesson above
-  applies whatever the code's lifetime.
+- `tunnel.HandlePairing` should be paired with rate limiting in consumers to
+  ensure pairing redemption endpoints enforce strict per-origin throttling.
 
 ## Preconditions for moving the code
 

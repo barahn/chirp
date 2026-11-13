@@ -14,13 +14,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # Copyright (C) 2026 Fabrintek Engenharia Digital Ltda
 
-FROM docker.io/library/golang:1.27-trixie@sha256:47667934874913a449b96faa7ef4777fa285d9ec29126ee80ed61c45b7cccf0e AS build
+FROM docker.io/library/golang:1.27-trixie@sha256:c47c3fda018d13d43a6bf5ebac3e5bba8a23a35782aa4faf531afaf47c64c39f AS build
 
 WORKDIR /src
 # Only what the relay is built from. cmd/chirp and its Fyne dependencies are
 # never compiled, so the build needs no cgo and fetches none of their modules.
 COPY go.mod go.sum ./
 COPY cmd/chirp-relay/ cmd/chirp-relay/
+COPY node/ node/
 COPY session/ session/
 COPY signalling/ signalling/
 
@@ -31,7 +32,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
     go build -trimpath -ldflags='-s -w' -o /out/chirp-relay ./cmd/chirp-relay
 
-FROM gcr.io/distroless/static-debian13:nonroot@sha256:e2e927ec666bae08560abb3c55d0659eceabb657f56b6782ab500a9fc7f555e3
+FROM gcr.io/distroless/static-debian13:nonroot@sha256:25ac8f0c3b2334a9eb05452266bd4697864a8c8ef0ef71e5e6480d7f92868329
 
 LABEL org.opencontainers.image.title="chirp-relay" \
       org.opencontainers.image.description="Chirp's self-hosted relay: codes, links, consent and WebRTC signalling" \

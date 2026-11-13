@@ -96,9 +96,8 @@ func (sm *SessionManager) SetContact(id rendezvous.PeerID, c Contact) error {
 
 // Lookup redeems a code for its owner's Contact. The code is consumed exactly
 // as Redeem consumes it -- a start code is replaced, a minted one is gone --
-// and failures count against origin from the same budget, so the lookup is no
-// cheaper an oracle than Redeem. It opens no session and does not mark the
-// owner busy: whatever follows happens between the two Chirps.
+// and failures count against origin from the same budget. It opens no session
+// and does not mark the owner busy: whatever follows happens between the two Chirps.
 //
 // An owner that registered no contact still loses the code it was reached
 // by, since which owner a code belongs to is known only once it is redeemed.

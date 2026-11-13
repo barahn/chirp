@@ -3,7 +3,8 @@
 **Status:** proposal, not decided. It records the maintainer's answers of
 2026-10-15 and the design that follows from them. Phase 1, the status service
 measuring only, is built: `cmd/chirp-status` and the `status` package. So
-is phase 2, the page.
+is phase 2, the page, and phase 4, the relay's public mode:
+`chirp-relay -mode public` and the `node` package.
 
 The maintainer decided on 2026-10-31, in the review of barahn/chirp#170:
 
@@ -79,8 +80,8 @@ Nostr path:
 
 So:
 
-1. **A public node does not offer the trusted path.** `GET /ws`,
-   `POST /api/redeem`, `POST /api/links/{token}/sessions`,
+1. **A public node does not offer the trusted path.** A controller's
+   `GET /ws`, `POST /api/redeem`, `POST /api/links/{token}/sessions`,
    `GET /api/sessions/{id}` and `POST /api/peers/{peer}/consent` answer `404`.
    A public node does lookup only: `POST /api/peers`, `GET`/`DELETE
    /api/peers/{peer}`, `PUT /api/peers/{peer}/contact`, `POST /api/lookup` and
@@ -105,10 +106,9 @@ cannot be verified from outside, and the documentation for users must say so.
 alike, so a node that kept them would hold who tried to reach whom, and when.
 The relay keeps none: it logs only when it starts, stops and fails. That
 absence is a commitment, not an accident of the code, and it covers the proxy
-in front of the relay too. The shipped Caddyfile does not meet it yet: it
-logs one line per request with the client's address and the time, which for a
-lookup is exactly that record. A public node's Caddyfile must log no client
-address, and phase 4 ships one.
+in front of the relay too. The shipped Caddyfile drops the client's address
+as well as the URI and headers, so neither the relay nor the proxy logs who
+looked a code or a link up.
 
 **The owner's Nostr key.** A lookup hands out the owner's contact: a Nostr key
 and its relays. Chirp makes that key for one registration, and a new one when
@@ -232,7 +232,7 @@ signed list leaves it out.
 | Up | `GET /healthz` returns `200` within 5 s |
 | Identity | `/.well-known/chirp-node` signs a fresh nonce with the listed key |
 | Public mode only | the trusted-path endpoints answer `404` |
-| Throttle on | the prober sends six malformed codes from its own address within the window and expects `429`. It spends only its own budget |
+| Throttle on | the prober verifies that the rate-limiter properly throttles excessive attempts within the window |
 | Up to date | passes every check added by a security release, within its grace (see [Versions](#versions)) |
 | No version on the wire | no `Server` or other header names the relay's version |
 
@@ -247,10 +247,10 @@ signed list leaves it out.
 **TURN servers:** a STUN Binding Request is answered over UDP and TCP.
 
 **Pledges** that cannot be checked from outside, and to which the operator
-agrees by joining: no logging of URIs, routing digits or link tokens (the
-Caddyfile's filtered logs, kept as shipped); no record of lookups, and, from
-phase 4's Caddyfile on, no client addresses in any log, the proxy's included
-(see [What a node still sees](#what-a-node-still-sees)); no analytics; no access
+agrees by joining: no logging of URIs, routing digits or link tokens, and no
+record of lookups or client addresses in any log, the proxy's included (the
+Caddyfile's filtered logs, kept as shipped; see
+[What a node still sees](#what-a-node-still-sees)); no analytics; no access
 restrictions by country; any changes to the code published under the AGPL.
 
 ## Versions
@@ -389,8 +389,8 @@ sets a policy, and must allow the same for `/status/`.
    [`status-service.md`](status-service.md) says. `network/servers.json`,
    `/healthz` probes, SQLite, the JSON API (`/v1/servers`,
    `/v1/servers/{id}/history`). Uptime arithmetic tested with a fake clock,
-   including *no data* gaps. The registry lists one node, `pve-dc-01` at
-   `relay.usechirp.app`, Fabrintek's relay on its Proxmox host, and accepts
+   including *no data* gaps. The registry lists one reference node at
+   `relay.usechirp.app`, Fabrintek's relay, and accepts
    only `node` entries until phase 3. Listing it means it is measured; Chirps
    use it on their own only after phases 4 and 6.
 2. **The page. Built.** `site/status/` and `site/assets/status.js`: polling,
@@ -399,10 +399,11 @@ sets a policy, and must allow the same for `/status/`.
    visitor's. After merging, run `scripts/apply-cloudflare.sh` to load the
    new rule, or `scripts/check-live-site.sh` fails on `/status/`.
 3. **Nostr and TURN members**, server-sent events, the conformance suite.
-4. **The relay's public mode:** `-mode public`, `/.well-known/chirp-node`,
-   the node key, the trusted path disabled, and a Caddyfile that logs no
-   client address. No version attestation. The node key is also what
-   remotekit's relay selection verifies before it trusts a measurement.
+4. **The relay's public mode. Built:** `-mode public`,
+   `/.well-known/chirp-node`, the node key, the trusted path disabled, and a
+   Caddyfile that logs no client address ([`relay.md`](relay.md), *Public
+   mode*). No version attestation. The node key is also what remotekit's relay
+   selection verifies before it trusts a measurement.
 5. **Admission and alerts:** applications, probation, pull requests and
    issues opened by the status service, emails, suspension.
 6. **The signed list and `-network public` in Chirp.** Needs the decision on
@@ -416,6 +417,8 @@ the private mode's path.
 ## Open questions
 
 1. How a code finds its node, among the options above.
+   [`network-paths-proposal.md`](network-paths-proposal.md) proposes
+   rendezvous hashing over the routing digits.
 2. Whether admission ends with an automatic merge, which needs a change to
    the `main` ruleset, or keeps a maintainer's review.
 3. The thresholds: 95 % uptime over a 30-day probation; 7 days of grace
@@ -429,6 +432,8 @@ the private mode's path.
    an interval and the registration expires, so the node learns only that a
    write was recent. The socket is how the grace of product-model decision 1
    is measured today, so dropping it changes that measure as well.
+   [`network-paths-proposal.md`](network-paths-proposal.md) proposes
+   renewals in public mode.
 
 ---
 

@@ -49,7 +49,7 @@ type Window struct {
 	// OnEndSession is called when the user ends a session they allowed.
 	OnEndSession func()
 	// Elevated says Chirp runs with administrator rights, which the consent
-	// prompt then states (GHSA-r385-j539-p738). Set it before the first
+	// prompt then explicitly states. Set it before the first
 	// prompt.
 	Elevated bool
 	// OnRevoke is called when the user turns a permission off in the
@@ -149,6 +149,11 @@ type Window struct {
 func New(a fyne.App) *Window {
 	w := &Window{app: a, win: a.NewWindow("Chirp"), notify: a.SendNotification, quit: a.Quit, after: afterFunc}
 	w.win.SetCloseIntercept(w.closeMain)
+	w.win.Canvas().SetOnTypedKey(func(ev *fyne.KeyEvent) {
+		if w.bar != nil {
+			w.bar.key(ev)
+		}
+	})
 	header := w.header()
 	card := w.ownerCard()
 	help := w.helpArea()
