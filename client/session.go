@@ -47,6 +47,10 @@ type SessionConn struct {
 	// issued and checked on, so the two ends agree whatever their machines'
 	// clocks say.
 	Clock func() time.Time
+	// TURN is this end's credential for the relay's TURN server, for when
+	// the two ends cannot reach each other directly. It is nil when the relay
+	// has none, and the session then goes on STUN alone.
+	TURN *TURNCredential
 
 	send func([]byte) error
 	in   chan []byte

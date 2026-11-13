@@ -134,6 +134,10 @@ type Client struct {
 	// controller is not told on its socket when the owner decides.
 	pollEvery time.Duration
 
+	// turnWait is how long a controller let in through the relay waits for
+	// its owner's TypeTURN; zero means defaultTURNWait.
+	turnWait time.Duration
+
 	// View, when set, shows each session Help is let into until its
 	// SessionConn ends; cmd/chirp runs remotekit's stream.Viewer in it. It
 	// is called on a goroutine of its own, with Help's context, and the

@@ -108,6 +108,9 @@ type knock struct {
 	Msg  string `json:"msg,omitempty"`
 	Via  string `json:"via,omitempty"`
 	Code string `json:"code,omitempty"`
+	// TURN is the controller's TURN credential, on a consent answer that
+	// lets it in (turn.go).
+	TURN *TURNCredential `json:"turn,omitempty"`
 }
 
 func (k knock) encode() []byte {
@@ -604,6 +607,7 @@ func (o *Owner) answerNostr(sessionID string, granted bool) (Session, bool, erro
 	}
 	if granted {
 		reply.Reason = ""
+		_, reply.TURN = o.turnForLocked(sessionID)
 		ask.allowed = true
 	} else {
 		o.nostrAsk = nil
@@ -847,6 +851,7 @@ func (c *Client) helpOverNostr(ctx context.Context, t Target, name string, emit 
 					cn := newSessionConn(head.SessionID, nil, send, c.Now)
 					cn.Nostr = true
 					cn.SigningKey, cn.PeerKey, cn.ViewerID = signKey, ownerKey, conn.PublicKey()
+					cn.TURN = head.TURN
 					sc, scDone = cn, cn.Done()
 					viewing.Add(1)
 					go func() {
