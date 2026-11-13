@@ -38,13 +38,15 @@ NATs (barahn/chirp#151).
 remotekit already generates credentials that expire
 (`webrtc.GenerateEphemeralTURNCredentials`, barahn/remotekit#64): username
 `<expiry>:<id>`, password `base64(HMAC-SHA1(secret, username))`, the format
-coturn's `use-auth-secret` checks. Released in v0.8.0, it is what the relay
-uses: one implementation of the format, shared with the client, and no new
-module, since `cmd/chirp` already imports `remotekit/webrtc`. remotekit
-tests it against pion's TURN server only, so Chirp tests it against coturn,
-the version `deploy/` runs: an allocation with a fresh credential, refusal
-once it has expired, and a session that outlives it. What is missing is
-something that hands them out. The relay already speaks to both ends.
+coturn's `use-auth-secret` checks. The relay writes the same format itself
+(`signalling/turn.go`) rather than import `remotekit/webrtc`, which would
+bring all of pion into it. Only the relay makes credentials; a Chirp only
+receives them. remotekit tests its generator against pion's TURN server only,
+so Chirp tests the relay's credentials against coturn, the version `deploy/`
+runs: an allocation with a fresh credential, refusal once it has expired or
+under another secret, and an allocation that keeps relaying after its
+credential expires. The relay already speaks to both ends, so it is the one
+that hands them out.
 
 ### Who gets a credential
 

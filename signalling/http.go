@@ -74,6 +74,12 @@ type Server struct {
 	// client.PingWait.
 	PingInterval time.Duration
 
+	// TURN, when set, lets an owner get TURN credentials for itself and the
+	// controller it lets in (POST /api/peers/{peer}/turn). Nil leaves the
+	// route out, so a relay without a TURN server answers 404 and its Chirps
+	// stay on STUN.
+	TURN *TURN
+
 	ownersMu sync.Mutex
 	owners   map[rendezvous.PeerID]*ownerConn
 
@@ -138,6 +144,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/lookup", s.lookup)
 	mux.HandleFunc("POST /api/links/{token}/lookup", s.lookupLink)
 	mux.HandleFunc("GET /ws", s.serveWS)
+	if s.TURN != nil {
+		mux.HandleFunc("POST /api/peers/{peer}/turn", s.issueTURN)
+	}
 	if !s.LookupOnly {
 		mux.HandleFunc("POST /api/peers/{peer}/consent", s.submitConsent)
 		mux.HandleFunc("POST /api/redeem", s.redeem)

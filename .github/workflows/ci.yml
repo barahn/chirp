@@ -142,7 +142,20 @@ jobs:
           install-mode: goinstall
           skip-cache: true
 
+      # signalling's TURN credentials are held to coturn itself, the TURN
+      # server deploy/ runs, since coturn and pion's server differ on what an
+      # expired credential may still do. Ubuntu's coturn is the 4.6 line that
+      # Debian's deploy installs; CHIRP_REQUIRE_COTURN makes those tests fail
+      # here rather than skip if it is missing.
+      - name: Install coturn
+        run: |
+          sudo apt-get install -y --no-install-recommends coturn
+          sudo systemctl disable --now coturn 2>/dev/null || true
+          turnserver --version 2>/dev/null || dpkg -s coturn | grep '^Version'
+
       - name: Test
+        env:
+          CHIRP_REQUIRE_COTURN: "1"
         run: go test -race -coverprofile=coverage.out ./...
 
       # The site's pages require Trusted Types, which not every browser

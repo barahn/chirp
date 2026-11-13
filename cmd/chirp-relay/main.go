@@ -34,8 +34,13 @@
 //
 // Each flag can also be set in the environment: CHIRP_RELAY_ADDR,
 // CHIRP_RELAY_SOCKET_MODE, CHIRP_RELAY_TRUSTED_PROXIES,
-// CHIRP_RELAY_SECURITY_CONTACT, CHIRP_RELAY_MODE and CHIRP_RELAY_NODE_KEY. A
-// flag given on the command line wins.
+// CHIRP_RELAY_SECURITY_CONTACT, CHIRP_RELAY_MODE, CHIRP_RELAY_NODE_KEY,
+// CHIRP_RELAY_TURN_SECRET_FILE and CHIRP_RELAY_TURN_URLS. A flag given on the
+// command line wins.
+//
+// With -turn-secret-file and -turn-urls, an owner gets short-lived TURN
+// credentials for itself and the controller it lets in, checked by a coturn
+// running use-auth-secret with the same secret (docs/stun-turn.md).
 package main
 
 import (
@@ -69,6 +74,9 @@ func main() {
 		"where to report a security problem with this relay: an email address or an https: URL, served as /.well-known/security.txt")
 	modeFlag := flag.String("mode", envOr("CHIRP_RELAY_MODE", "private"), "private, or public for a node of the public network")
 	nodeKey := flag.String("node-key", os.Getenv("CHIRP_RELAY_NODE_KEY"), "in public mode, the file holding the node's key; created on first start")
+	turnSecret := flag.String("turn-secret-file", os.Getenv("CHIRP_RELAY_TURN_SECRET_FILE"),
+		"the file, mode 600, holding the secret coturn checks credentials with (static-auth-secret); with -turn-urls, owners get TURN credentials")
+	turnList := flag.String("turn-urls", os.Getenv("CHIRP_RELAY_TURN_URLS"), "comma-separated turn: URLs of that TURN server, handed out with each credential")
 	flag.Parse()
 
 	if *healthcheck {
@@ -84,6 +92,10 @@ func main() {
 		log.Fatalf("chirp-relay: -security-contact: %v", err)
 	}
 	m, err := relayMode(*modeFlag, *nodeKey)
+	if err != nil {
+		log.Fatalf("chirp-relay: %v", err)
+	}
+	turn, err := turnConfig(*turnSecret, *turnList)
 	if err != nil {
 		log.Fatalf("chirp-relay: %v", err)
 	}
@@ -105,6 +117,7 @@ func main() {
 	defer sm.Close()
 	relay := signalling.NewServer(sm)
 	relay.LookupOnly = m.public
+	relay.TURN = turn
 	if unix || len(trusted) > 0 {
 		relay.ClientIP = signalling.ForwardedFor(trusted)
 	}
@@ -125,6 +138,9 @@ func main() {
 
 	if m.public {
 		log.Printf("chirp-relay: public mode, lookup only, node key in %s", *nodeKey)
+	}
+	if turn != nil {
+		log.Printf("chirp-relay: handing out TURN credentials for %s", strings.Join(turn.URLs, ", "))
 	}
 	switch {
 	case unix:
