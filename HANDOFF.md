@@ -115,6 +115,7 @@ client/clock_test.go
 client/e2e_test.go
 client/flow_test.go
 client/helper.go
+client/link_fragments_test.go
 client/nostr.go
 client/nostr_test.go
 client/owner.go
@@ -127,6 +128,7 @@ client/session_test.go
 client/socket.go
 client/target.go
 client/target_test.go
+client/testdata/link-fragments.json
 client/view_test.go
 cmd/chirp-relay/landing.html
 cmd/chirp-relay/main.go
