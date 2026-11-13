@@ -27,7 +27,7 @@ Whether "directly" is possible is ICE's job, and ICE needs two kinds of help:
 | What is configured | What works |
 | --- | --- |
 | Nothing | Two Chirps on the same network (LAN) only. |
-| STUN only | Most home and small-office networks, where at least one side's NAT keeps the same public port for every destination. |
+| STUN only | Most home and small-office networks: both NATs keep the same public port for every destination, or one does and lets in the other's packets from any port. It fails when one side is behind a symmetric NAT (a new port for each destination) and the other lets in only replies from the exact port it sent to. |
 | STUN and TURN | Almost everything, including symmetric NAT and carrier-grade NAT on both sides, networks that block UDP (TURN over TCP or TLS on 443), and strict corporate firewalls. |
 
 The failure without TURN is silent from the user's point of view. Both Chirps

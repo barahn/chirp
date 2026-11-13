@@ -28,8 +28,12 @@ questions are answered.
 
 Fabrintek's coturn runs `stun-only`. A TURN credential built into every
 binary would let anyone who unpacks one relay through the node
-([`stun-turn.md`](stun-turn.md), *Credentials*). So two Chirps that are both
-behind a symmetric or carrier-grade NAT do not connect today.
+([`stun-turn.md`](stun-turn.md), *Credentials*). So two Chirps do not
+connect today when one is behind a symmetric or carrier-grade NAT and the
+other's NAT lets in only replies from the exact port it sent to, as many home
+routers do. Nor do they when both are behind such NATs. One symmetric side is
+enough, and some large residential and mobile providers hand out symmetric
+NATs (barahn/chirp#151).
 
 remotekit already generates credentials that expire
 (`webrtc.GenerateEphemeralTURNCredentials`, barahn/remotekit#64): username
