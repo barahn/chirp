@@ -1,0 +1,22 @@
+{
+  "about": "What may follow the # of a Chirp link, as Chirp reads it (ParseTarget) and as usechirp.app/l shows it. Chirp's tests and the site's read this same file, so the two cannot disagree about a link. link is true when the fragment is a link Chirp opens and the page shows.",
+  "page": "https://usechirp.app/l#",
+  "cases": [
+    { "fragment": "BwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAhIiMkJSY", "link": true, "why": "a token alone, from a Chirp that signals through a relay" },
+    { "fragment": "BwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAhIiMkJSY.0042", "link": true, "why": "a token and the link's four secret digits" },
+    { "fragment": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA-_A", "link": true, "why": "base64url's two symbols" },
+    { "fragment": "", "link": false, "why": "no fragment" },
+    { "fragment": "BwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAhIiMkJS", "link": false, "why": "42 characters" },
+    { "fragment": "BwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAhIiMkJSYn", "link": false, "why": "44 characters" },
+    { "fragment": "BwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAhIiMkJS+", "link": false, "why": "standard base64's +" },
+    { "fragment": "BwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAhIiMkJS/", "link": false, "why": "standard base64's /" },
+    { "fragment": "BwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAhIiMkJS=", "link": false, "why": "padding" },
+    { "fragment": "BwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAhIiMkJSé", "link": false, "why": "a letter outside ASCII" },
+    { "fragment": "BwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAhIiMkJSY.", "link": false, "why": "a dot with no secret" },
+    { "fragment": "BwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAhIiMkJSY.042", "link": false, "why": "three secret digits" },
+    { "fragment": "BwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAhIiMkJSY.00420", "link": false, "why": "five secret digits" },
+    { "fragment": "BwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAhIiMkJSY.abcd", "link": false, "why": "letters for the secret" },
+    { "fragment": "BwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAhIiMkJSY.0042.1", "link": false, "why": "something after the secret" },
+    { "fragment": "482-913-5071", "link": false, "why": "a spoken code is not a link" }
+  ]
+}
