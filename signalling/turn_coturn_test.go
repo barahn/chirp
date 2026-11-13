@@ -25,18 +25,26 @@ import (
 
 const coturnRealm = "chirp.test"
 
+// coturnBinary finds turnserver, or skips the test, or fails it where coturn
+// is required.
+func coturnBinary(t *testing.T) string {
+	t.Helper()
+	if bin := os.Getenv("CHIRP_COTURN"); bin != "" {
+		return bin
+	}
+	if bin, err := exec.LookPath("turnserver"); err == nil {
+		return bin
+	}
+	if os.Getenv("CHIRP_REQUIRE_COTURN") != "" {
+		t.Fatal("coturn is required: set CHIRP_COTURN or put turnserver on PATH")
+	}
+	t.Skip("no coturn: set CHIRP_COTURN or put turnserver on PATH")
+	return ""
+}
+
 func startCoturn(t *testing.T, secret string) string {
 	t.Helper()
-	bin := os.Getenv("CHIRP_COTURN")
-	if bin == "" {
-		bin, _ = exec.LookPath("turnserver")
-	}
-	if bin == "" {
-		if os.Getenv("CHIRP_REQUIRE_COTURN") != "" {
-			t.Fatal("coturn is required: set CHIRP_COTURN or put turnserver on PATH")
-		}
-		t.Skip("no coturn: set CHIRP_COTURN or put turnserver on PATH")
-	}
+	bin := coturnBinary(t)
 	port := freeUDPPort(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	cmd := exec.CommandContext(ctx, bin,
