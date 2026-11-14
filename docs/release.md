@@ -223,13 +223,19 @@ publisher, not Fabrintek.
 
 ### Channels
 
-GitHub Releases is the source of every binary, and the site links
-`releases/latest/download/<name>`. Once the Windows build is signed, winget
-and Scoop can carry it as a portable package: no installer, nothing left
-behind. On Linux, Flathub may follow. Chirp ships no `.deb`, `.rpm` or
-installer, because it is not installed. It does not update itself either. At
-most, it says that a newer version exists, using the version the relay
-reports.
+GitHub Releases is the source of every binary. Asset names carry no version,
+so `releases/latest/download/<name>` always serves the newest build; the
+site's download buttons link `releases/latest` today. The site is
+[chirp-remote/chirp-site](https://github.com/chirp-remote/chirp-site): its
+download buttons stay hidden while its pages carry `data-release="pre"`, so
+the release that opens downloads is followed by a pull request there that
+removes it from `site/index.html` and `site/l/index.html`.
+
+Once the Windows build is signed, winget and Scoop can carry it as a portable
+package: no installer, nothing left behind. On Linux, Flathub may follow.
+Chirp ships no `.deb`, `.rpm` or installer, because it is not installed. It
+does not update itself either. At most, it says that a newer version exists,
+using the version the relay reports.
 
 ### Mobile
 
