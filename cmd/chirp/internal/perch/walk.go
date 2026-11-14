@@ -12,10 +12,10 @@ import (
 )
 
 // The bird walks by the taskbar as the site's bird walks on the app window
-// (barahn/chirp#187, site/assets/hop.js): small hops along its stretch, a
-// rest between them, now and then two short hops in a row, and away when
-// the pointer passes over it three times in a row -- to the far end, or to
-// the top of a window, and walks there. The rules
+// (barahn/chirp#187, chirp-site's site/assets/hop.js): small hops along its
+// stretch, a rest between them, now and then two short hops in a row, and
+// away when the pointer passes over it three times in a row -- to the far
+// end, or to the top of a window, and walks there. The rules
 // are the site's, in the site's pixels, where the bird is 74 pixels wide;
 // Scale turns them into the screen's.
 
@@ -39,7 +39,7 @@ type Rules struct {
 	Flapping                    time.Duration // of FleeTime
 }
 
-// Site is the site's walk, from hop.js and site.js.
+// Site is usechirp.app's walk, from chirp-site's hop.js and site.js.
 var Site = Rules{
 	Shortest: 18, Longest: 30,
 	ShortestRest: 800 * time.Millisecond, LongestRest: 3000 * time.Millisecond,

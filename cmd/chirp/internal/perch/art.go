@@ -102,9 +102,9 @@ func fade(img *image.RGBA, alpha float64) {
 }
 
 // Landing is the flight in, at fps frames a second: the site's land
-// animation (site/assets/site.css), from 40 right and 60 up, turned -12
-// degrees, to perched, over 0.9 s, eased by cubic-bezier(.2, .9, .3, 1.3),
-// which overshoots a little before it settles.
+// animation (site/assets/site.css in chirp-remote/chirp-site), from 40 right
+// and 60 up, turned -12 degrees, to perched, over 0.9 s, eased by
+// cubic-bezier(.2, .9, .3, 1.3), which overshoots a little before it settles.
 func Landing(fps int) []Motion {
 	ease := cubicBezier(.2, .9, .3, 1.3)
 	return flight(fps, 0.9, func(t float64) Motion {
