@@ -48,7 +48,7 @@ func startCoturn(t *testing.T, secret string) string {
 	port := freeUDPPort(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	cmd := exec.CommandContext(ctx, bin,
-		"-n", "--no-cli", "--no-tls", "--no-dtls", "--fingerprint",
+		"-n", "--no-cli", "--no-tls", "--no-dtls", "--no-tcp", "--fingerprint",
 		"--listening-ip=127.0.0.1", "--listening-port="+strconv.Itoa(port),
 		"--relay-ip=127.0.0.1", "--min-port=49160", "--max-port=49200",
 		"--allow-loopback-peers",
@@ -80,6 +80,8 @@ func startCoturn(t *testing.T, secret string) string {
 	return addr
 }
 
+// freeUDPPort finds a UDP port for coturn, which listens on UDP alone
+// (--no-tcp): a TCP listener on the same port may already be taken.
 func freeUDPPort(t *testing.T) int {
 	t.Helper()
 	c, err := net.ListenPacket("udp4", "127.0.0.1:0")

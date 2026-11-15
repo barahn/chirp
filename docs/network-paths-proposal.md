@@ -1,9 +1,10 @@
 # Proposal: finding a node, and paths no single operator can see
 
-**Status:** proposal, not decided. It answers open questions 1 and 6 of
+**Status:** [part 1](#1-turn-on-the-relay) was decided on 2026-11-13 and is
+being built for v0.6 (barahn/chirp#222). Parts 2 to 5 are still proposals,
+not decided, and nothing in them is built. It answers open questions 1 and 6 of
 [`status-page-proposal.md`](status-page-proposal.md), and turns
-[`relay.md`](relay.md)'s "TURN stays off" into a design. Nothing here is
-built.
+[`relay.md`](relay.md)'s "TURN stays off" into a design.
 
 That proposal says a node sees addresses, routing digits and timing, and
 that only a pledge stands between those and a log. This one narrows what a
