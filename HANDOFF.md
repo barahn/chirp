@@ -149,6 +149,7 @@ cmd/chirp/downloads_test.go
 cmd/chirp/downloads_windows.go
 cmd/chirp/fatal.go
 cmd/chirp/fatal_test.go
+cmd/chirp/ice_test.go
 cmd/chirp/internal/alert/alert.go
 cmd/chirp/internal/alert/alert_other.go
 cmd/chirp/internal/alert/alert_windows.go
