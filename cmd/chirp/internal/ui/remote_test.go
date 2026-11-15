@@ -208,3 +208,12 @@ func waitUntil(t *testing.T, cond func() bool) {
 		time.Sleep(10 * time.Millisecond)
 	}
 }
+
+// When no picture comes and nothing says why, the helper is told the two
+// computers could not connect, and what to try (barahn/chirp#151).
+func TestANoDirectPathNoticeSaysWhatToTry(t *testing.T) {
+	got := remoteNotice(NoticeNoDirectPath)
+	if !strings.Contains(got, "connect") || !strings.Contains(got, "network") {
+		t.Fatalf("the no-path notice says %q", got)
+	}
+}

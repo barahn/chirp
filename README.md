@@ -17,6 +17,7 @@ account, and nothing happens on your screen until you press *Allow*.
 [![License](https://img.shields.io/badge/License-AGPL--3.0-blue.svg?style=flat-square)](LICENSE)
 [![CI](https://github.com/barahn/chirp/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/barahn/chirp/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/barahn/chirp/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/barahn/chirp/actions/workflows/codeql.yml)
+[![CodeScene Average Code Health](https://codescene.io/projects/87671/status-badges/average-code-health)](https://codescene.io/projects/87671)
 
 </div>
 

@@ -108,13 +108,16 @@ mid-sentence without warning.
 | Refused, expired or failed | the message from § Messages | perched again |
 
 **On the site,** the bird flies in from the right, facing the way it flies and
-flapping, lands on the app window's top edge, then hops along it from one
-side to the other -- now and then two short hops in a row, as birds do on the
-ground -- resting between hops and chirping now and then. The mouse passing over it three times within four seconds shoos it to
-the far side. The choices are in `site/assets/hop.js`, tested by `bun test`
-in `site/`; `site.js` moves it with the Web Animations API, which the site's
-Content-Security-Policy allows. It stops while the page is hidden or the bird
-is scrolled away, and with reduced motion it only perches, as before.
+flapping, lands on the app window's top edge, then hops along it from one side
+to the other -- now and then two short hops in a row, as birds do on the
+ground -- resting between hops and chirping now and then. The mouse passing
+over it three times within four seconds shoos it to the far side. The choices
+are in `site/assets/hop.js` in
+[chirp-remote/chirp-site](https://github.com/chirp-remote/chirp-site), tested
+by `bun test` in `site/` there; `site.js` moves it with the Web Animations
+API, which the site's Content-Security-Policy allows. It stops while the page
+is hidden or the bird is scrolled away, and with reduced motion it only
+perches, as before.
 
 ## Sound
 
