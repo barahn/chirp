@@ -112,14 +112,7 @@ func (c *Client) follow(ctx context.Context, sock *Socket, sess Session, emit fu
 	defer poll.Stop()
 	allowed := false
 
-	// The owner says, before its first signal, whether this end has a TURN
-	// credential (TypeTURN). An allowed session waits for that word, or for
-	// turnWait from an owner that predates it, before it is shown: the
-	// viewer needs its ICE servers from the start.
-	var turn *TURNCredential
-	heardTURN := false
-	var waiting *Session
-	var allowedAt time.Time
+	turn := turnGate{wait: c.waitForTURN()}
 
 	// conn carries the session's signals once the owner lets this machine
 	// in. The owner's runner starts the moment it allows, a poll before this
@@ -146,7 +139,7 @@ func (c *Client) follow(ctx context.Context, sock *Socket, sess Session, emit fu
 			return
 		}
 		cn := newSessionConn(s.ID, nil, sock.Send, c.Now)
-		cn.TURN = turn
+		cn.TURN = turn.cred
 		for _, m := range early {
 			cn.deliver(m)
 		}
@@ -176,9 +169,8 @@ func (c *Client) follow(ctx context.Context, sock *Socket, sess Session, emit fu
 			return
 		case m := <-msgs:
 			if cred, ok := readTURNWord(m.Raw); ok && !m.FromRelay() {
-				turn, heardTURN = cred, true
-				if waiting != nil && !allowed {
-					letIn(*waiting)
+				if s := turn.hear(cred); s != nil && !allowed {
+					letIn(*s)
 				}
 				continue
 			}
@@ -218,13 +210,7 @@ func (c *Client) follow(ctx context.Context, sock *Socket, sess Session, emit fu
 			case StateConsentRequested:
 				emit(HelperEvent{Phase: HelperAsking, Session: s})
 			case StateConsentGranted, StateActive:
-				if allowed {
-					break
-				}
-				if waiting == nil {
-					waiting, allowedAt = &s, time.Now()
-				}
-				if heardTURN || time.Since(allowedAt) >= c.waitForTURN() {
+				if !allowed && turn.ready(s, time.Now()) {
 					letIn(s)
 				}
 			case StateConsentDenied:
