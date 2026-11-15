@@ -4,6 +4,7 @@
 package main
 
 import (
+	"reflect"
 	"slices"
 	"testing"
 
@@ -20,7 +21,7 @@ var sessionTURN = &client.TURNCredential{
 func TestASessionWithoutTURNKeepsTheConfiguredServers(t *testing.T) {
 	base := iceConfig("stun:relay.example:3478", "", "")
 	got := sessionICE(base, nil)
-	if !slices.Equal(got.ICEServers, base.ICEServers) || got.TURNUsername != "" || got.TURNPassword != "" {
+	if !reflect.DeepEqual(got, base) {
 		t.Fatalf("sessionICE without TURN = %+v, want %+v", got, base)
 	}
 }
@@ -46,7 +47,7 @@ func TestASessionsTURNCredentialIsAddedToTheConfiguredSTUN(t *testing.T) {
 func TestAConfiguredTURNCredentialIsKept(t *testing.T) {
 	base := iceConfig("turn:own.example:3478", "own-user", "own-pass")
 	got := sessionICE(base, sessionTURN)
-	if !slices.Equal(got.ICEServers, base.ICEServers) || got.TURNUsername != "own-user" || got.TURNPassword != "own-pass" {
+	if !reflect.DeepEqual(got, base) {
 		t.Fatalf("sessionICE with a configured TURN = %+v, want %+v", got, base)
 	}
 }
