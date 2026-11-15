@@ -17,7 +17,7 @@
 # Copyright (C) 2026 Fabrintek Engenharia Digital Ltda
 set -euo pipefail
 
-# usechirp.app's zone, as in scripts/apply-cloudflare.sh.
+# usechirp.app's zone, as in chirp-remote/chirp-site's scripts/apply-cloudflare.sh.
 zone=588dc7bfe393569ce736dce02eac5795
 name=""
 ipv4=""

@@ -5,7 +5,7 @@ package client
 
 import (
 	"context"
-	"strings"
+	"slices"
 	"testing"
 	"time"
 
@@ -32,8 +32,11 @@ func checkTURN(t *testing.T, side string, got *TURNCredential) {
 	if got == nil {
 		t.Fatalf("the %s's session has no TURN credential", side)
 	}
-	if strings.Join(got.URLs, ",") != strings.Join(testTURNURLs, ",") || got.Username == "" || got.Credential == "" {
-		t.Errorf("the %s's TURN credential is %+v", side, got)
+	if !slices.Equal(got.URLs, testTURNURLs) {
+		t.Errorf("the %s's TURN credential is for %v, want %v", side, got.URLs, testTURNURLs)
+	}
+	if got.Username == "" || got.Credential == "" {
+		t.Errorf("the %s's TURN credential has no username or password: %+v", side, got)
 	}
 }
 
@@ -149,5 +152,36 @@ func TestAHelperOfAnOwnerWithoutTURNSupportIsLetInAfterAWait(t *testing.T) {
 	}
 	if view.TURN != nil {
 		t.Errorf("the helper has a TURN credential %+v nobody sent", view.TURN)
+	}
+}
+
+func TestAnAllowedSessionWaitsForTheOwnersTURNWord(t *testing.T) {
+	start := time.Now()
+	g := turnGate{wait: time.Second}
+	if g.ready(Session{ID: "s"}, start) {
+		t.Fatal("shown before the owner said anything about TURN")
+	}
+	cred := &TURNCredential{Username: "u"}
+	if waiting := g.hear(cred); waiting == nil || waiting.ID != "s" {
+		t.Fatalf("hearing the owner let in %v, want the session waiting", waiting)
+	}
+	if !g.ready(Session{ID: "s"}, start) || g.cred != cred {
+		t.Error("not shown, with the owner's credential, once the owner spoke")
+	}
+}
+
+func TestAnOwnerFromBeforeTURNIsWaitedForOnlySoLong(t *testing.T) {
+	start := time.Now()
+	g := turnGate{wait: time.Second}
+	if g.hear(nil) != nil {
+		t.Error("a word before any allowed session let something in")
+	}
+	g = turnGate{wait: time.Second}
+	g.ready(Session{ID: "s"}, start)
+	if g.ready(Session{ID: "s"}, start.Add(999*time.Millisecond)) {
+		t.Error("shown before the wait was over")
+	}
+	if !g.ready(Session{ID: "s"}, start.Add(time.Second)) {
+		t.Error("still held back once the wait was over")
 	}
 }

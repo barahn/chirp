@@ -6,7 +6,6 @@ package client
 import (
 	"context"
 	"crypto/ed25519"
-	"encoding/json"
 	"errors"
 	"slices"
 	"sync"
@@ -481,12 +480,7 @@ func (o *Owner) startSession(ctx context.Context, sessionID string) {
 	if peerKey != nil {
 		conn.SigningKey, conn.PeerKey = o.signKey, peerKey
 	}
-	ownTURN, controllerTURN := o.turnFor(req.SessionID)
-	conn.TURN = ownTURN
-	if !viaNostr {
-		word, _ := json.Marshal(turnWord{Type: TypeTURN, TURN: controllerTURN})
-		_ = send(word)
-	}
+	o.handOutTURN(conn, send)
 	o.active = conn
 	o.emit(OwnerEvent{Started: &ActiveSession{ID: req.SessionID, Name: req.Name, Permissions: granted}})
 	o.serving.Add(1)

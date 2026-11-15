@@ -95,6 +95,46 @@ func (o *Owner) turnForLocked(sessionID string) (owner, controller *TURNCredenti
 	return o.turn.owner, o.turn.controller
 }
 
+// handOutTURN gives conn the owner's credential for its session and, over the
+// relay's sockets, tells the controller its own with send. Over Nostr the
+// controller's rode on the consent answer already.
+func (o *Owner) handOutTURN(conn *SessionConn, send func([]byte) error) {
+	own, controller := o.turnFor(conn.ID)
+	conn.TURN = own
+	if conn.Nostr {
+		return
+	}
+	word, _ := json.Marshal(turnWord{Type: TypeTURN, TURN: controller})
+	_ = send(word)
+}
+
+// turnGate holds a controller's allowed session back until its owner's
+// TypeTURN says whether this end has a TURN credential, or until an owner
+// that predates TypeTURN has had wait to send one: the viewer needs its ICE
+// servers from the start.
+type turnGate struct {
+	wait      time.Duration
+	cred      *TURNCredential
+	heard     bool
+	waiting   *Session
+	allowedAt time.Time
+}
+
+// hear keeps the owner's credential, and returns the allowed session that was
+// waiting for it, if any.
+func (g *turnGate) hear(cred *TURNCredential) *Session {
+	g.cred, g.heard = cred, true
+	return g.waiting
+}
+
+// ready reports whether the allowed session s may be shown at now.
+func (g *turnGate) ready(s Session, now time.Time) bool {
+	if g.waiting == nil {
+		g.waiting, g.allowedAt = &s, now
+	}
+	return g.heard || now.Sub(g.allowedAt) >= g.wait
+}
+
 // readTURNWord reports whether raw is an owner's TypeTURN, and the credential
 // it carries, if any.
 func readTURNWord(raw []byte) (*TURNCredential, bool) {
