@@ -52,6 +52,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/netip"
 	"os"
 	"os/signal"
 	"strconv"
@@ -132,8 +133,8 @@ func main() {
 		_ = srv.Shutdown(shutdown)
 	}()
 
-	logStart(m, *nodeKey, turn)
-	logListening(*addr, unix, len(trusted) > 0, *proxies)
+	logStart(m, turn)
+	logListening(*addr, unix, trusted)
 	if err := srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Printf("chirp-relay: %v", err)
 		stop()
@@ -145,6 +146,7 @@ func main() {
 type mode struct {
 	public   bool
 	identity http.Handler
+	nodeKey  string
 }
 
 func relayMode(name, keyPath string) (mode, error) {
@@ -159,7 +161,7 @@ func relayMode(name, keyPath string) (mode, error) {
 		if err != nil {
 			return mode{}, fmt.Errorf("-node-key: %w", err)
 		}
-		return mode{public: true, identity: node.Handler(key)}, nil
+		return mode{public: true, identity: node.Handler(key), nodeKey: keyPath}, nil
 	}
 	return mode{}, fmt.Errorf("-mode: %q is neither private nor public", name)
 }
@@ -253,21 +255,21 @@ func envOr(key, def string) string {
 	return def
 }
 
-func logStart(m mode, nodeKey string, turn *signalling.TURN) {
+func logStart(m mode, turn *signalling.TURN) {
 	if m.public {
-		log.Printf("chirp-relay: public mode, lookup only, node key in %s", nodeKey)
+		log.Printf("chirp-relay: public mode, lookup only, node key in %s", m.nodeKey)
 	}
 	if turn != nil {
 		log.Printf("chirp-relay: handing out TURN credentials for %s", strings.Join(turn.URLs, ", "))
 	}
 }
 
-func logListening(addr string, unix, trusted bool, proxies string) {
+func logListening(addr string, unix bool, trusted []netip.Prefix) {
 	switch {
 	case unix:
 		log.Printf("chirp-relay: listening on %s, trusting X-Forwarded-For from whoever can open it", addr)
-	case trusted:
-		log.Printf("chirp-relay: listening on %s, trusting X-Forwarded-For from %s", addr, proxies)
+	case len(trusted) > 0:
+		log.Printf("chirp-relay: listening on %s, trusting X-Forwarded-For from %v", addr, trusted)
 	default:
 		log.Printf("chirp-relay: listening on %s", addr)
 	}
