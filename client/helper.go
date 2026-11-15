@@ -168,10 +168,7 @@ func (c *Client) follow(ctx context.Context, sock *Socket, sess Session, emit fu
 			}
 			return
 		case m := <-msgs:
-			if cred, ok := readTURNWord(m.Raw); ok && !m.FromRelay() {
-				if s := turn.hear(cred); s != nil && !allowed {
-					letIn(*s)
-				}
+			if turn.take(m, letIn) {
 				continue
 			}
 			if !m.FromRelay() {
