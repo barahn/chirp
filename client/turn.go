@@ -118,13 +118,22 @@ type turnGate struct {
 	heard     bool
 	waiting   *Session
 	allowedAt time.Time
+	shown     bool
 }
 
-// hear keeps the owner's credential, and returns the allowed session that was
-// waiting for it, if any.
-func (g *turnGate) hear(cred *TURNCredential) *Session {
+// take reports whether m is the owner's TypeTURN. If it is, the gate keeps its
+// credential and shows, with show, the allowed session that was waiting for it.
+func (g *turnGate) take(m Message, show func(Session)) bool {
+	cred, ok := readTURNWord(m.Raw)
+	if !ok || m.FromRelay() {
+		return false
+	}
 	g.cred, g.heard = cred, true
-	return g.waiting
+	if g.waiting != nil && !g.shown {
+		g.shown = true
+		show(*g.waiting)
+	}
+	return true
 }
 
 // ready reports whether the allowed session s may be shown at now.
@@ -132,7 +141,8 @@ func (g *turnGate) ready(s Session, now time.Time) bool {
 	if g.waiting == nil {
 		g.waiting, g.allowedAt = &s, now
 	}
-	return g.heard || now.Sub(g.allowedAt) >= g.wait
+	g.shown = g.heard || now.Sub(g.allowedAt) >= g.wait
+	return g.shown
 }
 
 // readTURNWord reports whether raw is an owner's TypeTURN, and the credential

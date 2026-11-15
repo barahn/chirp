@@ -135,6 +135,7 @@ cmd/chirp-relay/main_test.go
 cmd/chirp-relay/mode_test.go
 cmd/chirp-relay/pages.go
 cmd/chirp-relay/pages_test.go
+cmd/chirp-relay/start.go
 cmd/chirp-relay/turn.go
 cmd/chirp-relay/turn_test.go
 cmd/chirp-status/main.go

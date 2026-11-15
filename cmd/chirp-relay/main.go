@@ -52,7 +52,6 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"net/netip"
 	"os"
 	"os/signal"
 	"strconv"
@@ -134,7 +133,7 @@ func main() {
 	}()
 
 	logStart(m, turn)
-	logListening(*addr, unix, trusted)
+	logListening(ln, trusted)
 	if err := srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Printf("chirp-relay: %v", err)
 		stop()
@@ -253,34 +252,4 @@ func envOr(key, def string) string {
 		return v
 	}
 	return def
-}
-
-func logStart(m mode, turn *signalling.TURN) {
-	if m.public {
-		log.Printf("chirp-relay: public mode, lookup only, node key in %s", m.nodeKey)
-	}
-	if turn != nil {
-		log.Printf("chirp-relay: handing out TURN credentials for %s", strings.Join(turn.URLs, ", "))
-	}
-}
-
-func logListening(addr string, unix bool, trusted []netip.Prefix) {
-	switch {
-	case unix:
-		log.Printf("chirp-relay: listening on %s, trusting X-Forwarded-For from whoever can open it", addr)
-	case len(trusted) > 0:
-		log.Printf("chirp-relay: listening on %s, trusting X-Forwarded-For from %v", addr, trusted)
-	default:
-		log.Printf("chirp-relay: listening on %s", addr)
-	}
-}
-
-// exitWithHealth asks the relay at addr whether it is up, and exits 0 if it
-// is, 1 if not.
-func exitWithHealth(addr string) {
-	if err := probe(addr); err != nil {
-		fmt.Fprintf(os.Stderr, "chirp-relay: %v\n", err)
-		os.Exit(1)
-	}
-	os.Exit(0)
 }

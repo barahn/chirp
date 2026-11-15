@@ -414,15 +414,13 @@ func (o *Owner) Answer(ctx context.Context, sessionID string, grant []string) (S
 	if id == "" {
 		return Session{}, ErrNotRegistered
 	}
+	reason := "declined by the owner"
 	if granted {
+		reason = "allowed by the owner"
 		o.fetchTURN(ctx, id, sessionID)
 	}
 	if s, ok, err := o.answerNostr(sessionID, granted); ok {
 		return s, err
-	}
-	reason := "declined by the owner"
-	if granted {
-		reason = "allowed by the owner"
 	}
 	s, err := o.client.Consent(ctx, id, sessionID, granted, reason)
 	if err == nil && (s.State == StateConsentGranted || s.State == StateActive) {
