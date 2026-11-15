@@ -170,8 +170,11 @@ func TestAnAllowedSessionWaitsForTheOwnersTURNWord(t *testing.T) {
 	if !g.take(Message{Type: TypeTURN, Raw: word}, show) {
 		t.Fatal("the owner's TURN word was not taken")
 	}
-	if !slices.Equal(shown, []string{"s"}) || g.cred == nil || g.cred.Username != "u" {
-		t.Errorf("hearing the owner showed %v with %+v, want s with its credential", shown, g.cred)
+	if !slices.Equal(shown, []string{"s"}) {
+		t.Errorf("hearing the owner showed %v, want s", shown)
+	}
+	if g.cred == nil || g.cred.Username != "u" {
+		t.Errorf("the gate kept %+v, want the owner's credential", g.cred)
 	}
 	g.take(Message{Type: TypeTURN, Raw: word}, show)
 	if len(shown) != 1 {
