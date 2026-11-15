@@ -123,8 +123,7 @@ func (c *Client) follow(ctx context.Context, sock *Socket, sess Session, emit fu
 	// one, and nil (never ready) before.
 	var conn *SessionConn
 	var connDone <-chan struct{}
-	var early [][]byte
-	var earlyBytes int
+	var early earlySignals
 	var viewing sync.WaitGroup
 	defer func() {
 		if conn != nil {
@@ -140,10 +139,7 @@ func (c *Client) follow(ctx context.Context, sock *Socket, sess Session, emit fu
 		}
 		cn := newSessionConn(s.ID, nil, sock.Send, c.Now)
 		cn.TURN = turn.cred
-		for _, m := range early {
-			cn.deliver(m)
-		}
-		early = nil
+		early.handTo(cn)
 		conn, connDone = cn, cn.Done()
 		viewing.Add(1)
 		go func() {
@@ -172,13 +168,7 @@ func (c *Client) follow(ctx context.Context, sock *Socket, sess Session, emit fu
 				continue
 			}
 			if !m.FromRelay() {
-				switch {
-				case conn != nil:
-					conn.deliver(m.Raw)
-				case len(early) < signalQueue && earlyBytes+len(m.Raw) <= signalBudget:
-					early = append(early, m.Raw)
-					earlyBytes += len(m.Raw)
-				}
+				early.pass(m.Raw, conn)
 				continue
 			}
 			switch m.Type {
@@ -222,4 +212,31 @@ func (c *Client) follow(ctx context.Context, sock *Socket, sess Session, emit fu
 			}
 		}
 	}
+}
+
+// earlySignals keeps the owner's signals that arrive before this end learns
+// it was let in, up to a queue's worth, for the session to read in order.
+type earlySignals struct {
+	queue [][]byte
+	bytes int
+}
+
+// pass hands raw to conn once there is one, and keeps it until then.
+func (e *earlySignals) pass(raw []byte, conn *SessionConn) {
+	if conn != nil {
+		conn.deliver(raw)
+		return
+	}
+	if len(e.queue) < signalQueue && e.bytes+len(raw) <= signalBudget {
+		e.queue = append(e.queue, raw)
+		e.bytes += len(raw)
+	}
+}
+
+// handTo delivers what was kept to the session that now reads it.
+func (e *earlySignals) handTo(conn *SessionConn) {
+	for _, raw := range e.queue {
+		conn.deliver(raw)
+	}
+	e.queue, e.bytes = nil, 0
 }
