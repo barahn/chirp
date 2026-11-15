@@ -46,6 +46,15 @@ func controller(t *testing.T, c *Client, shown Peer) (Session, *Socket) {
 }
 
 // signal returns the next message on s that the relay did not send itself.
+// expectNoTURN checks that, before anything of the session, the owner told
+// the controller on s that this relay has no TURN credential for it.
+func expectNoTURN(t *testing.T, s *Socket) {
+	t.Helper()
+	if got := signal(t, s); got != `{"type":"chirp_turn"}` {
+		t.Fatalf("the controller first got %s, want the owner's TURN word", got)
+	}
+}
+
 func signal(t *testing.T, s *Socket) string {
 	t.Helper()
 	for {
@@ -119,6 +128,7 @@ func TestAnAllowedSessionIsServedOverTheOwnerSocket(t *testing.T) {
 		t.Error("the session was served with no permissions")
 	}
 
+	expectNoTURN(t, ctrl)
 	if err := ctrl.Send([]byte(`{"type":"offer","sdp":"v=0"}`)); err != nil {
 		t.Fatal(err)
 	}
@@ -210,6 +220,7 @@ func TestRemotekitsRunnerServesOverTheOwnerSocket(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	expectNoTURN(t, ctrl)
 	var hello struct {
 		Type      string `json:"type"`
 		SessionID string `json:"session_id"`

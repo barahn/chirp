@@ -108,6 +108,9 @@ type knock struct {
 	Msg  string `json:"msg,omitempty"`
 	Via  string `json:"via,omitempty"`
 	Code string `json:"code,omitempty"`
+	// TURN is the controller's TURN credential, on a consent answer that
+	// lets it in (turn.go).
+	TURN *TURNCredential `json:"turn,omitempty"`
 }
 
 func (k knock) encode() []byte {
@@ -604,6 +607,7 @@ func (o *Owner) answerNostr(sessionID string, granted bool) (Session, bool, erro
 	}
 	if granted {
 		reply.Reason = ""
+		_, reply.TURN = o.turnForLocked(sessionID)
 		ask.allowed = true
 	} else {
 		o.nostrAsk = nil
@@ -844,9 +848,7 @@ func (c *Client) helpOverNostr(ctx context.Context, t Target, name string, emit 
 					if c.View == nil {
 						continue
 					}
-					cn := newSessionConn(head.SessionID, nil, send, c.Now)
-					cn.Nostr = true
-					cn.SigningKey, cn.PeerKey, cn.ViewerID = signKey, ownerKey, conn.PublicKey()
+					cn := c.nostrViewerConn(head, send, signKey, ownerKey, conn.PublicKey())
 					sc, scDone = cn, cn.Done()
 					viewing.Add(1)
 					go func() {
@@ -882,4 +884,15 @@ func (c *Client) helpOverNostr(ctx context.Context, t Target, name string, emit 
 // clock, or this one's, is off from the relay's by more than messages allow.
 func staleNostr(off time.Duration) {
 	log.Printf("chirp: dropped a Nostr message %v off this machine's clock", off.Round(time.Second))
+}
+
+// nostrViewerConn is the controller's end of the session the owner's consent
+// answer lets in over Nostr: signed with signKey, accepting only what ownerKey
+// signed, and with the TURN credential the answer carried.
+func (c *Client) nostrViewerConn(answer knock, send func([]byte) error, signKey ed25519.PrivateKey, ownerKey ed25519.PublicKey, viewerID string) *SessionConn {
+	cn := newSessionConn(answer.SessionID, nil, send, c.Now)
+	cn.Nostr = true
+	cn.SigningKey, cn.PeerKey, cn.ViewerID = signKey, ownerKey, viewerID
+	cn.TURN = answer.TURN
+	return cn
 }

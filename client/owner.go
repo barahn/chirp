@@ -88,6 +88,8 @@ type Owner struct {
 	// Nostr set, and nostrAsk the request that came over it (nostr.go).
 	nostr    *nostrOwner
 	nostrAsk *nostrAsk
+	// turn is what the relay gave for the session allowed last (turn.go).
+	turn *sessionTURN
 
 	// secrets, signKey, pakes and verified belong to the registration over
 	// Nostr, and only Run's goroutine touches them (pake.go): the secret
@@ -412,12 +414,13 @@ func (o *Owner) Answer(ctx context.Context, sessionID string, grant []string) (S
 	if id == "" {
 		return Session{}, ErrNotRegistered
 	}
-	if s, ok, err := o.answerNostr(sessionID, granted); ok {
-		return s, err
-	}
 	reason := "declined by the owner"
 	if granted {
 		reason = "allowed by the owner"
+		o.fetchTURN(ctx, id, sessionID)
+	}
+	if s, ok, err := o.answerNostr(sessionID, granted); ok {
+		return s, err
 	}
 	s, err := o.client.Consent(ctx, id, sessionID, granted, reason)
 	if err == nil && (s.State == StateConsentGranted || s.State == StateActive) {
@@ -475,6 +478,7 @@ func (o *Owner) startSession(ctx context.Context, sessionID string) {
 	if peerKey != nil {
 		conn.SigningKey, conn.PeerKey = o.signKey, peerKey
 	}
+	o.handOutTURN(conn, send)
 	o.active = conn
 	o.emit(OwnerEvent{Started: &ActiveSession{ID: req.SessionID, Name: req.Name, Permissions: granted}})
 	o.serving.Add(1)
