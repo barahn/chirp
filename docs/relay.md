@@ -736,15 +736,17 @@ Any perimeter gateway forwards port 3478 (both UDP and TCP) to the service conta
 From outside, `turnutils_stunclient relay.usechirp.app` prints the address it
 was seen from.
 
-TURN stays off until the relay hands out per-session credentials
-(barahn/remotekit#64; [`docs/stun-turn.md`](stun-turn.md), *Credentials*):
-one credential built into every binary would let anyone who unpacks one relay
-through the node. Until then, two Chirps do not connect when one is behind a
-symmetric or carrier-grade NAT and the other's NAT lets in only replies from
-the exact port it sent to, or when both are behind such NATs. The owner can
-still allow the session, but the helper gets no picture (barahn/chirp#151).
-[`network-paths-proposal.md`](network-paths-proposal.md), part 1, proposes how
-the relay hands them out.
+The relay hands out per-session TURN credentials when it is given
+`-turn-secret-file` and `-turn-urls` (barahn/chirp#222;
+[`docs/stun-turn.md`](stun-turn.md), *Credentials*). One credential built into
+every binary would instead let anyone who unpacks one relay through the node.
+Until Chirps ask for them (barahn/chirp#223, #224) and the reference node's
+coturn checks them (barahn/chirp#225), two Chirps do not connect when one is
+behind a symmetric or carrier-grade NAT and the other's NAT lets in only
+replies from the exact port it sent to, or when both are behind such NATs. The
+owner can still allow the session, but the helper gets no picture
+(barahn/chirp#151). [`network-paths-proposal.md`](network-paths-proposal.md),
+part 1, has the design.
 
 ## Operations
 
