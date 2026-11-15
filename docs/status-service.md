@@ -72,7 +72,8 @@ curl -s https://status.usechirp.app/v1/servers
 
 It answers JSON with `generated_at` a few seconds old and one entry per
 server. `https://status.usechirp.app/` then shows them, once the site's
-`/status/` policy is loaded (`scripts/apply-cloudflare.sh`).
+`/status/` policy is loaded (`scripts/apply-cloudflare.sh` in
+[chirp-remote/chirp-site](https://github.com/chirp-remote/chirp-site)).
 
 On the machine: `systemctl status chirp-status`, and `journalctl -u
 chirp-status` for what it could not record.

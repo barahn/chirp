@@ -4,7 +4,11 @@
 2026-10-15 and the design that follows from them. Phase 1, the status service
 measuring only, is built: `cmd/chirp-status` and the `status` package. So
 is phase 2, the page, and phase 4, the relay's public mode:
-`chirp-relay -mode public` and the `node` package.
+`chirp-relay -mode public` and the `node` package. The page, and the site
+around it, moved to
+[chirp-remote/chirp-site](https://github.com/chirp-remote/chirp-site) on
+2026-11-14; the paths below under `site/`, `.cloudflare/` and the site's
+scripts are that repository's.
 
 The maintainer decided on 2026-10-31, in the review of barahn/chirp#170:
 

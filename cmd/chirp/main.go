@@ -40,6 +40,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"flag"
+	"image"
 	"io"
 	"log"
 	"os"
@@ -451,8 +452,16 @@ func viewSession(ctx context.Context, conn *client.SessionConn, ice webrtc.PeerC
 	})
 	remote := <-opened
 	defer fyne.Do(remote.Close)
-	v.OnFrame(remote.Show)
-	v.OnNotice(func(n stream.Notice) { remote.Notice(n.Type) })
+	watch := watchForPicture(noPictureAfter, func() { remote.Notice(ui.NoticeNoDirectPath) })
+	defer watch.stop()
+	v.OnFrame(func(img *image.YCbCr) {
+		watch.settled()
+		remote.Show(img)
+	})
+	v.OnNotice(func(n stream.Notice) {
+		watch.settled()
+		remote.Notice(n.Type)
+	})
 	// The other computer's monitors, for the picker in the toolbar.
 	v.OnDisplays(remote.Displays)
 	sendFiles := func(list clipboard.FileList) error { return v.SendClipboardFiles(ctx, list) }

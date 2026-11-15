@@ -43,8 +43,15 @@ const (
 
 // remoteNotice is what the remote screen says when the other computer sends a
 // notice instead of its picture, or "" for one not worth showing.
+// NoticeNoDirectPath is the window's own notice for a session that has had
+// no picture, and no word from the other side about why, for too long: the
+// two computers could not connect (barahn/chirp#151).
+const NoticeNoDirectPath = "no_direct_path"
+
 func remoteNotice(kind string) string {
 	switch kind {
+	case NoticeNoDirectPath:
+		return tr("Your computer and theirs couldn't connect to each other. Try again, or try from another network, such as your phone's mobile data.")
 	case "consent_required":
 		return tr("They haven't allowed you to see their screen.")
 	case "capture_unavailable":

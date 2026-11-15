@@ -13,7 +13,7 @@ import (
 )
 
 // seeded is a small deterministic random source, so a walk can be replayed;
-// the same one site/assets/hop.test.js uses.
+// the same one chirp-site's site/assets/hop.test.js uses.
 func seeded(seed uint32) func() float64 {
 	s := seed
 	return func() float64 {
