@@ -59,8 +59,11 @@ func TestBothEndsUseTheSessionsTURNCredential(t *testing.T) {
 		"runner": runnerConfig(conn, base).PeerConfig,
 		"viewer": viewerConfig(conn, base).PeerConfig,
 	} {
-		if cfg == nil || cfg.TURNUsername != sessionTURN.Username || !slices.Contains(cfg.ICEServers, sessionTURN.URLs[0]) {
-			t.Errorf("the %s's PeerConfig = %+v, want the session's TURN", side, cfg)
+		if cfg == nil {
+			t.Fatalf("the %s has no PeerConfig", side)
+		}
+		if !reflect.DeepEqual(*cfg, sessionICE(base, sessionTURN)) {
+			t.Errorf("the %s's PeerConfig = %+v, want the session's TURN", side, *cfg)
 		}
 	}
 }
