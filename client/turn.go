@@ -80,14 +80,8 @@ func (o *Owner) fetchTURN(ctx context.Context, peerID, sessionID string) {
 	o.mu.Unlock()
 }
 
-// turnFor returns the credentials fetched for sessionID, if those were the
-// last fetched.
-func (o *Owner) turnFor(sessionID string) (owner, controller *TURNCredential) {
-	o.mu.Lock()
-	defer o.mu.Unlock()
-	return o.turnForLocked(sessionID)
-}
-
+// turnForLocked returns the credentials fetched for sessionID, if those were
+// the last fetched. o.mu is held.
 func (o *Owner) turnForLocked(sessionID string) (owner, controller *TURNCredential) {
 	if o.turn == nil || o.turn.sessionID != sessionID {
 		return nil, nil
@@ -99,7 +93,9 @@ func (o *Owner) turnForLocked(sessionID string) (owner, controller *TURNCredenti
 // relay's sockets, tells the controller its own with send. Over Nostr the
 // controller's rode on the consent answer already.
 func (o *Owner) handOutTURN(conn *SessionConn, send func([]byte) error) {
-	own, controller := o.turnFor(conn.ID)
+	o.mu.Lock()
+	own, controller := o.turnForLocked(conn.ID)
+	o.mu.Unlock()
 	conn.TURN = own
 	if conn.Nostr {
 		return

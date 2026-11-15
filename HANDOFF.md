@@ -112,6 +112,7 @@ client/clock_test.go
 client/e2e_test.go
 client/flow_test.go
 client/helper.go
+client/helper_test.go
 client/link_fragments_test.go
 client/nostr.go
 client/nostr_test.go
