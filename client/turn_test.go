@@ -158,25 +158,30 @@ func TestAHelperOfAnOwnerWithoutTURNSupportIsLetInAfterAWait(t *testing.T) {
 func TestAnAllowedSessionWaitsForTheOwnersTURNWord(t *testing.T) {
 	start := time.Now()
 	g := turnGate{wait: time.Second}
+	var shown []string
+	show := func(s Session) { shown = append(shown, s.ID) }
 	if g.ready(Session{ID: "s"}, start) {
 		t.Fatal("shown before the owner said anything about TURN")
 	}
-	cred := &TURNCredential{Username: "u"}
-	if waiting := g.hear(cred); waiting == nil || waiting.ID != "s" {
-		t.Fatalf("hearing the owner let in %v, want the session waiting", waiting)
+	if g.take(Message{Type: "offer", Raw: []byte(`{"type":"offer"}`)}, show) {
+		t.Error("a signal was taken for the owner's TURN word")
 	}
-	if !g.ready(Session{ID: "s"}, start) || g.cred != cred {
-		t.Error("not shown, with the owner's credential, once the owner spoke")
+	word := []byte(`{"type":"chirp_turn","turn":{"username":"u"}}`)
+	if !g.take(Message{Type: TypeTURN, Raw: word}, show) {
+		t.Fatal("the owner's TURN word was not taken")
+	}
+	if !slices.Equal(shown, []string{"s"}) || g.cred == nil || g.cred.Username != "u" {
+		t.Errorf("hearing the owner showed %v with %+v, want s with its credential", shown, g.cred)
+	}
+	g.take(Message{Type: TypeTURN, Raw: word}, show)
+	if len(shown) != 1 {
+		t.Errorf("a second word showed the session again: %v", shown)
 	}
 }
 
 func TestAnOwnerFromBeforeTURNIsWaitedForOnlySoLong(t *testing.T) {
 	start := time.Now()
 	g := turnGate{wait: time.Second}
-	if g.hear(nil) != nil {
-		t.Error("a word before any allowed session let something in")
-	}
-	g = turnGate{wait: time.Second}
 	g.ready(Session{ID: "s"}, start)
 	if g.ready(Session{ID: "s"}, start.Add(999*time.Millisecond)) {
 		t.Error("shown before the wait was over")
@@ -184,4 +189,7 @@ func TestAnOwnerFromBeforeTURNIsWaitedForOnlySoLong(t *testing.T) {
 	if !g.ready(Session{ID: "s"}, start.Add(time.Second)) {
 		t.Error("still held back once the wait was over")
 	}
+	g.take(Message{Type: TypeTURN, Raw: []byte(`{"type":"chirp_turn"}`)}, func(Session) {
+		t.Error("a late word showed the session a second time")
+	})
 }
