@@ -708,8 +708,9 @@ why, and gives a coturn configuration. Some notes for these deployments:
 
 - **TURN needs UDP, a range of ports, and an address it can announce.**
   Neither Caddy nor Cloudflare's proxy can carry it. Give coturn a public
-  address, or forward `3478/udp+tcp`, `5349/tcp` and the relay range
-  (`49152–65535/udp`) to it and set `external-ip` to the public address.
+  address, or forward `3478/udp+tcp`, `5349/tcp` and the relay range to it
+  and set `external-ip` to the public address. Chirp's template uses a narrow
+  range, `49160–49459/udp`, so the forwarding stays small.
 - **coturn fits in the same Proxmox container** as the relay if that
   container has a public address. Install it with `apt install coturn`. A
   separate container keeps the TURN bandwidth apart from the relay and is
@@ -717,36 +718,56 @@ why, and gives a coturn configuration. Some notes for these deployments:
 - **TURN carries every byte of a relayed session.** Size the container's
   network accordingly. The relay itself does not need it.
 
-### Fabrintek's network: STUN only, for now
+### Fabrintek's network: STUN and TURN
 
 A Chirp given no relay uses `relay.usechirp.app` and the STUN server
-`stun:relay.usechirp.app:3478` (`cmd/chirp`, `withDefaults`). That server is
-coturn in STUN-only mode, from [`deploy/coturn/`](../deploy/coturn/):
-`turnserver.conf` answers binding requests and ignores every TURN request,
-and `install.sh` installs it, starts it and checks that it answers.
+`stun:relay.usechirp.app:3478` (`cmd/chirp`, `withDefaults`). The same coturn
+relays sessions that cannot connect directly: when one side is behind a
+symmetric or carrier-grade NAT and the other's NAT lets in only replies from
+the exact port it sent to, or when both are behind such NATs (barahn/chirp#151).
+It is installed from [`deploy/coturn/`](../deploy/coturn/):
 
-In the reference deployment it runs alongside the proxy container, where the node's forwards
-land. The name is the relay's, a DNS-only record to the node's public address.
-Any perimeter gateway forwards port 3478 (both UDP and TCP) to the service container:
+```bash
+./install.sh --capacity-mbps 50 --external-ip PUBLIC/PRIVATE
+```
+
+- `turnserver.conf` is a template. `install.sh` fills it in, writes
+  `/etc/turnserver.conf` readable only by root and coturn, starts coturn and
+  checks that it answers STUN.
+- `--capacity-mbps` is what the whole server may relay: about half of the
+  uplink's measured upload floor, not its peak or its contract, since the relay
+  and everything else on the link share it. One allocation is capped at
+  10 Mbit/s, above VP8's ceiling.
+- `--external-ip` is the public address and the machine's own, when the machine
+  sits behind NAT.
+- The shared secret is created in `/etc/coturn/chirp-turn.secret` if it is not
+  there. Copy it to the relay's machine (mode 600, owned by the relay's user),
+  and give the relay `CHIRP_RELAY_TURN_SECRET_FILE` and
+  `CHIRP_RELAY_TURN_URLS`, for example
+  `turn:relay.example.org:3478?transport=udp,turn:relay.example.org:3478?transport=tcp`.
+  Only owners get credentials, from the relay, five minutes each
+  ([`docs/stun-turn.md`](stun-turn.md), *Credentials*).
+
+In the reference deployment it runs alongside the proxy container, where the
+node's forwards land. The name is the relay's, a DNS-only record to the node's
+public address. Every NAT layer in front forwards these to the service
+container:
 
 | Port | Protocol | Purpose |
 | --- | --- | --- |
-| `3478` | UDP, TCP | STUN binding requests |
+| `3478` | UDP, TCP | STUN, and TURN's requests |
+| `49160–49459` | UDP | TURN's relay range, two ports per relayed session |
 
 From outside, `turnutils_stunclient relay.usechirp.app` prints the address it
-was seen from.
+was seen from. A relayed allocation needs a credential from the relay, so
+checking TURN from outside takes one; the TURN checks proposed in
+[`status-page-proposal.md`](status-page-proposal.md), *Conformance*, are not
+built yet.
 
-The relay hands out per-session TURN credentials when it is given
-`-turn-secret-file` and `-turn-urls` (barahn/chirp#222;
-[`docs/stun-turn.md`](stun-turn.md), *Credentials*). One credential built into
-every binary would instead let anyone who unpacks one relay through the node.
-Until Chirps ask for them (barahn/chirp#223, #224) and the reference node's
-coturn checks them (barahn/chirp#225), two Chirps do not connect when one is
-behind a symmetric or carrier-grade NAT and the other's NAT lets in only
-replies from the exact port it sent to, or when both are behind such NATs. The
-owner can still allow the session, but the helper gets no picture
-(barahn/chirp#151). [`network-paths-proposal.md`](network-paths-proposal.md),
-part 1, has the design.
+When two Chirps use TURN, they both relay through this coturn, so it sends to
+its own public address: the node's gateway must allow that hairpin.
+[`network-paths-proposal.md`](network-paths-proposal.md), part 1, has the
+design.
 
 ## Operations
 
