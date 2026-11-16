@@ -271,6 +271,7 @@ docs/product-model.md
 docs/relay.md
 docs/release.md
 docs/rendezvous-proposal.md
+docs/signed-relay-list-proposal.md
 docs/status-page-proposal.md
 docs/status-service.md
 docs/stun-turn.md
