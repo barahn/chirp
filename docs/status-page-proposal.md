@@ -305,7 +305,14 @@ An issue never states the version, only that the node is behind.
 
 The status service publishes `network.json` at
 `https://status.usechirp.app/v1/network.json`: the active, conforming members,
-signed with an ed25519 key whose public half is compiled into Chirp.
+signed with an ed25519 key whose public half is compiled into Chirp. The
+same workflow also signs it keyless with Sigstore, so every list published is
+recorded in Rekor's public transparency log, where anyone can audit it. Only
+the list is recorded there; Chirp and the nodes record nothing. How it is
+signed, by which identity, and how a Chirp verifies it and treats an expired
+or older list, is in
+[`signed-relay-list-proposal.md`](signed-relay-list-proposal.md), accepted
+by the maintainer on 2026-11-16.
 
 - With `-network public`, a Chirp takes its lookup node, Nostr relays and TURN
   servers from that list, and checks the signature first.
@@ -427,8 +434,11 @@ the private mode's path.
    the `main` ruleset, or keeps a maintainer's review.
 3. The thresholds: 95 % uptime over a 30-day probation; 7 days of grace
    after a security release; 90 days suspended before removal.
-4. Who holds the status service's signing key, and how it is rotated. A Chirp
-   release pins the list key, so rotating it needs a release.
+4. Who holds the status service's signing key, and how it is rotated.
+   Answered in [`signed-relay-list-proposal.md`](signed-relay-list-proposal.md):
+   the key lives only in a GitHub environment that the list workflow on
+   `main` may use, rotation still needs a release, and a stolen key's lists
+   are visible in Rekor rather than silent.
 5. Whether operators must state the jurisdiction they run in, beyond a region.
 6. Whether a public node keeps the owner's socket. With it, the node knows
    which owners are running, from when and for how long, through a live

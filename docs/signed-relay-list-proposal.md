@@ -1,6 +1,6 @@
 # Proposal: signing the public relay list with Sigstore
 
-**Status:** proposal, not decided. Nothing here is built, and nothing here
+**Status:** design accepted by the maintainer on 2026-11-16 (barahn/chirp#242). Nothing here is built, and nothing here
 changes a workflow. It is a design for phase 6 of
 [`status-page-proposal.md`](status-page-proposal.md) (*Phases*), offered as
 an answer to that document's open question 4: who holds the status service's
