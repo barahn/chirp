@@ -7,12 +7,18 @@ an answer to that document's open question 4: who holds the status service's
 signing key, and how it is rotated.
 
 That proposal's section *The signed list* says the list is "signed with an
-ed25519 key whose public half is compiled into Chirp". This document proposes
-replacing that key with Sigstore keyless signing: `cosign sign-blob` in a
-GitHub Actions workflow, its certificate issued by Fulcio against the
-workflow's OIDC identity, and the signature recorded in Rekor. If the
+ed25519 key whose public half is compiled into Chirp". Nothing of it is built
+yet: the only ed25519 key in the code is phase 4's node key (`node/node.go`).
+
+This document proposes keeping that ed25519 signature as what Chirp checks,
+and adding a second, Sigstore keyless signature over the same bytes:
+`cosign sign-blob` in a GitHub Actions workflow, its certificate issued by
+Fulcio against the workflow's OIDC identity, and the signature recorded in
+Rekor. The first protects clients; the second makes every list ever signed
+publicly auditable. Why both, and why not keyless alone, is in
+[Which signature Chirp checks](#which-signature-chirp-checks). If the
 maintainer accepts it, *The signed list* and open question 4 change to point
-here; if not, this document records why the ed25519 key was kept.
+here.
 
 It also records, deliberately, why the same mechanism must never be used for
 Chirp's sessions (see [Where transparency would be a leak](#where-transparency-would-be-a-leak)).
@@ -40,6 +46,72 @@ What it costs is a dependency on Sigstore's public-good infrastructure at the
 moment of *signing* (not of verifying), and a verification policy that has to
 be written carefully, because it, and not the signature, is the security
 mechanism.
+
+## Which signature Chirp checks
+
+Three designs were compared.
+
+**ed25519 alone**, as the status proposal has it. Chirp verifies with
+`crypto/ed25519` from Go's standard library: no new dependency, nothing to
+refresh, a few lines of code. Its weakness is the key. Whoever steals it can
+sign a list and serve it to chosen clients only, and nobody else would ever
+see that list. Rotation after a theft needs a release, and older Chirps trust
+the stolen key until they are updated.
+
+**Keyless alone.** No key to steal, and every list is in Rekor. But Chirp
+would have to verify a Sigstore bundle: an X.509 chain to Fulcio, the
+certificate's identity extensions, Rekor's signed entry timestamp or
+inclusion proof, and the CT log's SCT. Done with
+[sigstore-go](https://github.com/sigstore/sigstore-go), that is possible
+offline (see [3](#3-how-chirp-verifies-and-what-it-does-when-that-fails)),
+but `pkg/verify`, `pkg/root` and `pkg/bundle` pull in about 340 packages
+from outside the standard library (`go list -deps`, sigstore-go at
+`787fb87`, 2026-11-12): TUF, Rekor's and the timestamp authority's clients,
+go-openapi, OpenTelemetry, protobuf and parts of `k8s.io`. Chirp's whole
+`go.mod` lists about 80 modules today. For a client whose job is a remote
+session, that is a large addition to what has to be trusted, patched and
+licence-checked, for one file fetched every few hours. Writing a minimal
+bundle verifier by hand instead would avoid the dependencies but put
+hand-written certificate and log-proof parsing into Chirp, which is the
+kind of code that is easy to get subtly wrong.
+
+The trust also moves rather than vanishes: a list is then as safe as GitHub's
+OIDC issuer, Fulcio's CA and the protection of one branch, and Sigstore's
+roots rotate on their own schedule, so an embedded root ages and needs a
+refresh path of its own.
+
+**Both, which this document proposes.** The workflow signs the canonical list
+twice: with an ed25519 key Chirp pins, and keyless, which logs it to Rekor.
+Chirp checks only the ed25519 signature, with the standard library. Anyone
+else — the project, operators, an independent monitor — checks the Sigstore
+bundle and watches Rekor for the workflow's identity.
+
+This is the most secure of the three for this project:
+
+- Clients gain no dependency and no new code beyond what the ed25519 design
+  already needed.
+- A stolen ed25519 key alone cannot produce a list that the published,
+  logged lists match. A targeted list exists only on the clients it was
+  served to, and any one of them, or a monitor fetching through many
+  vantage points, can show it is missing from Rekor. That turns a silent
+  compromise into a detectable one. It does not prevent it, which is the
+  honest limit of this design.
+- Compromising GitHub's OIDC or Fulcio alone signs nothing a Chirp accepts.
+- The ed25519 key lives only as a secret of a GitHub environment that only
+  the list workflow on `main` may use, as the macOS signing key does in
+  `release.yml`'s `release` environment. It never sits on the status
+  service's host.
+
+A later step, if the maintainer wants detection turned into prevention, is
+for Chirp to also require Rekor's signed entry timestamp over the list. That
+is one ECDSA signature over a canonical log entry, verifiable with the
+standard library, without the rest of a bundle. It is left out here because
+it is still hand-written parsing of Rekor's format, and the gain over
+detection should be weighed against that first.
+
+Where the rest of this document speaks of a Chirp verifying the bundle, it
+describes what an auditor does, and what Chirp would do only if keyless
+alone were chosen.
 
 ## 1. What is signed
 
@@ -124,7 +196,8 @@ come from the service. It comes from a scheduled workflow that:
    `GET /v1/servers` the page reads);
 3. builds the canonical list, with a `serial` one above the last published
    one and an `expires` a fixed interval ahead;
-4. signs it with `cosign sign-blob --bundle network.sigstore.json`;
+4. signs it with the ed25519 key (`network.json.sig`) and keyless with
+   `cosign sign-blob --bundle network.sigstore.json`;
 5. publishes both files where the service serves `/v1/network.json`.
 
 It runs on a schedule (proposed: every six hours) and when `servers.json`
@@ -156,8 +229,9 @@ Two consequences should be said plainly:
 
 ### The verification policy
 
-A Chirp accepts a list only if its bundle verifies and the certificate in it
-says:
+A verifier — a monitor, an operator, or Chirp itself if keyless alone were
+chosen — accepts a list's bundle only if it verifies and the certificate in
+it says:
 
 | Field | Required value |
 |---|---|
@@ -186,9 +260,12 @@ pin its new SAN and IDs in the release that introduces `-network public`.
 If a move ever has to happen later, the release before it accepts both
 identities, and the one after drops the old.
 
-Rotation, which open question 4 asks about, mostly disappears: there is no
-key to rotate. What is pinned is a workflow path and two numbers, and they
-change only when the maintainer moves or renames something on purpose.
+Rotation, which open question 4 asks about, splits in two. The keyless side
+has no key: what is pinned is a workflow path and two numbers, which change
+only when the maintainer moves or renames something on purpose. The ed25519
+key still rotates by release, as the status proposal says; what changes is
+that a theft is now visible in Rekor rather than silent, so the reason to
+rotate is known when it happens.
 
 ## 3. How Chirp verifies, and what it does when that fails
 
@@ -207,24 +284,41 @@ log "without actually checking the log itself"
 
 So verification needs the bundle, the list, and Sigstore's trusted root (the
 Fulcio CA certificates and the Rekor and CT log public keys). It does not
-need Fulcio or Rekor to be reachable. Chirp would verify in-process with
-[sigstore-go](https://github.com/sigstore/sigstore-go), whose verifier takes
-the trusted material, a requirement for transparency-log and timestamp
-evidence, and a certificate-identity policy. Its documented examples load the
-trusted root over TUF from Sigstore's public-good repository; it also supports
-a custom trusted root in the `sigstore_trustroot` format.
+need Fulcio or Rekor to be reachable. This was confirmed in sigstore-go's
+source (commit `787fb87`, 2026-11-12), not only in its documentation:
 
-Chirp embeds a trusted root in each release and refreshes it over TUF when it
-can. **To be confirmed before implementation:** the exact sigstore-go call
-that loads a root from an embedded file and verifies with no network access at
-all, and whether the cosign CLI offers an equivalent for people verifying by
-hand. The documentation read for this proposal shows the shape but not that
-call; the claim above rests on the bundle format, not on a tested path.
+- `root.NewTrustedRootFromJSON(bytes)` builds the trusted material from a
+  `trusted_root.json` held in memory, so it can come from `go:embed`. Only
+  `FetchTrustedRoot` and `NewLiveTrustedRoot` go through TUF.
+- `verify.NewVerifier(root, verify.WithTransparencyLog(1),
+  verify.WithObserverTimestamps(1), verify.WithSignedCertificateTimestamps(1))`
+  checks the log entry from the bundle itself: for Rekor v1 entries,
+  `tlog.VerifyInclusion` checks the signed entry timestamp and inclusion
+  proof against the log's key in the root; for Rekor v2 entries, the
+  checkpoint is checked as a signed note with the log's key, using only the
+  log's host name from the root. None of `pkg/verify` imports `net/http`.
+- `WithObserverTimestamps` makes the log's timestamp, not the clock, the time
+  at which the short-lived certificate is checked, which is what lets an
+  expired certificate verify. `WithCurrentTime` exists and its own comment
+  says it must not be used with short-lived certificates.
+- The identity policy is `verify.NewCertificateIdentity(san, issuer,
+  certificate.Extensions{SourceRepositoryIdentifier: …,
+  SourceRepositoryOwnerIdentifier: …})`, which compares the extensions at
+  OIDs `1.3.6.1.4.1.57264.1.15` and `.17` as well as SAN and issuer.
 
-`sigstore-go` is Apache-2.0, which the licence gate accepts
-([`CONTRIBUTING.md`](../CONTRIBUTING.md), *What is enforced today*). It is a
-substantial new dependency for Chirp, and adding it is part of what this
-proposal asks the maintainer to decide.
+What was not run is an end-to-end test with the network cut; that belongs to
+the implementation. For people verifying by hand, `cosign verify-blob
+--bundle` with `--certificate-identity` and `--certificate-oidc-issuer` is
+the documented command; which flags make the cosign CLI use a local trusted
+root instead of TUF was not confirmed.
+
+Under the design proposed here, this path is the auditors', and Chirp checks
+the ed25519 signature. sigstore-go is Apache-2.0, which the licence gate
+accepts ([`CONTRIBUTING.md`](../CONTRIBUTING.md), *What is enforced today*),
+and no rule of the repository forbids third-party packages: the rules are a
+permissive licence, dependencies pointing inwards
+([`ECOSYSTEM.md`](../ECOSYSTEM.md)), and pinning. Its weight is the reason
+it stays out of the client, not a rule.
 
 ### Freshness: rollback and replay
 
@@ -324,7 +418,8 @@ hashing over the node keys in the signed list; it is not decided.
 **Can be decided now**, because none of it depends on how a code finds its
 node:
 
-- Whether to use Sigstore keyless signing instead of a pinned ed25519 key.
+- Whether to sign twice (ed25519 for Chirp, keyless for the log), as
+  proposed, or with one of the two alone.
 - The signing identity: which repository, which workflow file, which
   trigger, and the order with the move to `chirp-remote`.
 - The verification policy, exact match on issuer, SAN and repository IDs.
@@ -347,10 +442,9 @@ node:
 
 **Also open, and not blocked:**
 
-- Exactly how sigstore-go verifies offline against an embedded root, to be
-  confirmed in its code and tests before anyone writes the client side.
-- How Chirp refreshes the embedded Sigstore trusted root between releases,
-  and how long it trusts one that it could not refresh.
+- Whether Chirp should later also require Rekor's signed entry timestamp
+  (see [Which signature Chirp checks](#which-signature-chirp-checks)).
+- Who runs the monitor that compares served lists with Rekor, and from where.
 - Signing depends on Sigstore's public-good Fulcio and Rekor being up when
   the workflow runs. An outage delays a new list; the seven-day expiry is
   meant to absorb that.
