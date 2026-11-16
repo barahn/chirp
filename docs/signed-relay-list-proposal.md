@@ -23,6 +23,23 @@ here.
 It also records, deliberately, why the same mechanism must never be used for
 Chirp's sessions (see [Where transparency would be a leak](#where-transparency-would-be-a-leak)).
 
+## What "log" means here, and what it does not
+
+In this document, *the log* is always Rekor: Sigstore's public, append-only
+transparency log. What goes into it is one entry per **relay list** the
+project publishes — the list's hash, the signature, and the identity of the
+workflow that signed it. The project's own workflow writes it; nothing else
+does.
+
+Nothing about people goes into it. Chirp writes nothing to Rekor and records
+nothing about its sessions, its users or its lookups. Relays write nothing to
+it either, and keep no record of lookups, as *What a node still sees* and the
+operators' pledges already require. Where this document says Chirp "requires
+the log", it means only that Chirp, before trusting a list, checks a proof
+that this list was published there, the way it checks a signature. Checking
+that proof is a read of data shipped with the list; it reveals nothing about
+the Chirp doing it.
+
 ## Why consider it at all
 
 A long-lived ed25519 key has to live somewhere. On the status service's host
@@ -104,9 +121,9 @@ This is the most secure of the three for this project:
 
 A later step is for Chirp to also require proof that the list is in Rekor.
 It is planned, not part of phase 6's first version; see
-[Requiring the log in Chirp](#requiring-the-log-in-chirp).
+[Chirp requiring proof of publication](#chirp-requiring-proof-of-publication).
 
-### Requiring the log in Chirp
+### Chirp requiring proof of publication
 
 **What it would add.** Chirp would accept a list only if it also carries
 proof that Rekor has logged it, bound to the list's hash and to the pinned
@@ -401,7 +418,7 @@ should be stated to users rather than hidden.
 | Situation | Chirp's behaviour |
 |---|---|
 | New list verifies, serial higher | Use it, store it as the last good list. |
-| New list fails verification, or wrong identity, or lower serial | Discard it, keep the last good list, say so in the log. Never use the failed one, not even partly. |
+| New list fails verification, or wrong identity, or lower serial | Discard it, keep the last good list, and tell the user. Never use the failed one, not even partly. |
 | Cannot fetch, last good list unexpired | Keep using the last good list. |
 | Last good list expired, nothing newer | Stop using the public network. Say that the public list has expired and that `-relay`, `-nostr` and `CHIRP_ICE` still work. |
 | `-relay`, `-nostr` or `CHIRP_ICE` set | Those win, as *The signed list* already says. No list is fetched for what they cover. |
@@ -496,9 +513,9 @@ node:
 
 **Also open, and not blocked:**
 
-- Requiring the log in Chirp: which Rekor version, the verifier's
+- Chirp requiring proof of publication: which Rekor version, the verifier's
   specification, and how the log key is refreshed
-  (see [Requiring the log in Chirp](#requiring-the-log-in-chirp)).
+  (see [Chirp requiring proof of publication](#chirp-requiring-proof-of-publication)).
 - Who runs the monitor that compares served lists with Rekor, and from where.
 - Signing depends on Sigstore's public-good Fulcio and Rekor being up when
   the workflow runs. An outage delays a new list; the seven-day expiry is
