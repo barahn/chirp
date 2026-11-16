@@ -75,14 +75,16 @@ trap 'rm -rf "$TMPDIR_WORK"' EXIT
 SNAPSHOT="$TMPDIR_WORK/snapshot.md"
 
 # Direct requirements, straight out of go.mod: no module cache, no network, so
-# this works in a CI job that has not run `go mod download` yet.
+# this works in a CI job that has not run `go mod download` yet. Paths only:
+# with versions, every Dependabot bump would fail the snapshot check, and the
+# versions are in go.mod anyway. A major bump still shows, in the path.
 list_direct_deps() {
 	awk '
 		/^require \(/           { in_block = 1; next }
 		in_block && /^\)/       { in_block = 0; next }
 		/\/\/ indirect/        { next }
-		in_block && NF >= 2     { printf "- `%s` %s\n", $1, $2 }
-		!in_block && /^require / && NF >= 3 { printf "- `%s` %s\n", $2, $3 }
+		in_block && NF >= 2     { printf "- `%s`\n", $1 }
+		!in_block && /^require / && NF >= 3 { printf "- `%s`\n", $2 }
 	' go.mod
 }
 
