@@ -102,12 +102,66 @@ This is the most secure of the three for this project:
   `release.yml`'s `release` environment. It never sits on the status
   service's host.
 
-A later step, if the maintainer wants detection turned into prevention, is
-for Chirp to also require Rekor's signed entry timestamp over the list. That
-is one ECDSA signature over a canonical log entry, verifiable with the
-standard library, without the rest of a bundle. It is left out here because
-it is still hand-written parsing of Rekor's format, and the gain over
-detection should be weighed against that first.
+A later step is for Chirp to also require proof that the list is in Rekor.
+It is planned, not part of phase 6's first version; see
+[Requiring the log in Chirp](#requiring-the-log-in-chirp).
+
+### Requiring the log in Chirp
+
+**What it would add.** Chirp would accept a list only if it also carries
+proof that Rekor has logged it, bound to the list's hash and to the pinned
+ed25519 key. Two things follow:
+
+- **Every list a Chirp accepts is public.** Today a stolen key can sign a
+  list served to a few clients only, and it surfaces only if one of them
+  reports it. With the proof required, a thief has to log the list first,
+  and a monitor watching the log sees it within minutes.
+- **A trusted time.** The log's integration time is a clock the signer does
+  not control, so `issued` can be checked against it, and a list dated in the
+  future cannot outlive its `expires`.
+
+**What it would not add.** It is not prevention. Rekor accepts entries
+signed with any key, so a thief can log a forged list and clients will accept
+it. The gain is that the attack becomes certainly public and dated, instead
+of possibly invisible. That is much stronger than detection by chance, and
+weaker than refusing the first use.
+
+**What it costs depends on Rekor's version.** An earlier draft of this
+document called it "one ECDSA signature". That holds only for Rekor v1:
+
+- **Rekor v1** gives a *signed entry timestamp*: an ECDSA signature by the
+  log over the canonical entry, its integration time, index and log ID.
+  The standard library verifies it, but Chirp would still parse the
+  `hashedrekord` body to check it names the list's hash and the ed25519 key.
+- **Rekor v2** (rekor-tiles) gives no signed entry timestamp. In
+  sigstore-go (`pkg/verify/tlog.go`, `787fb87`), a v2 entry is checked by a
+  Merkle inclusion proof against a checkpoint signed as a note. That is
+  still possible with the standard library and `golang.org/x/mod/sumdb/note`,
+  but it is more code that parses another project's formats, and the
+  integration time then comes from the checkpoint or a timestamp authority,
+  not from the entry.
+- **Either way**, Chirp pins the log's public key. Rekor's keys rotate and
+  the log moves to new shards, so the pinned key ages and needs its own
+  update path, or a release.
+- **Availability:** if Rekor is down, no new list is signed. The keyless
+  signature already depends on that, and the seven-day `expires` absorbs it.
+
+**Plan, before any code.**
+
+1. Find out which Rekor version the public-good instance will serve when
+   phase 6 is implemented, and whether v1 will still be written to. The
+   choice of format follows from that, not from what is easier today.
+2. Write the verifier's specification here, for that version only: the
+   exact bytes checked, the fields compared, the failure for each mismatch.
+3. Decide how the pinned log key is refreshed, and how long Chirp trusts one
+   it could not refresh, with the same fail-closed rule as an expired list.
+4. Build the test vectors first (entries produced by the real workflow, and
+   mutated ones that must fail), then the verifier, test-first.
+5. Ship it after phase 6's first version, as a separate release: until then
+   Chirp checks the ed25519 signature and the monitor watches the log.
+
+Phase 6 itself waits on finding the right node, so there is time for steps 1
+to 3 without delaying anything.
 
 Where the rest of this document speaks of a Chirp verifying the bundle, it
 describes what an auditor does, and what Chirp would do only if keyless
@@ -442,8 +496,9 @@ node:
 
 **Also open, and not blocked:**
 
-- Whether Chirp should later also require Rekor's signed entry timestamp
-  (see [Which signature Chirp checks](#which-signature-chirp-checks)).
+- Requiring the log in Chirp: which Rekor version, the verifier's
+  specification, and how the log key is refreshed
+  (see [Requiring the log in Chirp](#requiring-the-log-in-chirp)).
 - Who runs the monitor that compares served lists with Rekor, and from where.
 - Signing depends on Sigstore's public-good Fulcio and Rekor being up when
   the workflow runs. An outage delays a new list; the seven-day expiry is
