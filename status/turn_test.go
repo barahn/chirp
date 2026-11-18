@@ -200,8 +200,14 @@ func TestCheckTURNSucceedsWhenServerKeepsRelayingAfterExpiry(t *testing.T) {
 		t.Fatalf("CheckTURN: %v", err)
 	}
 	s := (&Prober{}).ProbeTURN(context.Background(), cfg)
-	if !s.OK || s.Err != "" || s.Latency <= 0 {
-		t.Errorf("ProbeTURN: %+v", s)
+	if !s.OK {
+		t.Errorf("ProbeTURN OK = false, err = %q", s.Err)
+	}
+	if s.Err != "" {
+		t.Errorf("ProbeTURN Err = %q, want empty", s.Err)
+	}
+	if s.Latency <= 0 {
+		t.Errorf("ProbeTURN Latency = %v, want > 0", s.Latency)
 	}
 }
 

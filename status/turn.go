@@ -54,6 +54,13 @@ type TURNConfig struct {
 	PeerAddr net.Addr
 }
 
+func defaultDuration(d, def time.Duration) time.Duration {
+	if d > 0 {
+		return d
+	}
+	return def
+}
+
 func (c TURNConfig) realm() string {
 	if c.Realm != "" {
 		return c.Realm
@@ -61,26 +68,9 @@ func (c TURNConfig) realm() string {
 	return defaultTURNRealm
 }
 
-func (c TURNConfig) lifetime() time.Duration {
-	if c.Lifetime > 0 {
-		return c.Lifetime
-	}
-	return defaultTURNLifetime
-}
-
-func (c TURNConfig) grace() time.Duration {
-	if c.Grace > 0 {
-		return c.Grace
-	}
-	return defaultTURNGrace
-}
-
-func (c TURNConfig) timeout() time.Duration {
-	if c.Timeout > 0 {
-		return c.Timeout
-	}
-	return ProbeTimeout
-}
+func (c TURNConfig) lifetime() time.Duration { return defaultDuration(c.Lifetime, defaultTURNLifetime) }
+func (c TURNConfig) grace() time.Duration    { return defaultDuration(c.Grace, defaultTURNGrace) }
+func (c TURNConfig) timeout() time.Duration  { return defaultDuration(c.Timeout, ProbeTimeout) }
 
 // CheckSTUN verifies that addr answers a STUN Binding Request over both UDP
 // and TCP (docs/status-page-proposal.md, Conformance).
@@ -88,21 +78,34 @@ func CheckSTUN(ctx context.Context, addr string) error {
 	if addr == "" {
 		return errors.New("stun: empty address")
 	}
-	if err := checkSTUNUDP(ctx, addr); err != nil {
+	if err := checkSTUNConn(ctx, addr, dialSTUNUDP); err != nil {
 		return fmt.Errorf("stun udp: %w", err)
 	}
-	if err := checkSTUNTCP(ctx, addr); err != nil {
+	if err := checkSTUNConn(ctx, addr, dialSTUNTCP); err != nil {
 		return fmt.Errorf("stun tcp: %w", err)
 	}
 	return nil
 }
 
-func checkSTUNUDP(ctx context.Context, addr string) error {
+func dialSTUNUDP(ctx context.Context, _ string) (net.PacketConn, error) {
+	var lc net.ListenConfig
+	return lc.ListenPacket(ctx, "udp4", ":0")
+}
+
+func dialSTUNTCP(ctx context.Context, addr string) (net.PacketConn, error) {
+	var d net.Dialer
+	tcpConn, err := d.DialContext(ctx, "tcp", addr)
+	if err != nil {
+		return nil, err
+	}
+	return turn.NewSTUNConn(tcpConn), nil
+}
+
+func checkSTUNConn(ctx context.Context, addr string, dial func(context.Context, string) (net.PacketConn, error)) error {
 	ctx, cancel := context.WithTimeout(ctx, ProbeTimeout)
 	defer cancel()
 
-	var lc net.ListenConfig
-	conn, err := lc.ListenPacket(ctx, "udp4", ":0")
+	conn, err := dial(ctx, addr)
 	if err != nil {
 		return err
 	}
@@ -111,22 +114,20 @@ func checkSTUNUDP(ctx context.Context, addr string) error {
 	return sendSTUNBinding(ctx, addr, conn)
 }
 
-func checkSTUNTCP(ctx context.Context, addr string) error {
-	ctx, cancel := context.WithTimeout(ctx, ProbeTimeout)
-	defer cancel()
-
-	var d net.Dialer
-	tcpConn, err := d.DialContext(ctx, "tcp", addr)
+func newTURNClient(cfg *turn.ClientConfig) (*turn.Client, error) {
+	c, err := turn.NewClient(cfg)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	defer func() { _ = tcpConn.Close() }()
-
-	return sendSTUNBinding(ctx, addr, turn.NewSTUNConn(tcpConn))
+	if err := c.Listen(); err != nil {
+		c.Close()
+		return nil, err
+	}
+	return c, nil
 }
 
 func sendSTUNBinding(ctx context.Context, addr string, conn net.PacketConn) error {
-	c, err := turn.NewClient(&turn.ClientConfig{
+	c, err := newTURNClient(&turn.ClientConfig{
 		STUNServerAddr: addr,
 		Conn:           conn,
 		RTO:            200 * time.Millisecond,
@@ -135,9 +136,6 @@ func sendSTUNBinding(ctx context.Context, addr string, conn net.PacketConn) erro
 		return err
 	}
 	defer c.Close()
-	if err := c.Listen(); err != nil {
-		return err
-	}
 
 	done := make(chan error, 1)
 	go func() {
@@ -189,7 +187,7 @@ func allocateTURN(ctx context.Context, cfg TURNConfig, lifetime, timeout time.Du
 		return nil, nil, err
 	}
 
-	c, err := turn.NewClient(&turn.ClientConfig{
+	c, err := newTURNClient(&turn.ClientConfig{
 		STUNServerAddr: cfg.Addr,
 		TURNServerAddr: cfg.Addr,
 		Username:       user,
@@ -199,11 +197,6 @@ func allocateTURN(ctx context.Context, cfg TURNConfig, lifetime, timeout time.Du
 		RTO:            200 * time.Millisecond,
 	})
 	if err != nil {
-		_ = conn.Close()
-		return nil, nil, err
-	}
-	if err := c.Listen(); err != nil {
-		c.Close()
 		_ = conn.Close()
 		return nil, nil, err
 	}
