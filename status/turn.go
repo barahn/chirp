@@ -108,30 +108,7 @@ func checkSTUNUDP(ctx context.Context, addr string) error {
 	}
 	defer func() { _ = conn.Close() }()
 
-	c, err := turn.NewClient(&turn.ClientConfig{
-		STUNServerAddr: addr,
-		Conn:           conn,
-		RTO:            200 * time.Millisecond,
-	})
-	if err != nil {
-		return err
-	}
-	defer c.Close()
-	if err := c.Listen(); err != nil {
-		return err
-	}
-
-	done := make(chan error, 1)
-	go func() {
-		_, err := c.SendBindingRequest()
-		done <- err
-	}()
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case err := <-done:
-		return err
-	}
+	return sendSTUNBinding(ctx, addr, conn)
 }
 
 func checkSTUNTCP(ctx context.Context, addr string) error {
@@ -145,9 +122,13 @@ func checkSTUNTCP(ctx context.Context, addr string) error {
 	}
 	defer func() { _ = tcpConn.Close() }()
 
+	return sendSTUNBinding(ctx, addr, turn.NewSTUNConn(tcpConn))
+}
+
+func sendSTUNBinding(ctx context.Context, addr string, conn net.PacketConn) error {
 	c, err := turn.NewClient(&turn.ClientConfig{
 		STUNServerAddr: addr,
-		Conn:           turn.NewSTUNConn(tcpConn),
+		Conn:           conn,
 		RTO:            200 * time.Millisecond,
 	})
 	if err != nil {
@@ -183,17 +164,30 @@ func CheckTURN(ctx context.Context, cfg TURNConfig) error {
 	}
 
 	lifetime := cfg.lifetime()
+	timeout := cfg.timeout()
+	relay, cleanup, err := allocateTURN(ctx, cfg, lifetime, timeout)
+	if err != nil {
+		return err
+	}
+	defer cleanup()
+
+	if err := waitWithContext(ctx, lifetime+cfg.grace()); err != nil {
+		return err
+	}
+	return relayProbe(ctx, relay, cfg.PeerAddr, timeout)
+}
+
+func allocateTURN(ctx context.Context, cfg TURNConfig, lifetime, timeout time.Duration) (net.PacketConn, func(), error) {
 	user, pass, err := turnRESTCredential(cfg.Secret, time.Now().Add(lifetime))
 	if err != nil {
-		return fmt.Errorf("turn: mint credential: %w", err)
+		return nil, nil, fmt.Errorf("turn: mint credential: %w", err)
 	}
 
 	var lc net.ListenConfig
 	conn, err := lc.ListenPacket(ctx, "udp4", ":0")
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
-	defer func() { _ = conn.Close() }()
 
 	c, err := turn.NewClient(&turn.ClientConfig{
 		STUNServerAddr: cfg.Addr,
@@ -205,31 +199,41 @@ func CheckTURN(ctx context.Context, cfg TURNConfig) error {
 		RTO:            200 * time.Millisecond,
 	})
 	if err != nil {
-		return err
+		_ = conn.Close()
+		return nil, nil, err
 	}
-	defer c.Close()
 	if err := c.Listen(); err != nil {
-		return err
+		c.Close()
+		_ = conn.Close()
+		return nil, nil, err
 	}
 
-	timeout := cfg.timeout()
 	allocCtx, allocCancel := context.WithTimeout(ctx, timeout)
 	relay, err := c.AllocateWithContext(allocCtx)
 	allocCancel()
 	if err != nil {
-		return fmt.Errorf("turn allocate: %w", err)
+		c.Close()
+		_ = conn.Close()
+		return nil, nil, fmt.Errorf("turn allocate: %w", err)
 	}
-	defer func() { _ = relay.Close() }()
 
-	timer := time.NewTimer(lifetime + cfg.grace())
+	cleanup := func() {
+		_ = relay.Close()
+		c.Close()
+		_ = conn.Close()
+	}
+	return relay, cleanup, nil
+}
+
+func waitWithContext(ctx context.Context, d time.Duration) error {
+	timer := time.NewTimer(d)
 	defer timer.Stop()
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
 	case <-timer.C:
+		return nil
 	}
-
-	return relayProbe(ctx, relay, cfg.PeerAddr, timeout)
 }
 
 func relayProbe(ctx context.Context, relay net.PacketConn, peerAddr net.Addr, timeout time.Duration) error {

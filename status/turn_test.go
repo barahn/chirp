@@ -31,33 +31,19 @@ func startInProcessTURN(t *testing.T, auth turn.AuthHandler) string {
 	port := udpConn.LocalAddr().(*net.UDPAddr).Port
 	tcpLn, err := net.Listen("tcp4", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)))
 	if err != nil {
-		// Rare race on the same port; fall back to a dedicated TCP port if needed,
-		// though CheckSTUN tests a single addr over both UDP and TCP.
 		_ = udpConn.Close()
 		t.Fatalf("listen tcp on udp port %d: %v", port, err)
 	}
 
+	gen := &turn.RelayAddressGeneratorStatic{
+		RelayAddress: net.ParseIP("127.0.0.1"),
+		Address:      "127.0.0.1",
+	}
 	srv, err := turn.NewServer(turn.ServerConfig{
-		Realm:       defaultTURNRealm,
-		AuthHandler: auth,
-		PacketConnConfigs: []turn.PacketConnConfig{
-			{
-				PacketConn: udpConn,
-				RelayAddressGenerator: &turn.RelayAddressGeneratorStatic{
-					RelayAddress: net.ParseIP("127.0.0.1"),
-					Address:      "127.0.0.1",
-				},
-			},
-		},
-		ListenerConfigs: []turn.ListenerConfig{
-			{
-				Listener: tcpLn,
-				RelayAddressGenerator: &turn.RelayAddressGeneratorStatic{
-					RelayAddress: net.ParseIP("127.0.0.1"),
-					Address:      "127.0.0.1",
-				},
-			},
-		},
+		Realm:             defaultTURNRealm,
+		AuthHandler:       auth,
+		PacketConnConfigs: []turn.PacketConnConfig{{PacketConn: udpConn, RelayAddressGenerator: gen}},
+		ListenerConfigs:   []turn.ListenerConfig{{Listener: tcpLn, RelayAddressGenerator: gen}},
 	})
 	if err != nil {
 		_ = udpConn.Close()
@@ -85,7 +71,10 @@ func coturnLikeAuth(secret string) turn.AuthHandler {
 			return "", nil, false
 		}
 		exp, err := strconv.ParseInt(ts, 10, 64)
-		if err != nil || time.Now().Unix() > exp {
+		if err != nil {
+			return "", nil, false
+		}
+		if time.Now().Unix() > exp {
 			return "", nil, false
 		}
 		mac := hmac.New(sha1.New, []byte(secret))
@@ -95,6 +84,71 @@ func coturnLikeAuth(secret string) turn.AuthHandler {
 		seen[ra.Username] = key
 		return ra.Username, key, true
 	}
+}
+
+func coturnBinary(t *testing.T) string {
+	t.Helper()
+	if bin := os.Getenv("CHIRP_COTURN"); bin != "" {
+		return bin
+	}
+	if bin, err := exec.LookPath("turnserver"); err == nil {
+		return bin
+	}
+	if os.Getenv("CHIRP_REQUIRE_COTURN") != "" {
+		t.Fatal("coturn is required: set CHIRP_COTURN or put turnserver on PATH")
+	}
+	t.Skip("no coturn: set CHIRP_COTURN or put turnserver on PATH")
+	return ""
+}
+
+func freeUDPPort(t *testing.T) int {
+	t.Helper()
+	c, err := net.ListenPacket("udp4", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = c.Close() }()
+	return c.LocalAddr().(*net.UDPAddr).Port
+}
+
+func startCoturn(t *testing.T, secret string) string {
+	t.Helper()
+	bin := coturnBinary(t)
+	port := freeUDPPort(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	cmd := exec.CommandContext(ctx, bin,
+		"-n", "--no-cli", "--no-tls", "--no-dtls", "--fingerprint",
+		"--listening-ip=127.0.0.1", "--listening-port="+strconv.Itoa(port),
+		"--relay-ip=127.0.0.1", "--min-port=49201", "--max-port=49240",
+		"--allow-loopback-peers",
+		"--use-auth-secret", "--static-auth-secret="+secret, "--realm="+defaultTURNRealm,
+		"--log-file=stdout", "--simple-log",
+	)
+	cmd.Cancel = func() error { return cmd.Process.Signal(os.Interrupt) }
+	cmd.WaitDelay = 5 * time.Second
+	if err := cmd.Start(); err != nil {
+		cancel()
+		t.Fatalf("start coturn: %v", err)
+	}
+	t.Cleanup(func() {
+		cancel()
+		_ = cmd.Wait()
+	})
+	addr := net.JoinHostPort("127.0.0.1", strconv.Itoa(port))
+	waitForSTUNReady(t, addr)
+	return addr
+}
+
+func waitForSTUNReady(t *testing.T, addr string) {
+	t.Helper()
+	deadline := time.Now().Add(20 * time.Second)
+	for time.Now().Before(deadline) {
+		if err := CheckSTUN(context.Background(), addr); err == nil {
+			return
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	t.Fatalf("coturn at %s did not answer STUN", addr)
 }
 
 func TestCheckSTUN(t *testing.T) {
@@ -152,53 +206,7 @@ func TestCheckTURNSucceedsWhenServerKeepsRelayingAfterExpiry(t *testing.T) {
 }
 
 func TestCheckTURNAgainstCoturn(t *testing.T) {
-	bin := os.Getenv("CHIRP_COTURN")
-	if bin == "" {
-		var err error
-		bin, err = exec.LookPath("turnserver")
-		if err != nil {
-			if os.Getenv("CHIRP_REQUIRE_COTURN") != "" {
-				t.Fatal("coturn is required: set CHIRP_COTURN or put turnserver on PATH")
-			}
-			t.Skip("no coturn: set CHIRP_COTURN or put turnserver on PATH")
-		}
-	}
-
-	c, err := net.ListenPacket("udp4", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
-	}
-	port := c.LocalAddr().(*net.UDPAddr).Port
-	_ = c.Close()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	cmd := exec.CommandContext(ctx, bin,
-		"-n", "--no-cli", "--no-tls", "--no-dtls", "--fingerprint",
-		"--listening-ip=127.0.0.1", "--listening-port="+strconv.Itoa(port),
-		"--relay-ip=127.0.0.1", "--min-port=49201", "--max-port=49240",
-		"--allow-loopback-peers",
-		"--use-auth-secret", "--static-auth-secret="+testTURNSecret, "--realm="+defaultTURNRealm,
-		"--log-file=stdout", "--simple-log",
-	)
-	cmd.Cancel = func() error { return cmd.Process.Signal(os.Interrupt) }
-	cmd.WaitDelay = 5 * time.Second
-	if err := cmd.Start(); err != nil {
-		cancel()
-		t.Fatalf("start coturn: %v", err)
-	}
-	t.Cleanup(func() {
-		cancel()
-		_ = cmd.Wait()
-	})
-
-	addr := net.JoinHostPort("127.0.0.1", strconv.Itoa(port))
-	deadline := time.Now().Add(20 * time.Second)
-	for time.Now().Before(deadline) {
-		if err := CheckSTUN(context.Background(), addr); err == nil {
-			break
-		}
-		time.Sleep(200 * time.Millisecond)
-	}
+	addr := startCoturn(t, testTURNSecret)
 	if err := CheckSTUN(context.Background(), addr); err != nil {
 		t.Fatalf("CheckSTUN against coturn: %v", err)
 	}
