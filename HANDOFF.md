@@ -319,6 +319,8 @@ status/registry_test.go
 status/service.go
 status/service_test.go
 status/store.go
+status/turn.go
+status/turn_test.go
 status/uptime.go
 status/uptime_test.go
 ```
